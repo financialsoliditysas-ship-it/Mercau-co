@@ -65,6 +65,8 @@ const categoryTheme: Record<DirectoryCategory, { label: string; initials: string
   }
 };
 
+const FAVORITES_STORAGE_KEY = "mercau.favoriteBusinessIds";
+
 function normalize(value: string) {
   return value
     .toLowerCase()
@@ -263,11 +265,11 @@ function BottomNav() {
           <SearchIcon className="h-5 w-5" />
           Buscar
         </a>
-        <a href="#directorio" className="grid min-h-10 place-items-center rounded-xl">
+        <a href="#favoritos" className="grid min-h-10 place-items-center rounded-xl">
           <HeartIcon />
           Favoritos
         </a>
-        <a href="#inscripcion" className="grid min-h-10 place-items-center rounded-xl">
+        <a href="#cuenta" className="grid min-h-10 place-items-center rounded-xl">
           <MenuIcon />
           Mi cuenta
         </a>
@@ -287,10 +289,14 @@ function BusinessVisual({ business, compact = false }: { business: DirectoryBusi
 
 function BusinessCard({
   business,
-  onOpen
+  onOpen,
+  isFavorite,
+  onToggleFavorite
 }: {
   business: DirectoryBusiness;
   onOpen: (business: DirectoryBusiness) => void;
+  isFavorite: boolean;
+  onToggleFavorite: (business: DirectoryBusiness) => void;
 }) {
   const callPhone = phoneForCall(business.whatsapp);
   const hasWhatsapp = Boolean(normalizePhoneForColombia(business.whatsapp));
@@ -308,8 +314,14 @@ function BusinessCard({
             <button type="button" onClick={() => onOpen(business)} className="min-w-0 flex-1 text-left">
               <h3 className="line-clamp-2 text-sm font-black leading-tight text-[#1F2937] sm:text-base md:text-lg">{business.name}</h3>
             </button>
-            <button type="button" className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 hover:bg-[#FFF1F0] hover:text-[#D82016] sm:h-9 sm:w-9" aria-label="Guardar negocio">
-              <HeartIcon />
+            <button
+              type="button"
+              onClick={() => onToggleFavorite(business)}
+              className={`grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016] sm:h-9 sm:w-9 ${isFavorite ? "text-[#D82016]" : "text-slate-400"}`}
+              aria-label={isFavorite ? `Quitar ${business.name} de favoritos` : `Guardar ${business.name} en favoritos`}
+              aria-pressed={isFavorite}
+            >
+              <HeartIcon filled={isFavorite} />
             </button>
           </div>
 
@@ -366,10 +378,14 @@ function BusinessCard({
 
 function BusinessDetailModal({
   business,
-  onClose
+  onClose,
+  isFavorite,
+  onToggleFavorite
 }: {
   business: DirectoryBusiness;
   onClose: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: (business: DirectoryBusiness) => void;
 }) {
   const callPhone = phoneForCall(business.whatsapp);
   const url = businessUrl(business);
@@ -406,8 +422,14 @@ function BusinessDetailModal({
                 {business.neighborhood ? ` · ${business.neighborhood}` : ""}
               </p>
             </div>
-            <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#FFF1F0] text-[#D82016]" aria-label="Guardar negocio">
-              <HeartIcon />
+            <button
+              type="button"
+              onClick={() => onToggleFavorite(business)}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#FFF1F0] text-[#D82016]"
+              aria-label={isFavorite ? `Quitar ${business.name} de favoritos` : `Guardar ${business.name} en favoritos`}
+              aria-pressed={isFavorite}
+            >
+              <HeartIcon filled={isFavorite} />
             </button>
           </div>
 
@@ -514,6 +536,20 @@ export default function MercauDirectory() {
   const [selectedBusiness, setSelectedBusiness] = useState<DirectoryBusiness | null>(null);
   const [businesses, setBusinesses] = useState<DirectoryBusiness[]>([]);
   const [directoryStatus, setDirectoryStatus] = useState("Cargando negocios aprobados...");
+  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+
+    const storedFavorites = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+    if (!storedFavorites) return [];
+
+    try {
+      const parsed = JSON.parse(storedFavorites);
+      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+    } catch {
+      window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
+      return [];
+    }
+  });
 
   async function loadBusinesses() {
     setIsDirectoryLoading(true);
@@ -546,6 +582,10 @@ export default function MercauDirectory() {
     loadBusinesses();
     trackMetric({ type: "Visita", notes: "Home directorio" });
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
+  }, [favoriteIds]);
 
   useEffect(() => {
     const search = query.trim();
@@ -594,6 +634,27 @@ export default function MercauDirectory() {
       }),
     [filteredBusinesses]
   );
+
+  const favoriteBusinesses = useMemo(
+    () => businesses.filter((business) => favoriteIds.includes(business.id)),
+    [businesses, favoriteIds]
+  );
+
+  function toggleFavorite(business: DirectoryBusiness) {
+    setFavoriteIds((current) => {
+      const isFavorite = current.includes(business.id);
+      return isFavorite
+        ? current.filter((id) => id !== business.id)
+        : [...current, business.id];
+    });
+
+    trackMetric({
+      type: favoriteIds.includes(business.id) ? "Favorito eliminado" : "Favorito guardado",
+      businessId: business.id,
+      businessName: business.name,
+      category: business.category
+    });
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -649,8 +710,8 @@ export default function MercauDirectory() {
             <nav className="hidden items-center gap-2 text-sm font-black text-slate-700 md:flex">
               <a href="#directorio" className="rounded-xl px-4 py-2 hover:bg-slate-100">Explorar</a>
               <a href="#inscripcion" className="rounded-xl bg-[#D82016] px-4 py-2 text-white hover:bg-[#B91C1C]">Inscribir mi negocio</a>
-              <a href="#directorio" className="grid h-10 w-10 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016]" aria-label="Favoritos"><HeartIcon /></a>
-              <a href="#inscripcion" className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-100">Mi cuenta</a>
+              <a href="#favoritos" className="grid h-10 w-10 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016]" aria-label="Favoritos"><HeartIcon filled={favoriteIds.length > 0} /></a>
+              <a href="#cuenta" className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-100">Mi cuenta</a>
             </nav>
             <button type="button" className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-700 md:hidden" aria-label="Abrir menú">
               <MenuIcon />
@@ -852,7 +913,13 @@ export default function MercauDirectory() {
                 <div className="rounded-[2rem] bg-white p-6 text-center font-bold text-slate-600 shadow-soft">Cargando negocios...</div>
               ) : sortedBusinesses.length > 0 ? (
                 sortedBusinesses.map((business) => (
-                  <BusinessCard key={business.id} business={business} onOpen={setSelectedBusiness} />
+                  <BusinessCard
+                    key={business.id}
+                    business={business}
+                    onOpen={setSelectedBusiness}
+                    isFavorite={favoriteIds.includes(business.id)}
+                    onToggleFavorite={toggleFavorite}
+                  />
                 ))
               ) : (
                 <EmptyState
@@ -862,6 +929,76 @@ export default function MercauDirectory() {
                   onClearSearch={() => setQuery("")}
                 />
               )}
+            </div>
+          </div>
+        </section>
+
+        <section id="favoritos" className="mx-auto mt-8 max-w-7xl px-4 md:px-6">
+          <div className="rounded-[2rem] bg-white p-5 shadow-soft md:p-7">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-black uppercase tracking-normal text-[#D82016]">Favoritos</p>
+                <h2 className="mt-1 text-2xl font-black text-[#1F2937] md:text-3xl">Tus negocios guardados</h2>
+                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+                  Por ahora se guardan en este navegador. Cuando conectemos cuentas, podrás recuperarlos desde otro celular o computador.
+                </p>
+              </div>
+              <span className="rounded-full bg-[#FFF1F0] px-4 py-2 text-sm font-black text-[#D82016]">
+                {favoriteBusinesses.length} guardados
+              </span>
+            </div>
+
+            {favoriteBusinesses.length > 0 ? (
+              <div className="mt-5 grid gap-2.5 md:grid-cols-2">
+                {favoriteBusinesses.map((business) => (
+                  <BusinessCard
+                    key={business.id}
+                    business={business}
+                    onOpen={setSelectedBusiness}
+                    isFavorite
+                    onToggleFavorite={toggleFavorite}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm font-semibold leading-6 text-slate-600">
+                Guarda negocios tocando el corazón de cada ficha. Esto sirve para volver rápido a los negocios que te interesan.
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section id="cuenta" className="mx-auto mt-8 max-w-7xl px-4 md:px-6">
+          <div className="grid gap-4 rounded-[2rem] bg-[#1F2937] p-5 text-white shadow-soft md:grid-cols-[0.8fr_1.2fr] md:p-7">
+            <div>
+              <p className="text-sm font-black uppercase tracking-normal text-white/70">Mi cuenta</p>
+              <h2 className="mt-2 text-3xl font-black leading-tight md:text-4xl">Próximo paso: guardar y administrar desde tu cuenta</h2>
+              <p className="mt-3 leading-7 text-white/75">
+                La búsqueda seguirá siendo pública. La cuenta será para conservar favoritos, reclamar negocios y administrar fichas cuando activemos el login real.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
+                <h3 className="text-lg font-black">Quiero explorar y guardar</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Registro corto con nombre y correo o celular. Tus favoritos quedarían sincronizados entre dispositivos.
+                </p>
+                <button type="button" disabled className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-200 px-4 text-sm font-black text-slate-500">
+                  Próximamente
+                </button>
+              </div>
+              <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
+                <h3 className="text-lg font-black">Tengo un negocio</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                  Primero crearías tu cuenta y luego podrías crear o reclamar tu ficha para actualizar datos y subir fotos.
+                </p>
+                <a href="#inscripcion" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C]">
+                  Inscribir mi negocio
+                </a>
+              </div>
+              <p className="rounded-2xl bg-white/10 p-4 text-sm font-semibold leading-6 text-white/80 sm:col-span-2">
+                Para activar cuentas reales necesitamos conectar un proveedor de autenticación y una base de datos de usuarios. Mi recomendación sigue siendo Supabase para esta etapa.
+              </p>
             </div>
           </div>
         </section>
@@ -963,7 +1100,12 @@ export default function MercauDirectory() {
       <BottomNav />
 
       {selectedBusiness ? (
-        <BusinessDetailModal business={selectedBusiness} onClose={() => setSelectedBusiness(null)} />
+        <BusinessDetailModal
+          business={selectedBusiness}
+          onClose={() => setSelectedBusiness(null)}
+          isFavorite={favoriteIds.includes(selectedBusiness.id)}
+          onToggleFavorite={toggleFavorite}
+        />
       ) : null}
     </>
   );
