@@ -39,6 +39,19 @@ package.json
 ## Variables de entorno
 
 - NEXT_PUBLIC_SITE_URL — define la URL pública para el sitemap/robots (ej: https://tudominio.com).
+- NEXT_PUBLIC_SUPABASE_URL — URL del proyecto Supabase.
+- NEXT_PUBLIC_SUPABASE_ANON_KEY — clave pública `anon` de Supabase.
+
+## Supabase
+
+Mercáu usa Supabase para la primera versión de cuentas y favoritos sincronizados.
+
+1. Crea las variables anteriores en Vercel.
+2. En Supabase, abre SQL Editor.
+3. Ejecuta el archivo `supabase/favorites.sql`.
+4. Activa el inicio de sesión por email desde Authentication si no está activo.
+
+La búsqueda pública y los favoritos locales siguen funcionando aunque Supabase no esté configurado.
 
 ## Despliegue en Vercel
 

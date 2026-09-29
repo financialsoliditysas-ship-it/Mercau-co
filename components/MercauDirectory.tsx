@@ -1,12 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import {
   DirectoryBusiness,
   DirectoryCategory,
   directoryCategories,
   directoryMunicipalities
 } from "@/data/directory";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 const categoryTheme: Record<DirectoryCategory, { label: string; initials: string; tone: string; terms: string[] }> = {
   "Comidas y Bebidas": {
@@ -550,6 +552,11 @@ export default function MercauDirectory() {
       return [];
     }
   });
+  const [user, setUser] = useState<User | null>(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [accountStatus, setAccountStatus] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [hasSyncedFavorites, setHasSyncedFavorites] = useState(false);
 
   async function loadBusinesses() {
     setIsDirectoryLoading(true);
@@ -584,8 +591,71 @@ export default function MercauDirectory() {
   }, []);
 
   useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setAccountStatus("Supabase todavía no está configurado en esta instalación.");
+      return;
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null);
+    });
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setHasSyncedFavorites(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
   }, [favoriteIds]);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !user || hasSyncedFavorites) return;
+    const supabaseClient = supabase;
+    const currentUser = user;
+
+    async function syncFavorites() {
+      const { data, error } = await supabaseClient
+        .from("favorites")
+        .select("business_id")
+        .eq("user_id", currentUser.id);
+
+      if (error) {
+        setAccountStatus("Tu sesión está activa, pero falta preparar la tabla de favoritos en Supabase.");
+        return;
+      }
+
+      const remoteIds = (data || [])
+        .map((record) => String(record.business_id || ""))
+        .filter(Boolean);
+      const mergedIds = Array.from(new Set([...favoriteIds, ...remoteIds]));
+
+      if (mergedIds.length > remoteIds.length) {
+        await supabaseClient
+          .from("favorites")
+          .upsert(
+            mergedIds.map((businessId) => ({
+              business_id: businessId,
+              user_id: currentUser.id
+            })),
+            { onConflict: "user_id,business_id" }
+          );
+      }
+
+      setFavoriteIds(mergedIds);
+      setHasSyncedFavorites(true);
+      setAccountStatus("Favoritos sincronizados con tu cuenta.");
+    }
+
+    syncFavorites();
+  }, [favoriteIds, hasSyncedFavorites, user]);
 
   useEffect(() => {
     const search = query.trim();
@@ -640,7 +710,9 @@ export default function MercauDirectory() {
     [businesses, favoriteIds]
   );
 
-  function toggleFavorite(business: DirectoryBusiness) {
+  async function toggleFavorite(business: DirectoryBusiness) {
+    const wasFavorite = favoriteIds.includes(business.id);
+
     setFavoriteIds((current) => {
       const isFavorite = current.includes(business.id);
       return isFavorite
@@ -648,12 +720,76 @@ export default function MercauDirectory() {
         : [...current, business.id];
     });
 
+    const supabase = getSupabaseBrowserClient();
+    if (supabase && user) {
+      const request = wasFavorite
+        ? supabase
+            .from("favorites")
+            .delete()
+            .eq("user_id", user.id)
+            .eq("business_id", business.id)
+        : supabase
+            .from("favorites")
+            .upsert(
+              {
+                business_id: business.id,
+                user_id: user.id
+              },
+              { onConflict: "user_id,business_id" }
+            );
+
+      const { error } = await request;
+
+      if (error) {
+        setAccountStatus("No se pudo sincronizar este favorito. Quedó guardado en este navegador.");
+      }
+    }
+
     trackMetric({
-      type: favoriteIds.includes(business.id) ? "Favorito eliminado" : "Favorito guardado",
+      type: wasFavorite ? "Favorito eliminado" : "Favorito guardado",
       businessId: business.id,
       businessName: business.name,
       category: business.category
     });
+  }
+
+  async function signInWithEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsAuthLoading(true);
+    setAccountStatus("Enviando enlace de acceso...");
+
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) {
+      setAccountStatus("Faltan las variables de Supabase para activar cuentas.");
+      setIsAuthLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: authEmail.trim(),
+      options: {
+        emailRedirectTo: window.location.origin
+      }
+    });
+
+    setIsAuthLoading(false);
+
+    if (error) {
+      setAccountStatus("No se pudo enviar el enlace. Revisa el correo e intenta de nuevo.");
+      return;
+    }
+
+    setAccountStatus("Te enviamos un enlace al correo. Ábrelo para entrar a tu cuenta de Mercáu.");
+  }
+
+  async function signOut() {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    await supabase.auth.signOut();
+    setUser(null);
+    setHasSyncedFavorites(false);
+    setAccountStatus("Saliste de tu cuenta. Tus favoritos de este navegador siguen aquí.");
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -974,31 +1110,65 @@ export default function MercauDirectory() {
               <p className="text-sm font-black uppercase tracking-normal text-white/70">Mi cuenta</p>
               <h2 className="mt-2 text-3xl font-black leading-tight md:text-4xl">Próximo paso: guardar y administrar desde tu cuenta</h2>
               <p className="mt-3 leading-7 text-white/75">
-                La búsqueda seguirá siendo pública. La cuenta será para conservar favoritos, reclamar negocios y administrar fichas cuando activemos el login real.
+                La búsqueda seguirá siendo pública. Tu cuenta sirve para conservar favoritos y preparar la futura administración de negocios.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
                 <h3 className="text-lg font-black">Quiero explorar y guardar</h3>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Registro corto con nombre y correo o celular. Tus favoritos quedarían sincronizados entre dispositivos.
+                  Entra con tu correo para sincronizar favoritos. La búsqueda y el contacto por WhatsApp siguen libres.
                 </p>
-                <button type="button" disabled className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-200 px-4 text-sm font-black text-slate-500">
-                  Próximamente
-                </button>
+                {user ? (
+                  <div className="mt-4 grid gap-2">
+                    <p className="rounded-xl bg-[#FFF1F0] p-3 text-xs font-black text-[#D82016]">
+                      Sesión activa: {user.email}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={signOut}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-900 hover:bg-slate-200"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={signInWithEmail} className="mt-4 grid gap-2">
+                    <label className="grid gap-1 text-xs font-black text-slate-700">
+                      Correo electrónico
+                      <input
+                        value={authEmail}
+                        onChange={(event) => setAuthEmail(event.target.value)}
+                        type="email"
+                        required
+                        placeholder="tunombre@correo.com"
+                        className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={isAuthLoading}
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C] disabled:opacity-60"
+                    >
+                      {isAuthLoading ? "Enviando..." : "Enviar enlace de acceso"}
+                    </button>
+                  </form>
+                )}
               </div>
               <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
                 <h3 className="text-lg font-black">Tengo un negocio</h3>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Primero crearías tu cuenta y luego podrías crear o reclamar tu ficha para actualizar datos y subir fotos.
+                  El WhatsApp será el dato principal para validar dueños. Luego conectaremos reclamar fichas y actualizar datos sin duplicar negocios.
                 </p>
                 <a href="#inscripcion" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C]">
                   Inscribir mi negocio
                 </a>
               </div>
-              <p className="rounded-2xl bg-white/10 p-4 text-sm font-semibold leading-6 text-white/80 sm:col-span-2">
-                Para activar cuentas reales necesitamos conectar un proveedor de autenticación y una base de datos de usuarios. Mi recomendación sigue siendo Supabase para esta etapa.
-              </p>
+              {accountStatus ? (
+                <p className="rounded-2xl bg-white/10 p-4 text-sm font-semibold leading-6 text-white/80 sm:col-span-2">
+                  {accountStatus}
+                </p>
+              ) : null}
             </div>
           </div>
         </section>
