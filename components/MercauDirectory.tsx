@@ -68,6 +68,7 @@ const categoryTheme: Record<DirectoryCategory, { label: string; initials: string
 };
 
 const FAVORITES_STORAGE_KEY = "mercau.favoriteBusinessIds";
+const MERCAU_PUBLIC_URL = "https://www.mercau.co";
 
 function normalize(value: string) {
   return value
@@ -768,7 +769,7 @@ export default function MercauDirectory() {
     const { error } = await supabase.auth.signInWithOtp({
       email: authEmail.trim(),
       options: {
-        emailRedirectTo: window.location.origin
+        emailRedirectTo: MERCAU_PUBLIC_URL
       }
     });
 
