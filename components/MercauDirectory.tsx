@@ -776,7 +776,7 @@ export default function MercauDirectory() {
     setIsAuthLoading(false);
 
     if (error) {
-      setAccountStatus("No se pudo enviar el enlace. Revisa el correo e intenta de nuevo.");
+      setAccountStatus(`No se pudo enviar el enlace: ${error.message}`);
       return;
     }
 
