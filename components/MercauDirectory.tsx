@@ -1197,7 +1197,7 @@ export default function MercauDirectory() {
                 <input name="businessName" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800">
-                Propietario o contacto
+                Nombre del propietario / administrador
                 <input name="ownerName" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800">
@@ -1223,11 +1223,11 @@ export default function MercauDirectory() {
                 </select>
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800">
-                Barrio o vereda
+                Dirección del negocio
                 <input name="neighborhood" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800 sm:col-span-2">
-                Descripción corta
+                Descripción corta del negocio
                 <textarea name="description" required rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800">
@@ -1250,7 +1250,13 @@ export default function MercauDirectory() {
                 Facebook o página
                 <input name="facebook" type="text" placeholder="Mi Negocio" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
-              <input type="hidden" name="wantsMarketplace" value="Después" />
+              <label className="grid gap-2 text-sm font-black text-slate-800 sm:col-span-2">
+                ¿Quieres vender en Mercáu?
+                <select name="wantsMarketplace" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
+                  <option value="Si">Sí</option>
+                  <option value="Después">Después</option>
+                </select>
+              </label>
               <button type="submit" disabled={isSubmitting} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#D82016] px-5 py-4 font-black text-white hover:bg-[#B91C1C] disabled:opacity-60 sm:col-span-2">
                 {isSubmitting ? "Enviando..." : "Enviar inscripción para revisión"}
               </button>
