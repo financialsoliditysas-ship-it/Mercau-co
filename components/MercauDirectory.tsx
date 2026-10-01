@@ -17,11 +17,11 @@ const categoryTheme: Record<DirectoryCategory, { label: string; initials: string
     tone: "from-[#D82016] to-[#991B1B]",
     terms: ["comida", "restaurante", "bebida", "licor", "licorera", "almuerzo", "cena", "rapida", "domicilio"]
   },
-  Hogar: {
-    label: "Hogar",
-    initials: "Ho",
+  "Hogar y Tecnología": {
+    label: "Hogar y Tecnología",
+    initials: "HT",
     tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["hogar", "tienda", "variedades", "casa", "aseo", "mercado"]
+    terms: ["hogar", "tecnologia", "tecnológico", "celular", "celulares", "computador", "computadores", "tienda", "variedades", "casa", "aseo", "mercado"]
   },
   Salud: {
     label: "Salud",
@@ -196,7 +196,7 @@ function CategoryIcon({ category, className = "h-5 w-5" }: { category: Directory
         <path d="M16 4v17M16 4c3 2 4 5 2 8h-2" {...common} />
       </>
     ),
-    Hogar: (
+    "Hogar y Tecnología": (
       <>
         <path d="m3 11 9-7 9 7" {...common} />
         <path d="M5 10v10h14V10M9 20v-6h6v6" {...common} />

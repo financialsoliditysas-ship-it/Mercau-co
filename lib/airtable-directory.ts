@@ -64,7 +64,12 @@ function linkedRecordId(value: unknown) {
 }
 
 function publicCategory(value: string): DirectoryBusiness["category"] {
-  const category = value === "Comida" ? "Comidas y Bebidas" : value;
+  const category =
+    value === "Comida"
+      ? "Comidas y Bebidas"
+      : value === "Hogar"
+        ? "Hogar y Tecnología"
+        : value;
   return category as DirectoryBusiness["category"];
 }
 

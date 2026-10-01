@@ -23,7 +23,7 @@ const FIELD_IDS = {
 
 const allowedCategories = new Set([
   "Comidas y Bebidas",
-  "Hogar",
+  "Hogar y Tecnología",
   "Salud",
   "Belleza",
   "Moda",

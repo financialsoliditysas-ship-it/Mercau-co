@@ -1,6 +1,6 @@
 export type DirectoryCategory =
   | "Comidas y Bebidas"
-  | "Hogar"
+  | "Hogar y Tecnología"
   | "Salud"
   | "Belleza"
   | "Moda"
@@ -48,7 +48,7 @@ export const directoryCategories: Array<{
   hint: string;
 }> = [
   { name: "Comidas y Bebidas", hint: "Restaurantes, comidas rápidas y bebidas" },
-  { name: "Hogar", hint: "Tiendas, variedades y productos de casa" },
+  { name: "Hogar y Tecnología", hint: "Tiendas, variedades, tecnología y productos de casa" },
   { name: "Salud", hint: "Droguerías, bienestar y atención local" },
   { name: "Belleza", hint: "Barberías, peluquerías y estética" },
   { name: "Moda", hint: "Ropa, calzado y accesorios" },
