@@ -1187,11 +1187,6 @@ export default function MercauDirectory() {
               <p className="mt-3 leading-7 text-slate-600">
                 El formulario está pensado para celular. Tu solicitud queda en revisión y se publica cuando Mercáu apruebe la información.
               </p>
-              <div className="mt-5 grid gap-3 text-sm font-bold text-slate-700">
-                <p className="rounded-2xl bg-slate-50 p-4">1. Datos básicos del negocio.</p>
-                <p className="rounded-2xl bg-slate-50 p-4">2. Municipio, categoría y contacto.</p>
-                <p className="rounded-2xl bg-slate-50 p-4">3. Revisión antes de publicar.</p>
-              </div>
             </div>
 
             <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
