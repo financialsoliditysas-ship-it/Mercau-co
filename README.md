@@ -49,7 +49,8 @@ Mercáu usa Supabase para la primera versión de cuentas y favoritos sincronizad
 1. Crea las variables anteriores en Vercel.
 2. En Supabase, abre SQL Editor.
 3. Ejecuta el archivo `supabase/favorites.sql`.
-4. Activa el inicio de sesión por email desde Authentication si no está activo.
+4. Ejecuta el archivo `supabase/business_admins.sql`.
+5. Activa el inicio de sesión por email desde Authentication si no está activo.
 
 La búsqueda pública y los favoritos locales siguen funcionando aunque Supabase no esté configurado.
 

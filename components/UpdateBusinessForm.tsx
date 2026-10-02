@@ -1,8 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 type UpdateBusiness = {
+  id: string;
   name: string;
   category: string;
   neighborhood: string;
@@ -17,10 +20,42 @@ type UpdateBusiness = {
 };
 
 export default function UpdateBusinessForm({ token }: { token: string }) {
+  const supabase = getSupabaseBrowserClient();
   const [business, setBusiness] = useState<UpdateBusiness | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [pageStatus, setPageStatus] = useState("Cargando enlace privado...");
   const [submitStatus, setSubmitStatus] = useState("");
+  const [accessStatus, setAccessStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingAccess, setIsCreatingAccess] = useState(false);
+
+  async function saveBusinessAccess(currentUser: User, currentBusiness: UpdateBusiness) {
+    if (!supabase) {
+      setAccessStatus("La conexión de cuentas todavía no está configurada.");
+      return;
+    }
+
+    const { error } = await supabase.from("business_admins").upsert(
+      {
+        user_id: currentUser.id,
+        business_id: currentBusiness.id,
+        business_name: currentBusiness.name,
+        owner_name: currentUser.user_metadata?.name || "",
+        owner_whatsapp: currentBusiness.whatsapp || "",
+        private_token: token,
+        status: "Activo"
+      },
+      { onConflict: "user_id,business_id" }
+    );
+
+    if (error) {
+      setAccessStatus("No se pudo asociar el negocio. Revisa que la tabla business_admins exista en Supabase.");
+      return;
+    }
+
+    window.localStorage.removeItem(`mercau.pendingBusinessAccess.${token}`);
+    setAccessStatus("Acceso activado. Ya puedes entrar a Mi negocio.");
+  }
 
   useEffect(() => {
     async function loadBusiness() {
@@ -45,6 +80,33 @@ export default function UpdateBusinessForm({ token }: { token: string }) {
 
     loadBusiness();
   }, [token]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const client = supabase;
+
+    async function loadSession() {
+      const { data } = await client.auth.getSession();
+      setUser(data.session?.user || null);
+    }
+
+    loadSession();
+
+    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.subscription.unsubscribe();
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!user || !business) return;
+
+    const pending = window.localStorage.getItem(`mercau.pendingBusinessAccess.${token}`);
+    if (pending === "1") {
+      saveBusinessAccess(user, business);
+    }
+  }, [user, business, token]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,6 +158,56 @@ export default function UpdateBusinessForm({ token }: { token: string }) {
     }
   }
 
+  async function onCreateAccess(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!business || !supabase) {
+      setAccessStatus("La conexión de cuentas todavía no está configurada.");
+      return;
+    }
+
+    const form = event.currentTarget;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    const name = String(payload.adminName || "").trim();
+    const email = String(payload.email || "").trim();
+    const password = String(payload.password || "");
+
+    if (!name || !email || password.length < 6) {
+      setAccessStatus("Escribe nombre, correo y una contraseña de mínimo 6 caracteres.");
+      return;
+    }
+
+    setIsCreatingAccess(true);
+    setAccessStatus("Creando acceso...");
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+        emailRedirectTo: typeof window !== "undefined" ? window.location.href : undefined
+      }
+    });
+
+    if (error) {
+      setAccessStatus(error.message === "User already registered"
+        ? "Ese correo ya existe. Entra en Mi negocio con tu contraseña."
+        : `No se pudo crear el acceso: ${error.message}`);
+      setIsCreatingAccess(false);
+      return;
+    }
+
+    window.localStorage.setItem(`mercau.pendingBusinessAccess.${token}`, "1");
+
+    if (data.session?.user) {
+      await saveBusinessAccess(data.session.user, business);
+    } else {
+      setAccessStatus("Revisa tu correo para confirmar la cuenta. Luego vuelve a abrir este mismo link privado para terminar la activación.");
+    }
+
+    form.reset();
+    setIsCreatingAccess(false);
+  }
+
   return (
     <main className="min-h-screen bg-[#fbfaf6]">
       <section className="bg-emerald-950 py-12 text-white">
@@ -116,7 +228,8 @@ export default function UpdateBusinessForm({ token }: { token: string }) {
 
       <section className="py-12 md:py-16">
         <div className="container grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+          <aside className="grid gap-4">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
             {business ? (
               <>
                 <p className="text-sm font-extrabold uppercase tracking-normal text-emerald-700">
@@ -140,6 +253,44 @@ export default function UpdateBusinessForm({ token }: { token: string }) {
             ) : (
               <p className="font-bold text-slate-700">{pageStatus}</p>
             )}
+          </div>
+
+          <form onSubmit={onCreateAccess} className="rounded-lg border border-slate-200 bg-white p-5 shadow-soft">
+            <p className="text-sm font-extrabold uppercase tracking-normal text-[#D82016]">
+              Activar acceso
+            </p>
+            <h2 className="mt-2 text-2xl font-black leading-tight">
+              Administra tu ficha
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+              Crea tu acceso privado para entrar después a Mi negocio. Este acceso queda asociado a esta ficha.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <label className="grid gap-2 text-sm font-bold">
+                Nombre del administrador
+                <input name="adminName" required className="min-h-11 rounded-lg border px-4 py-3 font-normal" />
+              </label>
+              <label className="grid gap-2 text-sm font-bold">
+                Correo electrónico
+                <input name="email" type="email" required className="min-h-11 rounded-lg border px-4 py-3 font-normal" />
+              </label>
+              <label className="grid gap-2 text-sm font-bold">
+                Contraseña
+                <input name="password" type="password" minLength={6} required className="min-h-11 rounded-lg border px-4 py-3 font-normal" />
+              </label>
+              <button
+                type="submit"
+                disabled={!business || isCreatingAccess}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-[#D82016] px-5 font-extrabold text-white disabled:opacity-60"
+              >
+                {isCreatingAccess ? "Activando..." : "Activar mi acceso"}
+              </button>
+              <a href="/mi-negocio" className="text-center text-sm font-black text-[#D82016] underline">
+                Ya tengo acceso, entrar a Mi negocio
+              </a>
+              {accessStatus ? <p className="rounded-lg bg-slate-100 p-3 text-sm font-bold text-slate-700">{accessStatus}</p> : null}
+            </div>
+          </form>
           </aside>
 
           <form

@@ -1159,9 +1159,12 @@ export default function MercauDirectory() {
               <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
                 <h3 className="text-lg font-black">Tengo un negocio</h3>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  El WhatsApp será el dato principal para validar dueños. Luego conectaremos reclamar fichas y actualizar datos sin duplicar negocios.
+                  Si ya activaste tu acceso desde el link privado, entra para ver tu ficha y solicitar cambios.
                 </p>
-                <a href="#inscripcion" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C]">
+                <a href="/mi-negocio" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C]">
+                  Entrar a Mi negocio
+                </a>
+                <a href="#inscripcion" className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-900 hover:bg-slate-200">
                   Inscribir mi negocio
                 </a>
               </div>
