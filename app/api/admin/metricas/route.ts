@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { toDirectoryCategory } from "@/data/directory";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function cleanText(value: unknown, max = 240) {
 }
 
 function publicCategory(value: string) {
-  return value === "Comida" ? "Comidas y Bebidas" : value;
+  return toDirectoryCategory(value);
 }
 
 function config() {

@@ -1,4 +1,4 @@
-import { DirectoryBusiness } from "@/data/directory";
+import { DirectoryBusiness, toDirectoryCategory } from "@/data/directory";
 
 const FIELD_IDS = {
   businessName: "fldZAuId3Z7tmNg1y",
@@ -64,13 +64,7 @@ function linkedRecordId(value: unknown) {
 }
 
 function publicCategory(value: string): DirectoryBusiness["category"] {
-  const category =
-    value === "Comida"
-      ? "Comidas y Bebidas"
-      : value === "Hogar"
-        ? "Hogar y Tecnología"
-        : value;
-  return category as DirectoryBusiness["category"];
+  return toDirectoryCategory(value);
 }
 
 function publicMunicipality(value: string): DirectoryBusiness["municipality"] {
@@ -165,7 +159,8 @@ export async function loadDirectoryBusinesses() {
       const fields = record.fields || {};
       const appliedUpdate = appliedUpdates.get(record.id) || {};
       const status = publicStatus(selectName(fields[FIELD_IDS.status]));
-      const category = publicCategory(selectName(fields[FIELD_IDS.category]));
+      const legacyCategory = selectName(fields[FIELD_IDS.category]);
+      const category = publicCategory(legacyCategory);
 
       if (!status || !approvedStatuses.has(status)) return null;
 
@@ -173,6 +168,10 @@ export async function loadDirectoryBusinesses() {
         id: record.id,
         name: text(fields, FIELD_IDS.businessName, "Negocio sin nombre"),
         category,
+        legacyCategory,
+        secondaryCategories: [],
+        subcategory: "",
+        tags: legacyCategory === "Emprendimientos" ? ["Emprendimiento local"] : [],
         municipality: publicMunicipality(text(fields, FIELD_IDS.municipality, "Nechí")),
         neighborhood:
           text(appliedUpdate, UPDATE_FIELD_IDS.newNeighborhood) ||

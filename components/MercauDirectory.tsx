@@ -11,59 +11,71 @@ import {
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 const categoryTheme: Record<DirectoryCategory, { label: string; initials: string; tone: string; terms: string[] }> = {
-  "Comidas y Bebidas": {
-    label: "Comidas y Bebidas",
+  "Comidas y bebidas": {
+    label: "Comidas y bebidas",
     initials: "CB",
     tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["comida", "restaurante", "bebida", "licor", "licorera", "almuerzo", "cena", "rapida", "domicilio"]
+    terms: ["comida", "comidas", "restaurante", "bebida", "licor", "licorera", "almuerzo", "cena", "rapida", "domicilio", "panaderia", "reposteria", "cafeteria", "heladeria", "asadero"]
   },
-  "Hogar y Tecnología": {
-    label: "Hogar y Tecnología",
+  "Tiendas y comercio": {
+    label: "Tiendas y comercio",
+    initials: "TC",
+    tone: "from-[#D82016] to-[#991B1B]",
+    terms: ["tienda", "tiendas", "comercio", "minimercado", "supermercado", "granero", "abarrotes", "miscelanea", "papeleria", "variedades", "ventas"]
+  },
+  "Ferretería y construcción": {
+    label: "Ferretería y construcción",
+    initials: "FC",
+    tone: "from-[#D82016] to-[#991B1B]",
+    terms: ["ferreteria", "ferretería", "herramientas", "materiales", "repuestos", "tornillos", "construccion", "construcción", "pintura", "plomeria", "electricidad"]
+  },
+  "Motos y vehículos": {
+    label: "Motos y vehículos",
+    initials: "MV",
+    tone: "from-[#D82016] to-[#991B1B]",
+    terms: ["moto", "motos", "vehiculo", "vehículos", "carro", "carros", "taller", "repuestos", "llantas", "lubricantes", "lavadero", "montallantas", "grua"]
+  },
+  "Salud y bienestar": {
+    label: "Salud y bienestar",
+    initials: "SB",
+    tone: "from-[#D82016] to-[#991B1B]",
+    terms: ["salud", "drogueria", "droguería", "farmacia", "medicina", "bienestar", "odontologia", "laboratorio", "optica", "terapia", "gimnasio"]
+  },
+  "Belleza y cuidado personal": {
+    label: "Belleza y cuidado personal",
+    initials: "BC",
+    tone: "from-[#D82016] to-[#991B1B]",
+    terms: ["belleza", "barberia", "barbería", "peluqueria", "peluquería", "unas", "uñas", "salon", "salón", "estetica", "estética", "cosmeticos", "cosméticos"]
+  },
+  "Moda y accesorios": {
+    label: "Moda y accesorios",
+    initials: "MA",
+    tone: "from-[#D82016] to-[#991B1B]",
+    terms: ["moda", "ropa", "calzado", "tenis", "accesorios", "bolsos", "joyeria", "bisuteria", "uniformes"]
+  },
+  "Hogar, tecnología y reparación": {
+    label: "Hogar, tecnología y reparación",
     initials: "HT",
     tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["hogar", "tecnologia", "tecnológico", "celular", "celulares", "computador", "computadores", "tienda", "variedades", "casa", "aseo", "mercado"]
+    terms: ["hogar", "tecnologia", "tecnología", "tecnológico", "celular", "celulares", "computador", "computadores", "casa", "electrodomestico", "electrodoméstico", "reparacion", "reparación", "ventilador", "televisor", "tecnico", "técnico", "muebles"]
   },
-  Salud: {
-    label: "Salud",
-    initials: "Sa",
+  "Transporte y movilidad": {
+    label: "Transporte y movilidad",
+    initials: "TM",
     tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["salud", "drogueria", "farmacia", "medicina", "bienestar"]
+    terms: ["transporte", "movilidad", "mototaxi", "taxi", "mensajeria", "mensajería", "domicilio", "domicilios", "envio", "envío", "carga", "mudanza", "fluvial"]
   },
-  Belleza: {
-    label: "Belleza",
-    initials: "Be",
+  "Agro, campo y alimentos": {
+    label: "Agro, campo y alimentos",
+    initials: "AC",
     tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["belleza", "barberia", "peluqueria", "unas", "salon", "estetica"]
+    terms: ["agro", "campo", "alimentos", "semillas", "animales", "agricola", "agrícola", "ganaderia", "ganadería", "pesca", "piscicultura", "rural"]
   },
-  Moda: {
-    label: "Moda",
-    initials: "Mo",
+  "Profesionales y servicios": {
+    label: "Profesionales y servicios",
+    initials: "PS",
     tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["moda", "ropa", "calzado", "tenis", "accesorios"]
-  },
-  Ferreteria: {
-    label: "Ferretería",
-    initials: "Fe",
-    tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["ferreteria", "herramientas", "materiales", "repuestos", "tornillos", "construccion"]
-  },
-  Servicios: {
-    label: "Servicios",
-    initials: "Se",
-    tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["servicio", "servicios", "arreglo", "reparacion", "ventilador", "ventiladores", "tecnico", "mantenimiento", "domicilios"]
-  },
-  Transporte: {
-    label: "Transporte",
-    initials: "Tr",
-    tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["transporte", "moto", "taxi", "mensajeria", "domicilio", "domicilios", "envio"]
-  },
-  Emprendimientos: {
-    label: "Emprendimientos",
-    initials: "Em",
-    tone: "from-[#D82016] to-[#991B1B]",
-    terms: ["emprendimiento", "emprendedor", "marca", "local", "redes"]
+    terms: ["servicio", "servicios", "profesional", "contador", "abogado", "diseñador", "fotografo", "fotógrafo", "publicidad", "eventos", "educacion", "educación", "limpieza", "seguridad", "funerario", "emprendimiento", "emprendedor"]
   }
 };
 
@@ -78,7 +90,7 @@ function normalize(value: string) {
 }
 
 function displayCategory(category: string) {
-  return category === "Ferreteria" ? "Ferretería" : category;
+  return category;
 }
 
 function normalizePhoneForColombia(phone: string) {
@@ -190,50 +202,58 @@ function StoreIcon() {
 function CategoryIcon({ category, className = "h-5 w-5" }: { category: DirectoryCategory; className?: string }) {
   const common = { stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   const paths: Record<DirectoryCategory, JSX.Element> = {
-    "Comidas y Bebidas": (
+    "Comidas y bebidas": (
       <>
         <path d="M7 3v8M4 3v8M10 3v8M4 11h6M7 11v10" {...common} />
         <path d="M16 4v17M16 4c3 2 4 5 2 8h-2" {...common} />
       </>
     ),
-    "Hogar y Tecnología": (
+    "Tiendas y comercio": (
       <>
-        <path d="m3 11 9-7 9 7" {...common} />
-        <path d="M5 10v10h14V10M9 20v-6h6v6" {...common} />
+        <path d="M4 10h16l-1.2-5H5.2L4 10Z" {...common} />
+        <path d="M6 10v9h12v-9M9 19v-5h6v5" {...common} />
       </>
     ),
-    Salud: (
-      <>
-        <path d="M12 21s8-4.5 8-11a5 5 0 0 0-8-4 5 5 0 0 0-8 4c0 6.5 8 11 8 11Z" {...common} />
-        <path d="M12 8v6M9 11h6" {...common} />
-      </>
-    ),
-    Belleza: (
-      <>
-        <path d="M12 3c2 3 5 5.5 5 9a5 5 0 0 1-10 0c0-3.5 3-6 5-9Z" {...common} />
-        <path d="M8 19h8" {...common} />
-      </>
-    ),
-    Moda: (
-      <>
-        <path d="M8 4h8l3 4-3 2v10H8V10L5 8l3-4Z" {...common} />
-        <path d="M10 4c.5 1.4 3.5 1.4 4 0" {...common} />
-      </>
-    ),
-    Ferreteria: (
+    "Ferretería y construcción": (
       <>
         <path d="m14 7 3-3 3 3-3 3" {...common} />
         <path d="M4 20 15 9" {...common} />
         <path d="m8 16 2 2" {...common} />
       </>
     ),
-    Servicios: (
+    "Motos y vehículos": (
       <>
-        <path d="M12 3v4M12 17v4M4.2 7.5l3.4 2M16.4 14.5l3.4 2M19.8 7.5l-3.4 2M7.6 14.5l-3.4 2" {...common} />
-        <circle cx="12" cy="12" r="4" {...common} />
+        <path d="M5 15h14l-1.5-5h-11L5 15Z" {...common} />
+        <path d="M7 15v2M17 15v2" {...common} />
+        <circle cx="7" cy="18" r="2" {...common} />
+        <circle cx="17" cy="18" r="2" {...common} />
       </>
     ),
-    Transporte: (
+    "Salud y bienestar": (
+      <>
+        <path d="M12 21s8-4.5 8-11a5 5 0 0 0-8-4 5 5 0 0 0-8 4c0 6.5 8 11 8 11Z" {...common} />
+        <path d="M12 8v6M9 11h6" {...common} />
+      </>
+    ),
+    "Belleza y cuidado personal": (
+      <>
+        <path d="M12 3c2 3 5 5.5 5 9a5 5 0 0 1-10 0c0-3.5 3-6 5-9Z" {...common} />
+        <path d="M8 19h8" {...common} />
+      </>
+    ),
+    "Moda y accesorios": (
+      <>
+        <path d="M8 4h8l3 4-3 2v10H8V10L5 8l3-4Z" {...common} />
+        <path d="M10 4c.5 1.4 3.5 1.4 4 0" {...common} />
+      </>
+    ),
+    "Hogar, tecnología y reparación": (
+      <>
+        <path d="m3 11 9-7 9 7" {...common} />
+        <path d="M5 10v10h14V10M9 20v-6h6v6" {...common} />
+      </>
+    ),
+    "Transporte y movilidad": (
       <>
         <path d="M5 16V7h10l4 4v5" {...common} />
         <path d="M15 8v4h4" {...common} />
@@ -241,10 +261,17 @@ function CategoryIcon({ category, className = "h-5 w-5" }: { category: Directory
         <circle cx="17" cy="17" r="2" {...common} />
       </>
     ),
-    Emprendimientos: (
+    "Agro, campo y alimentos": (
       <>
-        <path d="M12 3v18" {...common} />
-        <path d="M12 7c-4 0-6 2-6 5 4 0 6-2 6-5ZM12 12c4 0 6 2 6 5-4 0-6-2-6-5Z" {...common} />
+        <path d="M12 21V9" {...common} />
+        <path d="M12 9c-4 0-6 2-6 5 4 0 6-2 6-5ZM12 13c4 0 6 2 6 5-4 0-6-2-6-5Z" {...common} />
+        <path d="M12 9c1-3 3-4 5-5" {...common} />
+      </>
+    ),
+    "Profesionales y servicios": (
+      <>
+        <path d="M12 3v4M12 17v4M4.2 7.5l3.4 2M16.4 14.5l3.4 2M19.8 7.5l-3.4 2M7.6 14.5l-3.4 2" {...common} />
+        <circle cx="12" cy="12" r="4" {...common} />
       </>
     )
   };
@@ -329,6 +356,9 @@ function BusinessCard({
           </div>
 
           <p className="mt-0.5 text-xs font-semibold text-slate-700 sm:text-sm">{displayCategory(business.category)}</p>
+          {business.subcategory ? (
+            <p className="mt-0.5 text-[11px] font-bold text-[#D82016] sm:text-xs">{business.subcategory}</p>
+          ) : null}
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-500 sm:text-xs">
             <span className="inline-flex items-center gap-1">
               <LocationIcon className="h-3.5 w-3.5" />
@@ -419,6 +449,14 @@ function BusinessDetailModal({
             <div className="min-w-0 flex-1">
               <h2 className="text-2xl font-black leading-tight text-slate-950 md:text-3xl">{business.name}</h2>
               <p className="mt-1 font-bold text-slate-700">{displayCategory(business.category)}</p>
+              {business.subcategory ? <p className="mt-1 text-sm font-black text-[#D82016]">{business.subcategory}</p> : null}
+              {business.tags?.length ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {business.tags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-[#FFF1F0] px-2.5 py-1 text-xs font-black text-[#D82016]">{tag}</span>
+                  ))}
+                </div>
+              ) : null}
               <p className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-slate-500">
                 <LocationIcon className="h-4 w-4" />
                 {business.municipality}
@@ -538,6 +576,7 @@ export default function MercauDirectory() {
   const [isDirectoryLoading, setIsDirectoryLoading] = useState(true);
   const [selectedBusiness, setSelectedBusiness] = useState<DirectoryBusiness | null>(null);
   const [businesses, setBusinesses] = useState<DirectoryBusiness[]>([]);
+  const [signupCategory, setSignupCategory] = useState<DirectoryCategory | "">("");
   const [directoryStatus, setDirectoryStatus] = useState("Cargando negocios aprobados...");
   const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -677,13 +716,19 @@ export default function MercauDirectory() {
     const term = normalize(query);
 
     return businesses.filter((business) => {
-      const categoryMatches = activeCategory ? business.category === activeCategory : true;
+      const categoryMatches = activeCategory
+        ? business.category === activeCategory || Boolean(business.secondaryCategories?.includes(activeCategory))
+        : true;
       const municipalityMatches = activeMunicipality ? business.municipality === activeMunicipality : true;
       const categoryTerms = categoryTheme[business.category]?.terms || [];
       const searchable = normalize(
         [
           business.name,
           displayCategory(business.category),
+          business.legacyCategory,
+          business.subcategory,
+          ...(business.secondaryCategories || []),
+          ...(business.tags || []),
           business.municipality,
           business.neighborhood,
           business.description,
@@ -799,7 +844,11 @@ export default function MercauDirectory() {
     setStatus("Enviando inscripción...");
 
     const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form).entries());
+    const formData = new FormData(form);
+    const payload: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {
+      ...Object.fromEntries(formData.entries()),
+      secondaryCategories: formData.getAll("secondaryCategories")
+    };
 
     try {
       const response = await fetch("/api/inscripciones", {
@@ -814,6 +863,7 @@ export default function MercauDirectory() {
       }
 
       form.reset();
+      setSignupCategory("");
       setStatus("Inscripción recibida. Queda pendiente de revisión antes de publicarse.");
       trackMetric({
         type: "Inscripcion enviada",
@@ -831,6 +881,7 @@ export default function MercauDirectory() {
   const resultsLabel = isDirectoryLoading
     ? "Cargando resultados"
     : `${sortedBusinesses.length} ${sortedBusinesses.length === 1 ? "resultado" : "resultados"}`;
+  const signupCategoryConfig = directoryCategories.find((category) => category.name === signupCategory);
 
   return (
     <>
@@ -1020,7 +1071,7 @@ export default function MercauDirectory() {
                 <button type="button" onClick={() => setActiveCategory("")} className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-black ${activeCategory === "" ? "bg-[#D82016] text-white" : "bg-slate-100 text-slate-700"}`}>
                   Todos
                 </button>
-                {directoryCategories.slice(0, 5).map((category) => (
+                {directoryCategories.map((category) => (
                   <button key={category.name} type="button" onClick={() => setActiveCategory(category.name)} className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-black ${activeCategory === category.name ? "bg-[#D82016] text-white" : "bg-slate-100 text-slate-700"}`}>
                     {displayCategory(category.name)}
                   </button>
@@ -1203,14 +1254,32 @@ export default function MercauDirectory() {
                 <input name="whatsapp" required inputMode="tel" placeholder="Ej: 3001234567" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800">
-                Categoría
-                <select name="category" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
+                Categoría principal
+                <select
+                  name="category"
+                  required
+                  value={signupCategory}
+                  onChange={(event) => setSignupCategory(event.target.value as DirectoryCategory | "")}
+                  className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20"
+                >
                   <option value="">Seleccionar categoría</option>
                   {directoryCategories.map((category) => (
                     <option key={category.name} value={category.name}>{displayCategory(category.name)}</option>
                   ))}
                 </select>
               </label>
+              {signupCategoryConfig ? (
+                <label className="grid gap-2 text-sm font-black text-slate-800">
+                  Subcategoría
+                  <select name="subcategory" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
+                    <option value="">Seleccionar subcategoría</option>
+                    {signupCategoryConfig.subcategories.map((subcategory) => (
+                      <option key={subcategory} value={subcategory}>{subcategory}</option>
+                    ))}
+                    <option value="Otra actividad">Otra actividad</option>
+                  </select>
+                </label>
+              ) : null}
               <label className="grid gap-2 text-sm font-black text-slate-800">
                 Municipio
                 <select name="municipality" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
@@ -1227,6 +1296,29 @@ export default function MercauDirectory() {
               <label className="grid gap-2 text-sm font-black text-slate-800 sm:col-span-2">
                 Descripción corta del negocio
                 <textarea name="description" required rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
+              </label>
+              {signupCategory ? (
+                <fieldset className="grid gap-2 rounded-2xl border border-slate-200 p-4 sm:col-span-2">
+                  <legend className="px-1 text-sm font-black text-slate-800">Categorías secundarias opcionales</legend>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {directoryCategories
+                      .filter((category) => category.name !== signupCategory)
+                      .map((category) => (
+                        <label key={category.name} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                          <input type="checkbox" name="secondaryCategories" value={category.name} className="h-4 w-4 accent-[#D82016]" />
+                          {category.name}
+                        </label>
+                      ))}
+                  </div>
+                </fieldset>
+              ) : null}
+              <label className="grid gap-2 text-sm font-black text-slate-800">
+                Etiquetas o servicios
+                <input name="tags" placeholder="Ej: domicilios, repuestos, papelería" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
+              </label>
+              <label className="grid gap-2 text-sm font-black text-slate-800">
+                Otra actividad
+                <input name="otherActivity" placeholder="Si no encaja, escríbela aquí" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
               </label>
               <label className="grid gap-2 text-sm font-black text-slate-800">
                 Horario

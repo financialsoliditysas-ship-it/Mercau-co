@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { directoryCategories } from "@/data/directory";
 
 const FIELD_IDS = {
   businessName: "fldZAuId3Z7tmNg1y",
@@ -21,17 +22,8 @@ const FIELD_IDS = {
   updateLink: "fldINHrjgKw2AATkZ"
 };
 
-const allowedCategories = new Set([
-  "Comidas y Bebidas",
-  "Hogar y Tecnología",
-  "Salud",
-  "Belleza",
-  "Moda",
-  "Ferreteria",
-  "Servicios",
-  "Transporte",
-  "Emprendimientos"
-]);
+const allowedCategories = new Set<string>(directoryCategories.map((category) => category.name));
+const allowedSubcategories = new Set(directoryCategories.flatMap((category) => category.subcategories));
 
 const allowedMunicipalities = new Set([
   "Cáceres",
@@ -86,6 +78,18 @@ export async function POST(request: NextRequest) {
   const ownerName = cleanText(body.ownerName, 100);
   const whatsapp = normalizePhone(body.whatsapp);
   const category = allowedCategories.has(body.category) ? body.category : "";
+  const subcategory = allowedSubcategories.has(body.subcategory)
+    ? cleanText(body.subcategory, 100)
+    : body.subcategory === "Otra actividad"
+      ? "Otra actividad"
+      : "";
+  const secondaryCategories = Array.isArray(body.secondaryCategories)
+    ? body.secondaryCategories
+        .map((value: unknown) => cleanText(value, 100))
+        .filter((value: string) => allowedCategories.has(value) && value !== category)
+    : [];
+  const tags = cleanText(body.tags, 240);
+  const otherActivity = cleanText(body.otherActivity, 240);
   const requestedMunicipality = normalizeMunicipality(body.municipality);
   const municipality = allowedMunicipalities.has(requestedMunicipality)
     ? requestedMunicipality
@@ -116,7 +120,13 @@ export async function POST(request: NextRequest) {
     [FIELD_IDS.facebook]: cleanSocial(body.facebook),
     [FIELD_IDS.status]: "Pendiente",
     [FIELD_IDS.source]: "Formulario",
-    [FIELD_IDS.notes]: "Inscripcion recibida desde el MVP publico de Mercáu.",
+    [FIELD_IDS.notes]: [
+      "Inscripcion recibida desde el MVP publico de Mercáu.",
+      subcategory ? `Subcategoria: ${subcategory}.` : "",
+      secondaryCategories.length ? `Categorias secundarias: ${secondaryCategories.join(", ")}.` : "",
+      tags ? `Etiquetas o servicios: ${tags}.` : "",
+      otherActivity ? `Otra actividad para revision: ${otherActivity}.` : ""
+    ].filter(Boolean).join("\n"),
     [FIELD_IDS.updateToken]: updateToken,
     [FIELD_IDS.updateLink]: updateLink
   };

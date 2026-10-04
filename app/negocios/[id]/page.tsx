@@ -30,7 +30,7 @@ function phoneForCall(phone: string) {
 }
 
 function displayCategory(category: string) {
-  return category === "Ferreteria" ? "Ferretería" : category;
+  return category;
 }
 
 function socialUrl(value: string | undefined, network: "instagram" | "facebook") {
@@ -145,6 +145,8 @@ export default async function BusinessPage({
               <section className="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
                 <h2 className="text-lg font-black text-[#1F2937]">Datos del negocio</h2>
                 <p><strong>Categoría:</strong> {displayCategory(business.category)}</p>
+                {business.subcategory ? <p><strong>Subcategoría:</strong> {business.subcategory}</p> : null}
+                {business.tags?.length ? <p><strong>Etiquetas:</strong> {business.tags.join(", ")}</p> : null}
                 <p><strong>Municipio:</strong> {business.municipality}</p>
                 <p><strong>Zona:</strong> {business.neighborhood || "Consultar"}</p>
                 <p><strong>Domicilios:</strong> {business.deliveries === "Si" ? "Sí" : business.deliveries || "Consultar"}</p>
