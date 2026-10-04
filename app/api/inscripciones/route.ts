@@ -22,6 +22,15 @@ const FIELD_IDS = {
   updateLink: "fldINHrjgKw2AATkZ"
 };
 
+const OPTIONAL_CATEGORY_FIELD_IDS = {
+  primaryCategory: process.env.AIRTABLE_CATEGORIA_PRINCIPAL_FIELD_ID || "",
+  subcategory: process.env.AIRTABLE_SUBCATEGORIA_FIELD_ID || "",
+  secondaryCategories: process.env.AIRTABLE_CATEGORIAS_SECUNDARIAS_FIELD_ID || "",
+  tags: process.env.AIRTABLE_ETIQUETAS_FIELD_ID || "",
+  legacyCategory: process.env.AIRTABLE_CATEGORIA_ANTERIOR_FIELD_ID || "",
+  otherActivity: process.env.AIRTABLE_OTRA_ACTIVIDAD_FIELD_ID || ""
+};
+
 const allowedCategories = new Set<string>(directoryCategories.map((category) => category.name));
 const allowedSubcategories = new Set(directoryCategories.flatMap((category) => category.subcategories));
 
@@ -49,6 +58,17 @@ function normalizePhone(value: unknown) {
 
 function cleanSocial(value: unknown) {
   return cleanText(value, 180).replace(/\s+/g, " ");
+}
+
+function setOptionalField(
+  fields: Record<string, string | string[]>,
+  fieldId: string,
+  value: string | string[]
+) {
+  if (!fieldId) return;
+  if (Array.isArray(value) && value.length === 0) return;
+  if (!Array.isArray(value) && !value) return;
+  fields[fieldId] = value;
 }
 
 function appUrl(request: NextRequest) {
@@ -104,7 +124,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const fields: Record<string, string> = {
+  const notes = [
+    "Inscripcion recibida desde el MVP publico de Mercáu.",
+    subcategory ? `Subcategoria: ${subcategory}.` : "",
+    secondaryCategories.length ? `Categorias secundarias: ${secondaryCategories.join(", ")}.` : "",
+    tags ? `Etiquetas o servicios: ${tags}.` : "",
+    otherActivity ? `Otra actividad para revision: ${otherActivity}.` : ""
+  ].filter(Boolean).join("\n");
+
+  const fields: Record<string, string | string[]> = {
     [FIELD_IDS.businessName]: businessName,
     [FIELD_IDS.ownerName]: ownerName,
     [FIELD_IDS.whatsapp]: whatsapp,
@@ -120,16 +148,24 @@ export async function POST(request: NextRequest) {
     [FIELD_IDS.facebook]: cleanSocial(body.facebook),
     [FIELD_IDS.status]: "Pendiente",
     [FIELD_IDS.source]: "Formulario",
-    [FIELD_IDS.notes]: [
-      "Inscripcion recibida desde el MVP publico de Mercáu.",
-      subcategory ? `Subcategoria: ${subcategory}.` : "",
-      secondaryCategories.length ? `Categorias secundarias: ${secondaryCategories.join(", ")}.` : "",
-      tags ? `Etiquetas o servicios: ${tags}.` : "",
-      otherActivity ? `Otra actividad para revision: ${otherActivity}.` : ""
-    ].filter(Boolean).join("\n"),
+    [FIELD_IDS.notes]: notes,
     [FIELD_IDS.updateToken]: updateToken,
     [FIELD_IDS.updateLink]: updateLink
   };
+
+  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.primaryCategory, category);
+  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.subcategory, subcategory);
+  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.secondaryCategories, secondaryCategories);
+  setOptionalField(
+    fields,
+    OPTIONAL_CATEGORY_FIELD_IDS.tags,
+    tags
+      .split(",")
+      .map((tag) => cleanText(tag, 60))
+      .filter(Boolean)
+  );
+  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.legacyCategory, category);
+  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.otherActivity, otherActivity);
 
   Object.keys(fields).forEach((key) => {
     if (!fields[key]) delete fields[key];

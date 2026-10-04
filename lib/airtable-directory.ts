@@ -16,6 +16,14 @@ const FIELD_IDS = {
   source: "fldOZnz4JnwxkLTYA"
 };
 
+const OPTIONAL_CATEGORY_FIELD_IDS = {
+  primaryCategory: process.env.AIRTABLE_CATEGORIA_PRINCIPAL_FIELD_ID || "",
+  subcategory: process.env.AIRTABLE_SUBCATEGORIA_FIELD_ID || "",
+  secondaryCategories: process.env.AIRTABLE_CATEGORIAS_SECUNDARIAS_FIELD_ID || "",
+  tags: process.env.AIRTABLE_ETIQUETAS_FIELD_ID || "",
+  legacyCategory: process.env.AIRTABLE_CATEGORIA_ANTERIOR_FIELD_ID || ""
+};
+
 const UPDATE_TABLE_ID = "tblZFp7SvVV7MuBWD";
 
 const UPDATE_FIELD_IDS = {
@@ -48,7 +56,22 @@ function selectName(value: unknown) {
 }
 
 function text(fields: Record<string, unknown>, fieldId: string, fallback = "") {
+  if (!fieldId) return fallback;
   return String(fields[fieldId] || fallback).trim();
+}
+
+function multiSelectNames(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (typeof item === "object" && item && "name" in item) {
+        return String((item as { name?: unknown }).name || "").trim();
+      }
+
+      return String(item || "").trim();
+    })
+    .filter(Boolean);
 }
 
 function linkedRecordId(value: unknown) {
@@ -159,8 +182,22 @@ export async function loadDirectoryBusinesses() {
       const fields = record.fields || {};
       const appliedUpdate = appliedUpdates.get(record.id) || {};
       const status = publicStatus(selectName(fields[FIELD_IDS.status]));
-      const legacyCategory = selectName(fields[FIELD_IDS.category]);
-      const category = publicCategory(legacyCategory);
+      const originalCategory = selectName(fields[FIELD_IDS.category]);
+      const storedLegacyCategory =
+        text(fields, OPTIONAL_CATEGORY_FIELD_IDS.legacyCategory) || originalCategory;
+      const category = publicCategory(
+        selectName(fields[OPTIONAL_CATEGORY_FIELD_IDS.primaryCategory]) || originalCategory
+      );
+      const secondaryCategories = multiSelectNames(
+        fields[OPTIONAL_CATEGORY_FIELD_IDS.secondaryCategories]
+      ).map(publicCategory);
+      const storedTags = multiSelectNames(fields[OPTIONAL_CATEGORY_FIELD_IDS.tags]);
+      const tags =
+        storedTags.length > 0
+          ? storedTags
+          : storedLegacyCategory === "Emprendimientos"
+            ? ["Emprendimiento local"]
+            : [];
 
       if (!status || !approvedStatuses.has(status)) return null;
 
@@ -168,10 +205,10 @@ export async function loadDirectoryBusinesses() {
         id: record.id,
         name: text(fields, FIELD_IDS.businessName, "Negocio sin nombre"),
         category,
-        legacyCategory,
-        secondaryCategories: [],
-        subcategory: "",
-        tags: legacyCategory === "Emprendimientos" ? ["Emprendimiento local"] : [],
+        legacyCategory: storedLegacyCategory,
+        secondaryCategories,
+        subcategory: selectName(fields[OPTIONAL_CATEGORY_FIELD_IDS.subcategory]),
+        tags,
         municipality: publicMunicipality(text(fields, FIELD_IDS.municipality, "Nechí")),
         neighborhood:
           text(appliedUpdate, UPDATE_FIELD_IDS.newNeighborhood) ||
