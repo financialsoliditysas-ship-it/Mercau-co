@@ -53,33 +53,9 @@ function classify(oldCategory: string, name: string, description: string, neighb
   } else if (hasAny(text, ["tilapia", "granja", "piscicultura", "pesca", "agro", "agricola", "ganaderia", "semilla"])) {
     primary = "Agro, campo y alimentos";
     subcategory = "Piscicultura";
-  } else if (
-    oldCategory === "Moda" ||
-    hasAny(text, ["ropa", "calzado", "tenis", "camiseta", "camisetas", "boutique", "prendas", "gorras", "bolsos", "joyeria", "joyas", "oro", "bisuteria", "uniformes", "sandalias", "accesorios y perfumeria"])
-  ) {
-    primary = "Moda y accesorios";
-    if (hasAny(text, ["joyeria", "joyas", "oro", "bisuteria"])) subcategory = "Joyería y bisutería";
-    else if (hasAny(text, ["calzado", "tenis", "sandalias"])) subcategory = "Calzado";
-    else if (hasAny(text, ["camiseta", "camisetas", "ropa", "boutique", "prendas"])) subcategory = "Ropa";
-    else subcategory = "Accesorios";
-  } else if (
-    oldCategory === "Belleza" ||
-    hasAny(text, ["cosmetico", "cosmeticos", "maquillaje", "barberia", "peluqueria", "belleza", "manicure", "pedicure", "capilar", "estetica"])
-  ) {
-    primary = "Belleza y cuidado personal";
-    if (hasAny(text, ["cosmetico", "cosmeticos", "maquillaje"])) subcategory = "Cosméticos";
-    else if (hasAny(text, ["barberia"])) subcategory = "Barberías";
-    else if (hasAny(text, ["peluqueria"])) subcategory = "Peluquerías";
-    else subcategory = "Salones de belleza";
-  } else if (
-    oldCategory === "Salud" ||
-    hasAny(text, ["drogueria", "farmacia", "medicamento", "salud", "bienestar", "fuxion", "natural", "odontologia", "laboratorio", "optica", "gimnasio"])
-  ) {
-    primary = "Salud y bienestar";
-    if (hasAny(text, ["drogueria", "farmacia", "medicamento"])) subcategory = "Droguerías y farmacias";
-    else if (hasAny(text, ["fuxion", "natural"])) subcategory = "Productos naturales";
-    else if (hasAny(text, ["gimnasio"])) subcategory = "Gimnasios";
-    else subcategory = "Bienestar";
+  } else if (hasAny(text, ["educativa", "educacion", "clases", "estudios", "centro de estudios"])) {
+    primary = "Profesionales y servicios";
+    subcategory = "Educación";
   } else if (
     oldCategory === "Transporte" ||
     hasAny(text, ["transporte", "taxi", "mototaxi", "mensajeria", "domicilio", "domicilios", "encomienda", "carga", "mudanza", "fluvial", "nechi caucasia"])
@@ -97,6 +73,7 @@ function classify(oldCategory: string, name: string, description: string, neighb
     primary = "Ferretería y construcción";
     subcategory = "Ferreterías";
   } else if (
+    oldCategory === "Hogar" ||
     oldCategory === "Hogar y Tecnología" ||
     hasAny(text, ["celular", "celulares", "tecnologia", "tecnologico", "electrodomestico", "ventilador", "ventiladores", "aire acondicionado", "aires acondicionados", "lavadora", "nevera", "servicio tecnico", "reparacion", "mantenimiento", "muebles", "decoracion"])
   ) {
@@ -110,6 +87,33 @@ function classify(oldCategory: string, name: string, description: string, neighb
       else if (hasAny(text, ["ventilador", "ventiladores"])) subcategory = "Reparación de ventiladores";
       else subcategory = "Electrodomésticos";
     }
+  } else if (
+    oldCategory === "Belleza" ||
+    hasAny(text, ["cosmetico", "cosmeticos", "maquillaje", "barberia", "peluqueria", "belleza", "manicure", "pedicure", "capilar", "estetica"])
+  ) {
+    primary = "Belleza y cuidado personal";
+    if (hasAny(text, ["cosmetico", "cosmeticos", "maquillaje"])) subcategory = "Cosméticos";
+    else if (hasAny(text, ["barberia"])) subcategory = "Barberías";
+    else if (hasAny(text, ["peluqueria"])) subcategory = "Peluquerías";
+    else subcategory = "Salones de belleza";
+  } else if (
+    oldCategory === "Moda" ||
+    hasAny(text, ["ropa", "calzado", "tenis", "camiseta", "camisetas", "boutique", "prendas", "gorras", "bolsos", "joyeria", "joyas", "oro", "bisuteria", "uniformes", "sandalias", "accesorios y perfumeria"])
+  ) {
+    primary = "Moda y accesorios";
+    if (hasAny(text, ["joyeria", "joyas", "oro", "bisuteria"])) subcategory = "Joyería y bisutería";
+    else if (hasAny(text, ["calzado", "tenis", "sandalias"])) subcategory = "Calzado";
+    else if (hasAny(text, ["camiseta", "camisetas", "ropa", "boutique", "prendas"])) subcategory = "Ropa";
+    else subcategory = "Accesorios";
+  } else if (
+    oldCategory === "Salud" ||
+    hasAny(text, ["drogueria", "farmacia", "medicamento", "salud", "bienestar", "fuxion", "natural", "odontologia", "laboratorio", "optica", "gimnasio"])
+  ) {
+    primary = "Salud y bienestar";
+    if (hasAny(text, ["drogueria", "farmacia", "medicamento"])) subcategory = "Droguerías y farmacias";
+    else if (hasAny(text, ["fuxion", "natural"])) subcategory = "Productos naturales";
+    else if (hasAny(text, ["gimnasio"])) subcategory = "Gimnasios";
+    else subcategory = "Bienestar";
   } else if (hasAny(text, ["tienda", "variedades", "miscelanea", "papeleria", "productos del hogar", "articulos escolares", "abarrotes", "supermercado", "granero"])) {
     primary = "Tiendas y comercio";
     if (hasAny(text, ["papeleria", "articulos escolares"])) subcategory = "Papelerías";
@@ -122,9 +126,6 @@ function classify(oldCategory: string, name: string, description: string, neighb
   } else if (hasAny(text, ["fotografia", "foto", "publicidad", "medios", "producciones", "digital", "noticias"])) {
     primary = "Profesionales y servicios";
     subcategory = "Publicidad y medios";
-  } else if (hasAny(text, ["educativa", "educacion", "clases", "estudios"])) {
-    primary = "Profesionales y servicios";
-    subcategory = "Educación";
   }
 
   if (hasAny(text, ["domicilio", "domicilios"])) tags.add("Domicilios");
