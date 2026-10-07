@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDeliveryHistory, getDeliveryOrderByPublicId } from "@/lib/deliveries";
+import DeliveryAutoRefresh from "@/components/DeliveryAutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ export default async function DeliveryTrackingPage({
           <p className="text-sm font-black uppercase tracking-normal text-[#D82016]">Pedido</p>
           <h1 className="mt-1 text-4xl font-black">{order.public_id}</h1>
           <p className="mt-2 font-semibold text-slate-600">Creado: {formatDate(order.created_at)}</p>
+          <DeliveryAutoRefresh status={order.status} />
 
           <div className="mt-6 grid gap-3">
             {steps.map((step, index) => {
