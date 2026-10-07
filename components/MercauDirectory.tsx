@@ -897,6 +897,7 @@ export default function MercauDirectory() {
             </a>
             <nav className="hidden items-center gap-2 text-sm font-black text-slate-700 md:flex">
               <a href="#directorio" className="rounded-xl px-4 py-2 hover:bg-slate-100">Explorar</a>
+              <a href="/enviar" className="rounded-xl border border-[#D82016] px-4 py-2 text-[#D82016] hover:bg-[#FFF1F0]">Solicitar envío</a>
               <a href="#inscripcion" className="rounded-xl bg-[#D82016] px-4 py-2 text-white hover:bg-[#B91C1C]">Inscribir mi negocio</a>
               <a href="#favoritos" className="grid h-10 w-10 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016]" aria-label="Favoritos"><HeartIcon filled={favoriteIds.length > 0} /></a>
               <a href="#cuenta" className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-100">Mi cuenta</a>
@@ -961,6 +962,9 @@ export default function MercauDirectory() {
               <div className="mt-3 grid min-w-0 gap-2 sm:grid-cols-[1fr_auto] md:mt-4">
                 <a href="#directorio" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#D82016] px-5 text-sm font-black text-white hover:bg-[#B91C1C] md:min-h-12 md:text-base">
                   Explorar directorio
+                </a>
+                <a href="/enviar" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#1F2937] hover:bg-slate-100 md:min-h-12 md:text-base">
+                  Solicitar envío
                 </a>
                 <a href="#inscripcion" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#D82016] bg-white px-5 text-sm font-black text-[#D82016] hover:bg-[#FFF1F0] md:min-h-12 md:text-base">
                   <StoreIcon />
