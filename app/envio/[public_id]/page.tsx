@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 import { getDeliveryHistory, getDeliveryOrderByPublicId } from "@/lib/deliveries";
 import DeliveryAutoRefresh from "@/components/DeliveryAutoRefresh";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 const steps = [
   { key: "created", label: "Solicitud recibida" },
@@ -39,6 +42,7 @@ export default async function DeliveryTrackingPage({
 }: {
   params: { public_id: string };
 }) {
+  noStore();
   const order = await getDeliveryOrderByPublicId(params.public_id);
   if (!order) notFound();
 
