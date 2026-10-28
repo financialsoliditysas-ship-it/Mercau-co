@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { applyShipdayWebhook } from "@/lib/deliveries";
+import { requireShipdayWebhookToken, WebhookAuthError } from '@/lib/shipday-webhook-auth';
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    requireShipdayWebhookToken(request.headers.get('token'));
     const payload = await request.json();
     const token = request.headers.get("token");
     const result = await applyShipdayWebhook(payload || {}, token);
 
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo procesar el webhook.";
-    const status = message.includes("autorizado") ? 401 : 400;
+    const message = 'No se pudo procesar el webhook.';
+    const status = error instanceof WebhookAuthError ? error.status : 400;
     return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

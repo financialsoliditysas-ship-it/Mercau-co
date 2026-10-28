@@ -241,7 +241,7 @@ export default function AdminMetricasPage() {
                 helper="Personas que avanzaron a los datos de entrega."
               />
               <MetricCard
-                label="Pedidos confirmados"
+                label="Solicitudes de pedido"
                 value={data.summary.pedidosConfirmados}
                 helper="Pedidos enviados al negocio, todavía no ventas entregadas."
               />

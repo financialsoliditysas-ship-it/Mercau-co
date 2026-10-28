@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { serviceTypes } from "@/lib/delivery-types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import BackToAccount from "@/components/BackToAccount";
@@ -44,6 +44,8 @@ function money(value: number) {
 }
 
 export default function SendPage() {
+  const requestKey = useRef('');
+  const submitting = useRef(false);
   const [form, setForm] = useState<DeliveryForm>(initialForm);
   const [step, setStep] = useState<"form" | "confirm" | "done">("form");
   const [status, setStatus] = useState("");
@@ -187,15 +189,19 @@ export default function SendPage() {
   }
 
   async function submitDelivery() {
+    if (submitting.current) return;
+    submitting.current = true;
     setStatus("Creando solicitud...");
 
     try {
+      requestKey.current ||= sessionStorage.getItem('mercau.delivery.pending-request') || crypto.randomUUID();
+      sessionStorage.setItem('mercau.delivery.pending-request', requestKey.current);
       const client=getSupabaseBrowserClient();
       const session=client?(await client.auth.getSession()).data.session:null;
       const response = await fetch("/api/deliveries", {
         method: "POST",
         headers: { "Content-Type": "application/json",...(session?{Authorization:`Bearer ${session.access_token}`}:{}) },
-        body: JSON.stringify({ ...form, source: "WEB",pickupBusinessId })
+        body: JSON.stringify({ ...form, source: "WEB",pickupBusinessId,requestKey:requestKey.current })
       });
       const payload = await response.json();
 
@@ -209,9 +215,12 @@ export default function SendPage() {
         message: payload.message
       });
       setStep("done");
+      sessionStorage.removeItem('mercau.delivery.pending-request');
       setStatus("");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "No se pudo crear la solicitud.");
+    } finally {
+      submitting.current = false;
     }
   }
 

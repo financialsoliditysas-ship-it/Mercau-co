@@ -744,7 +744,6 @@ export default function MercauDirectory() {
             <nav className="hidden items-center gap-2 text-sm font-black text-slate-700 xl:flex">
               <a href="#directorio" className="rounded-xl px-4 py-2 hover:bg-slate-100">Explorar</a>
               <a href="/nosotros" className="rounded-xl px-4 py-2 hover:bg-slate-100">Conoce Mercáu</a>
-              <a href="/enviar" className="rounded-xl border border-[#D82016] px-4 py-2 text-[#D82016] hover:bg-[#FFF1F0]">Solicitar envío</a>
               <a href="/negocios/registro" className="rounded-xl bg-[#D82016] px-4 py-2 text-white hover:bg-[#B91C1C]">Inscribir mi negocio</a>
               <InstallMercau />
               <a href="#favoritos" className="grid h-10 w-10 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016]" aria-label="Favoritos"><HeartIcon filled={favoriteIds.length > 0} /></a>
@@ -770,7 +769,6 @@ export default function MercauDirectory() {
               <div className="mx-auto grid max-w-md gap-1 text-sm font-black text-slate-800">
                 <a onClick={() => setMobileMenuOpen(false)} href="#directorio" className="rounded-md px-3 py-3 hover:bg-slate-100">Explorar negocios</a>
                 <a onClick={() => setMobileMenuOpen(false)} href="/nosotros" className="rounded-md px-3 py-3 hover:bg-slate-100">Conoce Mercáu</a>
-                <a onClick={() => setMobileMenuOpen(false)} href="/enviar" className="rounded-md px-3 py-3 hover:bg-slate-100">Solicitar envío</a>
                 <a onClick={() => setMobileMenuOpen(false)} href="/negocios/registro" className="rounded-md px-3 py-3 text-[#D82016] hover:bg-[#FFF1F0]">Inscribir mi negocio</a>
                 <InstallMercau compact />
                 <a onClick={() => setMobileMenuOpen(false)} href="#favoritos" className="rounded-md px-3 py-3 hover:bg-slate-100">Favoritos</a>

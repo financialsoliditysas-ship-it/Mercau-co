@@ -88,7 +88,6 @@ export default function Page() {
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="/#directorio" className="inline-flex min-h-12 items-center gap-2 rounded-md bg-[#D82016] px-5 font-black text-white">Explorar negocios <ArrowRight size={18} /></Link>
               <Link href="/negocios/registro" className="inline-flex min-h-12 items-center rounded-md border border-white bg-white px-5 font-black text-[#1F2937]">Registrar mi negocio</Link>
-              <Link href="/enviar" className="inline-flex min-h-12 items-center rounded-md border border-white px-5 font-black text-white">Solicitar envío</Link>
             </div>
           </div>
         </div>
@@ -176,7 +175,7 @@ export default function Page() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-6 md:px-6">
           <strong className="text-2xl font-black">Mercáu</strong>
           <nav className="flex flex-wrap gap-4 text-sm font-bold" aria-label="Pie de página">
-            <Link href="/">Inicio</Link><Link href="/#directorio">Negocios</Link><Link href="/enviar">Solicitar envío</Link><Link href="/mi-cuenta">Mi cuenta</Link>
+            <Link href="/">Inicio</Link><Link href="/#directorio">Negocios</Link><Link href="/mi-cuenta">Mi cuenta</Link>
           </nav>
         </div>
       </footer>

@@ -20,15 +20,15 @@ assert(!commerce.includes('phone')&&!commerce.includes('address')&&!commerce.inc
 assert(restaurant.includes("trackCommerceEvent('Menu visto','ViewContent'"),'Falta vista de menú');
 assert(restaurant.includes("trackCommerceEvent('Producto agregado','AddToCart'"),'Falta producto agregado');
 assert(restaurant.includes("trackCommerceEvent('Carrito iniciado','InitiateCheckout'"),'Falta inicio de checkout');
-assert(restaurant.includes("trackCommerceEvent('Pedido confirmado','Lead'"),'Falta pedido confirmado');
+assert(restaurant.includes("trackCommerceEvent('Solicitud de pedido recibida','Lead'"),'Falta solicitud recibida');
 assert(restaurant.includes("trackMetaEvent('OrderSubmitted'"),'Falta evento de pedido enviado');
 assert(!restaurant.includes("'Pedido confirmado','Purchase'"),'Pedido enviado se marca falsamente como compra');
 for(const type of ['Menu visto','Producto visto','Producto agregado','Carrito iniciado','Pedido revisado','Pedido confirmado'])assert(metrics.includes(`"${type}"`),`Métrica no permitida: ${type}`);
 assert(catalog.includes('<CatalogShareActions'),'Faltan acciones para compartir menú');
 assert(catalog.includes('openGraph:'),'Faltan metadatos sociales del menú');
 assert(adminMetrics.includes('menusVistos: countType("Menu visto")'),'El administrador no cuenta menús vistos');
-assert(adminMetrics.includes('pedidosConfirmados: countType("Pedido confirmado")'),'El administrador no cuenta pedidos confirmados');
-assert(adminPage.includes('label="Pedidos confirmados"'),'El embudo no aparece en el panel administrativo');
+assert(adminMetrics.includes('countType("Pedido confirmado") + countType("Solicitud de pedido recibida")'),'Falta compatibilidad con las solicitudes históricas');
+assert(adminPage.includes('label="Solicitudes de pedido"'),'El embudo no aparece en el panel administrativo');
 assert(metrics.includes('"Pagina instalacion visitada"'),'La API no permite registrar visitas a instalación');
 assert(installLanding.includes('trackPublicMetric("Pagina instalacion visitada")'),'La landing no registra la visita');
 assert(installLanding.includes('sessionStorage'),'La visita puede duplicarse por recargas durante la misma sesión');

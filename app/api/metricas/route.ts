@@ -41,6 +41,7 @@ const allowedTypes = new Set([
   "Carrito iniciado",
   "Pedido revisado",
   "Pedido confirmado",
+  "Solicitud de pedido recibida",
   "business_card_viewed",
   "business_card_whatsapp_clicked",
   "business_card_favorite_added",

@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
     productosAgregados: countType("Producto agregado"),
     carritosIniciados: countType("Carrito iniciado"),
     pedidosRevisados: countType("Pedido revisado"),
-    pedidosConfirmados: countType("Pedido confirmado"),
+    pedidosConfirmados: countType("Pedido confirmado") + countType("Solicitud de pedido recibida"),
     negociosInscritos: businesses.length,
     negociosAprobados: businesses.filter((record: { fields?: Record<string, unknown> }) => {
       const status = selectName((record.fields || {})[NEGOCIOS_FIELD_IDS.status]);

@@ -1,0 +1,64 @@
+const assert=require('node:assert/strict');
+const {chromium}=require('C:/Users/isver/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
+const base='http://localhost:3057';
+(async()=>{
+  const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+  try{
+    for(const width of [320,390,768,1440]){
+      const context=await browser.newContext({viewport:{width,height:900},geolocation:{latitude:6.2442,longitude:-75.5812},permissions:['geolocation']});
+      const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+      page.setDefaultNavigationTimeout(90000);
+      await page.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
+      await page.goto(`${base}/comprar`,{waitUntil:'networkidle'});
+      await page.getByText('Asados de prueba',{exact:true}).waitFor();
+      assert.equal(await page.locator('.buyer-business').count(),4);
+      assert(await page.getByText('Vista de prueba',{exact:false}).isVisible());
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`Overflow ${width}`);
+      const cols=await page.locator('.buyer-business-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+      assert.equal(cols,width<640?2:width<1000?3:4);
+      assert.equal(await page.locator('img').evaluateAll(images=>images.filter(i=>!i.complete||i.naturalWidth===0).length),0);
+      await page.screenshot({path:`outputs/buyer-home-${width}.png`,fullPage:true});
+      await page.locator('.buyer-destination').click();
+      await page.getByRole('button',{name:'Nechí',exact:true}).click();
+      assert((await page.locator('.buyer-destination').innerText()).includes('Nechí'));
+      await page.reload({waitUntil:'networkidle'});
+      assert((await page.locator('.buyer-destination').innerText()).includes('Nechí'));
+      await page.locator('.buyer-destination').click();
+      await page.getByRole('button',{name:'Usar mi ubicación',exact:true}).click();
+      await page.getByText('Ubicación obtenida.',{exact:false}).waitFor();
+      assert((await page.evaluate(()=>localStorage.getItem('mercau.buyer.destination.v1'))).includes('Nechí'),'GPS overwrote manual destination');
+      await page.getByRole('button',{name:'Cerrar selección de destino'}).click();
+      await page.getByRole('link',{name:'Restaurantes Comidas y bebidas'}).click();
+      await page.waitForURL('**/comprar/restaurantes');
+      await page.getByRole('heading',{name:'Restaurantes',exact:true}).waitFor();
+      await page.getByText('Asados de prueba',{exact:true}).waitFor();
+      assert.equal(await page.locator('.buyer-business').count(),2);
+      await page.screenshot({path:`outputs/buyer-restaurants-${width}.png`,fullPage:true});
+      await page.getByRole('textbox',{name:'Busca un negocio o producto'}).fill('Hamburguesas');
+      await page.getByRole('button',{name:'Buscar',exact:true}).click();
+      assert.equal(await page.locator('.buyer-business').count(),1);
+      await page.getByRole('button',{name:'Guardar en favoritos: Hamburguesas de prueba'}).click();
+      await page.goto(`${base}/comprar/favoritos`,{waitUntil:'networkidle'});
+      assert.equal(await page.locator('.buyer-business').count(),1);
+      await page.goto(`${base}/comprar/comercios`,{waitUntil:'networkidle'});
+      await page.getByText('Tienda de prueba',{exact:true}).waitFor();
+      assert.equal(await page.locator('.buyer-business').count(),2);
+      await page.screenshot({path:`outputs/buyer-commerce-${width}.png`,fullPage:true});
+      await page.goto(`${base}/comprar/explorar`,{waitUntil:'networkidle'});
+      await page.getByText('Asados de prueba',{exact:true}).waitFor();
+      await page.locator('.buyer-destination').click();
+      await page.getByRole('button',{name:'Caucasia',exact:true}).click();
+      assert.equal(await page.locator('.buyer-business').count(),1);
+      assert.equal(await page.locator('.buyer-commercial').count(),0,'Empty catalog CTA must not appear');
+      await page.goto(`${base}/comprar/pedidos`,{waitUntil:'networkidle'});
+      await page.getByText('Tus pedidos, en un solo lugar',{exact:true}).waitFor();
+      await page.goto(`${base}/envio/MCU-000001`,{waitUntil:'networkidle'});
+      await page.getByText('Entra con la cuenta que solicitó el pedido',{exact:false}).waitFor();
+      assert.equal((await page.request.get(`${base}/api/seguimiento/MCU-000001`)).status(),401);
+      assert.equal((await page.request.post(`${base}/api/webhooks/shipday`,{data:{event:'ORDER_COMPLETED'}})).status(),503);
+      assert.deepEqual(errors,[]);
+      await context.close();
+      console.log(`PASS buyer UI ${width}px: render, assets, filters, favorites, manual destination, simulated Medellin GPS, private tracking.`);
+    }
+  }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

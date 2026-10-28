@@ -150,7 +150,7 @@ async function sqlTests() {
   const metadata = await listing.generateMetadata({ params: { id: business.id } });
   assert.equal(metadata.title, 'Financial Solidity sas | Mercáu');
   assert.equal(metadata.alternates.canonical, urls.businessPath(business));
-  assert.equal(metadata.openGraph.images[0].url, 'https://www.mercau.co/logo-mercau.png');
+  assert.equal(metadata.openGraph.images[0].url, `https://www.mercau.co/api/negocios/${business.id}/og?v=1`);
   await assert.rejects(() => listing.default({ params: { id: business.id } }), /REDIRECT:\/negocios\/financial-solidity-sas$/);
   const listingHtml = renderToStaticMarkup(await listing.default({ params: { id: business.publicSlug } }));
   assert(listingHtml.includes(urls.businessCatalogPath(business)));

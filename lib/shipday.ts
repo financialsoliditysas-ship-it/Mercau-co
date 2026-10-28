@@ -96,6 +96,10 @@ export class ShipdayProvider implements LogisticsProvider {
           order.pickup_neighborhood
         ),
         restaurantPhoneNumber: cleanPhone(order.pickup_phone || order.customer_phone),
+        ...(Number.isFinite(order.pickup_latitude) && Number.isFinite(order.pickup_longitude)
+          ? { pickupLatitude: order.pickup_latitude, pickupLongitude: order.pickup_longitude } : {}),
+        ...(Number.isFinite(order.delivery_latitude) && Number.isFinite(order.delivery_longitude)
+          ? { deliveryLatitude: order.delivery_latitude, deliveryLongitude: order.delivery_longitude } : {}),
         expectedDeliveryDate: todayUtcDate(),
         expectedPickupTime: utcTimeAfter(20),
         expectedDeliveryTime: utcTimeAfter(60),

@@ -496,7 +496,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       setCart([]); setCheckout(false); setReview(false); setRequestKey('');
       setCurrentOrderId(r.public_id);
       if(live&&restaurantId){
-        trackCommerceEvent('Pedido confirmado','Lead',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)});
+        trackCommerceEvent('Solicitud de pedido recibida','Lead',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)});
         trackMetaEvent('OrderSubmitted',{content_ids:cart.map(line=>line.productId),content_name:title,content_type:'product',currency:'COP',value:subtotal+fee,num_items:cart.reduce((sum,line)=>sum+line.quantity,0),order_id:r.public_id},true);
       }
     } catch (e) { setNotice(e instanceof Error ? e.message : 'No se pudo enviar el pedido.'); }
