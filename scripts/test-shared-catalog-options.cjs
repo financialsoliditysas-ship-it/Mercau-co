@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const migration=fs.readFileSync('supabase/catalog_shared_option_groups.sql','utf8');
+const library=fs.readFileSync('lib/catalog-shared-options.ts','utf8');
+const route=fs.readFileSync('app/api/mi-negocio/[businessId]/opciones/route.ts','utf8');
+const component=fs.readFileSync('components/CatalogSharedOptions.tsx','utf8');
+const catalog=fs.readFileSync('lib/business-catalog.ts','utf8');
+assert(migration.includes('enable row level security'));
+assert(migration.includes('revoke all on public.business_catalog_option_groups from public, anon, authenticated'));
+assert(migration.includes('references public.business_catalog_products(id) on delete cascade'));
+assert(library.includes('mergeSharedGroup'));
+assert(library.includes(".update({option_groups:groups})"));
+assert(route.includes('await catalogOwner(request,params.businessId)'));
+assert(route.includes("body.action==='link'"));
+assert(component.includes('Biblioteca de opciones'));
+assert(component.includes('Editar nombres y precios'));
+assert(catalog.includes('Este producto usa opciones compartidas'));
+console.log('PASS shared catalog options: private tables, owner authorization, product links, synchronization and direct-edit protection. No production data created.');

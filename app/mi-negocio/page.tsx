@@ -1,5 +1,5 @@
-import MyBusinessDashboard from "@/components/MyBusinessDashboard";
+import { redirect } from 'next/navigation';
 
 export default function MyBusinessPage() {
-  return <MyBusinessDashboard />;
+  redirect('/mi-cuenta/negocio');
 }

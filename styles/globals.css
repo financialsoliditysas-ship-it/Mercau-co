@@ -27,3 +27,7 @@ body {
 .container {
   @apply max-w-6xl mx-auto px-4;
 }
+
+@media (display-mode: standalone) {
+  .mercau-install-control { display: none !important; }
+}

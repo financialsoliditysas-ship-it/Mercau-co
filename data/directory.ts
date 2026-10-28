@@ -20,6 +20,13 @@ export type DirectoryMunicipality =
   | "Zaragoza";
 
 export type DirectoryBusiness = {
+  publicSlug?: string;
+  photoUrl?: string;
+  hasCatalog?: boolean;
+  catalogItemCount?: number;
+  commercialSearchTerms?: string[];
+  photoKind?: 'photo' | 'logo';
+  photoVersion?: string;
   id: string;
   name: string;
   category: DirectoryCategory;
@@ -36,7 +43,8 @@ export type DirectoryBusiness = {
   instagram?: string;
   facebook?: string;
   mapsUrl?: string;
-  status: "Verificado" | "Destacado";
+  status: "Verificado" | "Destacado" | "Publicado";
+  pilotRestaurant?: 'restaurante-mercado';
   source: string;
 };
 

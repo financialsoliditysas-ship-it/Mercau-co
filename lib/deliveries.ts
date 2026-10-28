@@ -24,6 +24,12 @@ function requireField(value: string, label: string) {
   if (!value) throw new Error(`Falta ${label}.`);
 }
 
+function optionalNumber(value: unknown, min: number, max: number) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null;
+}
+
 export function normalizeDeliveryInput(body: Record<string, unknown>): DeliveryOrderInput {
   const input = {
     serviceType: cleanText(body.serviceType, 80),
@@ -35,11 +41,19 @@ export function normalizeDeliveryInput(body: Record<string, unknown>): DeliveryO
     pickupContact: cleanText(body.pickupContact, 120),
     pickupPhone: cleanText(body.pickupPhone, 40),
     pickupInstructions: cleanText(body.pickupInstructions, 500),
+    pickupLatitude: optionalNumber(body.pickupLatitude, -90, 90),
+    pickupLongitude: optionalNumber(body.pickupLongitude, -180, 180),
+    pickupLocationAccuracyM: optionalNumber(body.pickupLocationAccuracyM, 0, 100000),
+    pickupLocationCapturedAt: cleanText(body.pickupLocationCapturedAt, 40) || null,
     deliveryName: cleanText(body.deliveryName, 160),
     deliveryAddress: cleanText(body.deliveryAddress, 240),
     deliveryNeighborhood: cleanText(body.deliveryNeighborhood, 120),
     deliveryPhone: cleanText(body.deliveryPhone, 40),
     deliveryInstructions: cleanText(body.deliveryInstructions, 500),
+    deliveryLatitude: optionalNumber(body.deliveryLatitude, -90, 90),
+    deliveryLongitude: optionalNumber(body.deliveryLongitude, -180, 180),
+    deliveryLocationAccuracyM: optionalNumber(body.deliveryLocationAccuracyM, 0, 100000),
+    deliveryLocationCapturedAt: cleanText(body.deliveryLocationCapturedAt, 40) || null,
     description: cleanText(body.description, 500),
     notes: cleanText(body.notes, 700),
     source: parseSource(body.source)
@@ -55,6 +69,12 @@ export function normalizeDeliveryInput(body: Record<string, unknown>): DeliveryO
   requireField(input.deliveryAddress, "la direccion de entrega");
   requireField(input.deliveryPhone, "el telefono de entrega");
   requireField(input.description, "que vamos a llevar");
+  if ((input.pickupLatitude === null) !== (input.pickupLongitude === null)) {
+    throw new Error("La ubicación de recogida está incompleta.");
+  }
+  if ((input.deliveryLatitude === null) !== (input.deliveryLongitude === null)) {
+    throw new Error("La ubicación de entrega está incompleta.");
+  }
 
   return input;
 }
@@ -101,7 +121,7 @@ async function updateDeliveryOrder(
   return data as DeliveryOrder;
 }
 
-export async function createDeliveryOrder(rawBody: Record<string, unknown>) {
+export async function createDeliveryOrder(rawBody: Record<string, unknown>, context: {userId?:string;businessId?:string} = {}) {
   const input = normalizeDeliveryInput(rawBody);
   const supabase = getSupabaseAdminClient();
 
@@ -115,16 +135,25 @@ export async function createDeliveryOrder(rawBody: Record<string, unknown>) {
     pickup_contact: input.pickupContact,
     pickup_phone: input.pickupPhone,
     pickup_instructions: input.pickupInstructions,
+    pickup_latitude: input.pickupLatitude,
+    pickup_longitude: input.pickupLongitude,
+    pickup_location_accuracy_m: input.pickupLocationAccuracyM,
+    pickup_location_captured_at: input.pickupLocationCapturedAt,
     delivery_name: input.deliveryName,
     delivery_address: input.deliveryAddress,
     delivery_neighborhood: input.deliveryNeighborhood,
     delivery_phone: input.deliveryPhone,
     delivery_instructions: input.deliveryInstructions,
+    delivery_latitude: input.deliveryLatitude,
+    delivery_longitude: input.deliveryLongitude,
+    delivery_location_accuracy_m: input.deliveryLocationAccuracyM,
+    delivery_location_captured_at: input.deliveryLocationCapturedAt,
     description: input.description,
     notes: input.notes,
     delivery_fee: getDeliveryFeeCop(),
     status: "created",
     source: input.source
+    ,...(context.userId ? {customer_user_id:context.userId}:{}),...(context.businessId ? {pickup_business_id:context.businessId}:{})
   };
 
   const { data, error } = await supabase
@@ -280,6 +309,7 @@ export async function applyShipdayWebhook(payload: Record<string, unknown>, toke
   const event = cleanText(payload.event, 80);
   const externalStatus = cleanText(payload.order_status, 80);
   const timestamp = cleanText(payload.timestamp, 80);
+  const carrier = (payload.carrier || {}) as Record<string, unknown>;
   const status = mapShipdayEventToStatus(event, externalStatus);
   const supabase = getSupabaseAdminClient();
 
@@ -296,13 +326,29 @@ export async function applyShipdayWebhook(payload: Record<string, unknown>, toke
     status,
     shipday_status: externalStatus || event || null
   };
+  if (carrier.id) updates.shipday_carrier_id = cleanText(carrier.id, 80);
+  if (carrier.name) updates.courier_name = cleanText(carrier.name, 160);
+  if (carrier.phone) updates.courier_phone = cleanText(carrier.phone, 40);
+  if (carrier.vehicle_description) updates.courier_vehicle = cleanText(carrier.vehicle_description, 160);
+  if (carrier.plate_number) updates.courier_plate = cleanText(carrier.plate_number, 40);
 
   if (status === "assigned") updates.assigned_at = now;
   if (status === "picked_up") updates.picked_up_at = now;
   if (status === "delivered") updates.delivered_at = now;
   if (status === "cancelled") updates.cancelled_at = now;
 
-  await updateDeliveryOrder(order.id, updates);
+  try {
+    await updateDeliveryOrder(order.id, updates);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.includes("courier_") && !message.includes("shipday_carrier_id")) throw error;
+    delete updates.shipday_carrier_id;
+    delete updates.courier_name;
+    delete updates.courier_phone;
+    delete updates.courier_vehicle;
+    delete updates.courier_plate;
+    await updateDeliveryOrder(order.id, updates);
+  }
 
   await addHistory({
     deliveryOrderId: order.id,

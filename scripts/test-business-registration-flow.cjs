@@ -1,0 +1,15 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const Module = require("node:module");
+const ts = require("typescript");
+const file = "lib/business-registration-flow.ts";
+const mod = new Module(file);
+mod._compile(ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, file + ".cjs");
+const { businessRegistrationPath, businessRegistrationStage } = mod.exports;
+assert.equal(businessRegistrationPath, "/negocios/registro");
+assert.equal(businessRegistrationStage({ ready:true, hasSession:false, recovering:false, loading:false, hasData:false, businesses:[] }), "auth", "A new visitor must create or enter an account.");
+assert.equal(businessRegistrationStage({ ready:true, hasSession:true, recovering:false, loading:false, hasData:true, businesses:[] }), "register", "An existing buyer must continue to business registration.");
+assert.equal(businessRegistrationStage({ ready:true, hasSession:true, recovering:false, loading:false, hasData:true, businesses:[{business_id:"recGLMhJYXTRE46st",status:"Activo"}] }), "panel", "An owner must continue to the existing panel instead of duplicating the business.");
+assert.equal(businessRegistrationStage({ ready:true, hasSession:false, recovering:true, loading:false, hasData:false, businesses:[] }), "auth", "Password recovery must remain in the business entry flow.");
+assert.equal(businessRegistrationStage({ ready:true, hasSession:true, recovering:false, loading:true, hasData:false, businesses:[] }), "loading", "An interrupted session must wait for ownership data before choosing a path.");
+console.log("PASS business registration entry: new user, buyer, owner, recovery and interrupted session.");

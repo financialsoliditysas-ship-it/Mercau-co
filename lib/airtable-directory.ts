@@ -1,4 +1,6 @@
 import { DirectoryBusiness, toDirectoryCategory } from "@/data/directory";
+import { photoDetails, photoFieldId } from './business-photo';
+import { isPilotBusinessNote } from './pilot-directory-data';
 
 const FIELD_IDS = {
   businessName: "fldZAuId3Z7tmNg1y",
@@ -37,13 +39,14 @@ const UPDATE_FIELD_IDS = {
   deliveries: "fldxITFwlegSY2hFp",
   instagram: "fldb37RSOmv5op09a",
   facebook: "fldyyeqCumnxqjG3x",
-  mapsUrl: "fldDn2C4jBQQjD3yG"
+  mapsUrl: "fldDn2C4jBQQjD3yG",
+  internalComment: "fld5XhR6GjiKu6fF3"
 };
 
-const approvedStatuses = new Set(["Verificado", "Destacado"]);
+const approvedStatuses = new Set(["Verificado", "Destacado", "Publicado"]);
 
 function publicStatus(value: string): DirectoryBusiness["status"] | null {
-  if (value === "Verificado" || value === "Destacado") return value;
+  if (value === "Verificado" || value === "Destacado" || value === "Publicado") return value;
   return null;
 }
 
@@ -106,6 +109,11 @@ async function loadAppliedUpdates(config: {
     filterByFormula: "{Estado} = 'Aplicada'"
   });
 
+  const updates = new Map<string, Record<string, unknown>>();
+  let offset: string | undefined;
+  do {
+  if (offset) params.set('offset',offset);
+
   const response = await fetch(
     `https://api.airtable.com/v0/${config.baseId}/${config.updateTableId}?${params.toString()}`,
     {
@@ -118,8 +126,6 @@ async function loadAppliedUpdates(config: {
   const result = await response.json();
 
   if (!response.ok) return new Map<string, Record<string, unknown>>();
-
-  const updates = new Map<string, Record<string, unknown>>();
 
   (result.records || []).forEach(
     (record: { createdTime?: string; fields?: Record<string, unknown> }) => {
@@ -136,6 +142,9 @@ async function loadAppliedUpdates(config: {
       }
     }
   );
+
+  offset = typeof result.offset === 'string' ? result.offset : undefined;
+  } while (offset);
 
   return updates;
 }
@@ -155,7 +164,7 @@ export async function loadDirectoryBusinesses() {
     pageSize: "100",
     returnFieldsByFieldId: "true",
     filterByFormula:
-      "OR({Estado} = 'Verificado', {Estado} = 'Destacado')"
+      "OR({Estado} = 'Verificado', {Estado} = 'Destacado', {Estado} = 'Publicado')"
   });
 
   const response = await fetch(
@@ -181,6 +190,11 @@ export async function loadDirectoryBusinesses() {
     .map((record): DirectoryBusiness | null => {
       const fields = record.fields || {};
       const appliedUpdate = appliedUpdates.get(record.id) || {};
+      let direct: Record<string, string | string[]> | null = null;
+      try {
+        const note = JSON.parse(String(appliedUpdate[UPDATE_FIELD_IDS.internalComment] || ''));
+        if (note.kind === 'owner_edit' && note.business_id === record.id && note.after && typeof note.after === 'object') direct = note.after;
+      } catch { /* Legacy requests have plain-text notes. */ }
       const status = publicStatus(selectName(fields[FIELD_IDS.status]));
       const originalCategory = selectName(fields[FIELD_IDS.category]);
       const storedLegacyCategory =
@@ -200,16 +214,21 @@ export async function loadDirectoryBusinesses() {
             : [];
 
       if (!status || !approvedStatuses.has(status)) return null;
+      const pilotRestaurant=isPilotBusinessNote(fields.fldrZ1LUWRcvKklVQ) ? 'restaurante-mercado' as const : undefined;
+      const photo=photoDetails(record.id,fields[photoFieldId]);
 
       return {
+        ...photo,
+        photoUrl:photo.photoUrl || (pilotRestaurant ? '/demo-burger.jpg' : undefined),
+        pilotRestaurant,
         id: record.id,
-        name: text(fields, FIELD_IDS.businessName, "Negocio sin nombre"),
-        category,
+        name: typeof direct?.name==='string'?direct.name:text(fields, FIELD_IDS.businessName, "Negocio sin nombre"),
+        category:typeof direct?.category==='string'?publicCategory(direct.category):category,
         legacyCategory: storedLegacyCategory,
-        secondaryCategories,
-        subcategory: selectName(fields[OPTIONAL_CATEGORY_FIELD_IDS.subcategory]),
-        tags,
-        municipality: publicMunicipality(text(fields, FIELD_IDS.municipality, "Nechí")),
+        secondaryCategories:Array.isArray(direct?.secondaryCategories)?direct.secondaryCategories.map(publicCategory):secondaryCategories,
+        subcategory: typeof direct?.subcategory==='string'?direct.subcategory:selectName(fields[OPTIONAL_CATEGORY_FIELD_IDS.subcategory]),
+        tags:Array.isArray(direct?.tags)?direct.tags:tags,
+        municipality: publicMunicipality(typeof direct?.municipality==='string'?direct.municipality:text(fields, FIELD_IDS.municipality, "Nechí")),
         neighborhood:
           text(appliedUpdate, UPDATE_FIELD_IDS.newNeighborhood) ||
           text(fields, FIELD_IDS.neighborhood, "Nechí"),
@@ -221,23 +240,23 @@ export async function loadDirectoryBusinesses() {
             FIELD_IDS.description,
             "Negocio local inscrito en el directorio."
           ),
-        hours:
+        hours: direct ? String(direct.hours || '') :
           text(appliedUpdate, UPDATE_FIELD_IDS.newHours) ||
           text(fields, FIELD_IDS.hours, "Consultar por WhatsApp"),
-        whatsapp:
+        whatsapp:typeof direct?.whatsapp==='string'?direct.whatsapp:
           text(appliedUpdate, UPDATE_FIELD_IDS.newWhatsapp) ||
           text(fields, FIELD_IDS.whatsapp),
         deliveries:
           selectName(appliedUpdate[UPDATE_FIELD_IDS.deliveries]) ||
           selectName(fields[FIELD_IDS.deliveries]) ||
           "Consultar",
-        instagram:
+        instagram: direct ? String(direct.instagram || '') :
           text(appliedUpdate, UPDATE_FIELD_IDS.instagram) ||
           text(fields, FIELD_IDS.instagram),
-        facebook:
+        facebook: direct ? String(direct.facebook || '') :
           text(appliedUpdate, UPDATE_FIELD_IDS.facebook) ||
           text(fields, FIELD_IDS.facebook),
-        mapsUrl:
+        mapsUrl: direct ? String(direct.mapsUrl || '') :
           text(appliedUpdate, UPDATE_FIELD_IDS.mapsUrl) ||
           text(fields, FIELD_IDS.mapsUrl),
         status,

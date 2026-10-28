@@ -1,4 +1,9 @@
 node_modules
 .next
+.next-*
 .vercel
-.env*.local
+.env*
+!.env.example
+*.log
+*.tsbuildinfo
+outputs/

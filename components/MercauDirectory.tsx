@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import {
   DirectoryBusiness,
@@ -9,6 +9,14 @@ import {
   directoryMunicipalities
 } from "@/data/directory";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import BackToAccount from "./BackToAccount";
+import BusinessImage from './BusinessImage';
+import BusinessLocation from './BusinessLocation';
+import { catalogLabel } from '@/lib/catalog-validation';
+import PilotBusinessNotice from './PilotBusinessNotice';
+import { businessPath, businessCatalogPath, businessPublicUrl, businessShareMessage } from '@/lib/business-public-url';
+import { useFavorites } from './account/useFavorites';
+import InstallMercau from './InstallMercau';
 
 const categoryTheme: Record<DirectoryCategory, { label: string; initials: string; tone: string; terms: string[] }> = {
   "Comidas y bebidas": {
@@ -79,7 +87,6 @@ const categoryTheme: Record<DirectoryCategory, { label: string; initials: string
   }
 };
 
-const FAVORITES_STORAGE_KEY = "mercau.favoriteBusinessIds";
 const MERCAU_PUBLIC_URL = "https://www.mercau.co";
 
 function normalize(value: string) {
@@ -136,11 +143,6 @@ function trackMetric(payload: Record<string, string>) {
   }).catch(() => {});
 }
 
-function businessUrl(business: DirectoryBusiness) {
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://www.mercau.co";
-  return `${origin}/negocios/${business.id}`;
-}
-
 function SearchIcon({ className = "h-5 w-5" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -153,6 +155,14 @@ function MenuIcon() {
   return (
     <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseMenuIcon() {
+  return (
+    <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -283,7 +293,7 @@ function CategoryIcon({ category, className = "h-5 w-5" }: { category: Directory
   );
 }
 
-function BottomNav() {
+function BottomNav({ onSearch }: { onSearch: () => void }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 px-1.5 pb-[calc(0.35rem+env(safe-area-inset-bottom))] pt-1 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur md:hidden" aria-label="Navegación principal">
       <div className="mx-auto grid max-w-md grid-cols-4 gap-1 text-[10px] font-bold text-slate-500">
@@ -291,15 +301,15 @@ function BottomNav() {
           <StoreIcon />
           Inicio
         </a>
-        <a href="#directorio" className="grid min-h-10 place-items-center rounded-xl">
+        <button type="button" onClick={onSearch} className="grid min-h-10 place-items-center rounded-xl">
           <SearchIcon className="h-5 w-5" />
           Buscar
-        </a>
+        </button>
         <a href="#favoritos" className="grid min-h-10 place-items-center rounded-xl">
           <HeartIcon />
           Favoritos
         </a>
-        <a href="#cuenta" className="grid min-h-10 place-items-center rounded-xl">
+        <a href="/mi-cuenta?entry=general" className="grid min-h-10 place-items-center rounded-xl">
           <MenuIcon />
           Mi cuenta
         </a>
@@ -312,10 +322,12 @@ function BusinessVisual({ business, compact = false }: { business: DirectoryBusi
   return (
     <div className={`relative grid shrink-0 place-items-center overflow-hidden rounded-2xl border border-[#F3D1CE] bg-[#FFF6F5] text-[#D82016] ${compact ? "h-24 w-20 sm:h-28 sm:w-24" : "h-28 w-28 md:h-32 md:w-32"}`}>
       <span className="absolute inset-x-0 bottom-0 h-1 bg-[#D82016]" />
-      <CategoryIcon category={business.category} className={compact ? "h-7 w-7" : "h-11 w-11"} />
+      <BusinessImage name={business.name} photoUrl={business.photoUrl} photoKind={business.photoKind} className="h-full w-full" fallback={<CategoryIcon category={business.category} className={compact ? "h-7 w-7" : "h-11 w-11"} />} />
     </div>
   );
 }
+
+const viewedBusinessCards = new Set<string>();
 
 function BusinessCard({
   business,
@@ -328,83 +340,44 @@ function BusinessCard({
   isFavorite: boolean;
   onToggleFavorite: (business: DirectoryBusiness) => void;
 }) {
-  const callPhone = phoneForCall(business.whatsapp);
   const hasWhatsapp = Boolean(normalizePhoneForColombia(business.whatsapp));
   const isFeatured = business.status === "Destacado";
+  const cardRef=useRef<HTMLElement|null>(null);
+  const commercialLabel=catalogLabel(business.category);
+  useEffect(()=>{
+    const element=cardRef.current;
+    if(!element || viewedBusinessCards.has(business.id) || !("IntersectionObserver" in window))return;
+    const observer=new IntersectionObserver(entries=>{
+      if(!entries.some(entry=>entry.isIntersecting && entry.intersectionRatio>=0.5) || viewedBusinessCards.has(business.id))return;
+      viewedBusinessCards.add(business.id);
+      trackMetric({type:"business_card_viewed",businessId:business.id,businessName:business.name,category:business.category});
+      observer.disconnect();
+    },{threshold:[0.5]});
+    observer.observe(element);
+    return()=>observer.disconnect();
+  },[business.category,business.id,business.name]);
+  function openBusiness(){trackMetric({type:"business_info_opened",businessId:business.id,businessName:business.name,category:business.category});onOpen(business);}
+  function trackCommercialOpen(){trackMetric({type:business.category==="Comidas y bebidas"?"menu_opened":"catalog_opened",businessId:business.id,businessName:business.name,category:business.category});}
 
   return (
-    <article className="w-full min-w-0 rounded-[1.25rem] border border-[#E5E7EB] bg-white p-2 shadow-soft transition hover:-translate-y-0.5 hover:border-[#F3D1CE] sm:p-3">
-      <div className="flex min-w-0 gap-2 sm:gap-3">
-        <button type="button" onClick={() => onOpen(business)} className="text-left" aria-label={`Ver ficha de ${business.name}`}>
-          <BusinessVisual business={business} compact />
+    <article ref={cardRef} className="flex min-w-0 flex-col overflow-hidden rounded-md border border-[#F3D1CE] bg-white transition hover:-translate-y-0.5 hover:border-[#D82016] hover:shadow-sm">
+      <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#FAE8E6] bg-[#FFF8F7]">
+        <button type="button" onClick={openBusiness} className="h-full w-full" aria-label={`Ver información de ${business.name}`}>
+          <BusinessImage name={business.name} photoUrl={business.photoUrl} photoKind={business.photoKind} className="h-full w-full" fallback={<CategoryIcon category={business.category} className="h-9 w-9" />} />
         </button>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1.5 sm:gap-2">
-            <button type="button" onClick={() => onOpen(business)} className="min-w-0 flex-1 text-left">
-              <h3 className="line-clamp-2 text-sm font-black leading-tight text-[#1F2937] sm:text-base md:text-lg">{business.name}</h3>
-            </button>
-            <button
-              type="button"
-              onClick={() => onToggleFavorite(business)}
-              className={`grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016] sm:h-9 sm:w-9 ${isFavorite ? "text-[#D82016]" : "text-slate-400"}`}
-              aria-label={isFavorite ? `Quitar ${business.name} de favoritos` : `Guardar ${business.name} en favoritos`}
-              aria-pressed={isFavorite}
-            >
-              <HeartIcon filled={isFavorite} />
-            </button>
-          </div>
-
-          <p className="mt-0.5 text-xs font-semibold text-slate-700 sm:text-sm">{displayCategory(business.category)}</p>
-          {business.subcategory ? (
-            <p className="mt-0.5 text-[11px] font-bold text-[#D82016] sm:text-xs">{business.subcategory}</p>
-          ) : null}
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-500 sm:text-xs">
-            <span className="inline-flex items-center gap-1">
-              <LocationIcon className="h-3.5 w-3.5" />
-              {business.municipality}
-            </span>
-            {business.neighborhood ? <span>{business.neighborhood}</span> : null}
-          </div>
-          {isFeatured ? (
-            <span className="mt-2 inline-flex rounded-full bg-[#FFF1F0] px-2.5 py-1 text-xs font-black text-[#D82016]">
-              Destacado
-            </span>
-          ) : null}
+        <button type="button" onClick={()=>onToggleFavorite(business)} className={`absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-full bg-white/95 shadow-sm ${isFavorite?"text-[#D82016]":"text-slate-500"}`} aria-label={isFavorite?`Quitar ${business.name} de favoritos`:`Guardar ${business.name} en favoritos`} aria-pressed={isFavorite}><HeartIcon filled={isFavorite}/></button>
+        {isFeatured&&<span className="absolute bottom-2 left-2 rounded-full bg-white/95 px-2 py-1 text-[10px] font-black text-[#D82016]">Destacado</span>}
+      </div>
+      <div className="flex flex-1 flex-col p-2.5 sm:p-3">
+        <button type="button" onClick={openBusiness} className="min-w-0 text-left"><h3 className="line-clamp-2 min-h-9 text-sm font-black leading-[1.15] text-slate-950 sm:min-h-10 sm:text-base">{business.name}</h3></button>
+        <p className="mt-1 line-clamp-1 text-[11px] font-bold text-slate-700 sm:text-xs">{displayCategory(business.category)}</p>
+        <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-slate-500 sm:text-xs"><LocationIcon className="mr-1 inline h-3 w-3"/>{business.municipality}{business.neighborhood?` · ${business.neighborhood}`:""}</p>
+        {business.pilotRestaurant&&<p className="mt-1 line-clamp-1 text-[10px] font-bold text-[#D82016]">Prueba sin venta real</p>}
+        <div className={`mt-auto grid gap-1.5 pt-3 ${business.hasCatalog&&hasWhatsapp?"grid-cols-[minmax(0,1fr)_2.75rem]":"grid-cols-1"}`}>
+          {business.hasCatalog&&<a href={businessCatalogPath(business)} onClick={trackCommercialOpen} className="inline-flex min-h-11 min-w-0 items-center justify-center rounded-md bg-[#D82016] px-2 text-center text-[11px] font-black text-white sm:text-xs">{commercialLabel}</a>}
+          {hasWhatsapp&&<a href={whatsappUrl(business.whatsapp,business.name)} target="_blank" rel="noreferrer" onClick={()=>{trackMetric({type:"Clic WhatsApp",businessId:business.id,businessName:business.name,category:business.category});trackMetric({type:"business_card_whatsapp_clicked",businessId:business.id,businessName:business.name,category:business.category});}} className={`inline-flex min-h-11 items-center justify-center gap-1 rounded-md ${business.hasCatalog?"px-2":"px-3"} bg-[#D82016] text-xs font-black text-white transition hover:bg-[#B91C14]`} aria-label={`Contactar a ${business.name} por WhatsApp`}><WhatsappIcon/>{!business.hasCatalog&&<span>WhatsApp</span>}</a>}
         </div>
       </div>
-
-      <div className="mt-2 flex justify-end gap-1.5 sm:gap-2">
-        <a
-          href={whatsappUrl(business.whatsapp, business.name)}
-          target="_blank"
-          rel="noreferrer"
-          aria-disabled={!hasWhatsapp}
-          onClick={() =>
-            trackMetric({
-              type: "Clic WhatsApp",
-              businessId: business.id,
-              businessName: business.name,
-              category: business.category
-            })
-          }
-          className={`inline-flex min-h-9 w-10 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-black text-white sm:min-h-10 sm:w-auto sm:px-3 ${hasWhatsapp ? "bg-[#D82016] hover:bg-[#B91C1C]" : "pointer-events-none bg-slate-300"}`}
-        >
-          <WhatsappIcon />
-          <span className="hidden sm:inline">WhatsApp</span>
-        </a>
-        <a
-          href={callPhone ? `tel:${callPhone}` : "#"}
-          aria-disabled={!callPhone}
-          className={`inline-flex min-h-9 w-10 items-center justify-center gap-1.5 rounded-xl px-2 text-sm font-black sm:min-h-10 sm:w-auto sm:px-3 ${callPhone ? "bg-slate-100 text-slate-900 hover:bg-slate-200" : "pointer-events-none bg-slate-100 text-slate-400"}`}
-        >
-          <PhoneIcon />
-          <span className="hidden sm:inline">Llamar</span>
-        </a>
-      </div>
-      <a href={`/negocios/${business.id}`} className="mt-2 inline-flex text-xs font-black text-[#D82016]">
-        Ver ficha completa
-      </a>
     </article>
   );
 }
@@ -421,12 +394,12 @@ function BusinessDetailModal({
   onToggleFavorite: (business: DirectoryBusiness) => void;
 }) {
   const callPhone = phoneForCall(business.whatsapp);
-  const url = businessUrl(business);
-  const shareText = `Mira ${business.name} en Mercáu: ${url}`;
+  const url = businessPublicUrl(business);
+  const shareText = businessShareMessage(business);
 
   async function shareBusiness() {
     if (navigator.share) {
-      await navigator.share({ title: business.name, text: shareText, url });
+      try { await navigator.share({ title: business.name, text: `${business.name}\nConoce nuestro negocio en Mercáu:`, url }); } catch { /* Dismissing the share sheet is not a page error. */ }
       return;
     }
     await navigator.clipboard?.writeText(shareText);
@@ -474,7 +447,7 @@ function BusinessDetailModal({
             </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
+          {!business.pilotRestaurant && <div className="mt-5 grid grid-cols-[1fr_auto] gap-2">
             <a
               href={whatsappUrl(business.whatsapp, business.name)}
               target="_blank"
@@ -496,12 +469,14 @@ function BusinessDetailModal({
               <PhoneIcon />
               Llamar
             </a>
-          </div>
+          </div>}
           <button type="button" onClick={shareBusiness} className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-900">
             Compartir
           </button>
 
           <section className="mt-6">
+            {business.pilotRestaurant && <PilotBusinessNotice />}
+            {business.hasCatalog && <a href={businessCatalogPath(business)} className="mb-4 inline-flex min-h-12 w-full items-center justify-center rounded-md bg-[#D82016] px-4 text-sm font-bold text-white">{catalogLabel(business.category)}</a>}
             <h3 className="text-lg font-black text-slate-950">Qué ofrece</h3>
             <p className="mt-2 leading-7 text-slate-700">{business.description}</p>
           </section>
@@ -510,18 +485,18 @@ function BusinessDetailModal({
             <h3 className="text-lg font-black text-slate-950">Dónde atiende</h3>
             <p><strong>Municipio:</strong> {business.municipality}</p>
             <p><strong>Zona:</strong> {business.neighborhood || "Consultar"}</p>
+            <BusinessLocation mapsUrl={business.mapsUrl} />
             <p><strong>Domicilios:</strong> {business.deliveries === "Si" ? "Sí" : business.deliveries || "Consultar"}</p>
             <p><strong>Horario:</strong> {business.hours || "Consultar por WhatsApp"}</p>
           </section>
 
           <section className="mt-6 grid gap-2">
             <h3 className="text-lg font-black text-slate-950">Información del negocio</h3>
-            {business.mapsUrl ? <a className="font-bold text-[#D82016] underline" href={business.mapsUrl} target="_blank" rel="noreferrer">Abrir ubicación</a> : null}
             {business.instagram ? <a className="font-bold text-[#D82016] underline" href={socialUrl(business.instagram, "instagram")} target="_blank" rel="noreferrer">Instagram</a> : null}
             {business.facebook ? <a className="font-bold text-[#D82016] underline" href={socialUrl(business.facebook, "facebook")} target="_blank" rel="noreferrer">Facebook</a> : null}
           </section>
 
-          <a href="#inscripcion" onClick={onClose} className="mt-6 inline-flex w-full justify-center text-sm font-black text-[#D82016]">
+          <a href="/negocios/registro" onClick={onClose} className="mt-6 inline-flex w-full justify-center text-sm font-black text-[#D82016]">
             Reportar datos incorrectos
           </a>
         </div>
@@ -559,7 +534,7 @@ function EmptyState({
         <button type="button" onClick={onClearSearch} className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200 px-4 font-black text-slate-900">
           Cambiar búsqueda
         </button>
-        <a href="#inscripcion" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#D82016] px-4 font-black text-white">
+        <a href="/negocios/registro" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#D82016] px-4 font-black text-white">
           Inscribir mi negocio gratis
         </a>
       </div>
@@ -567,39 +542,56 @@ function EmptyState({
   );
 }
 
+function DirectorySkeleton() {
+  return <div className="contents" aria-label="Cargando negocios">{Array.from({length:8},(_,index)=><div key={index} className="animate-pulse overflow-hidden rounded-md border border-slate-200 bg-white"><div className="aspect-[4/3] bg-slate-200"/><div className="space-y-2 p-3"><div className="h-4 w-4/5 rounded bg-slate-200"/><div className="h-3 w-3/5 rounded bg-slate-100"/><div className="h-3 w-2/5 rounded bg-slate-100"/><div className="mt-3 h-11 rounded bg-slate-200"/></div></div>)}</div>;
+}
+
 export default function MercauDirectory() {
+  useEffect(() => {
+    const legacy = window.location.hash;
+    if (legacy === '#cuenta') window.location.replace('/mi-cuenta');
+    if (legacy === '#inscripcion') window.location.replace('/negocios/registro');
+  }, []);
   const [activeCategory, setActiveCategory] = useState<DirectoryCategory | "">("");
   const [activeMunicipality, setActiveMunicipality] = useState("");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDirectoryLoading, setIsDirectoryLoading] = useState(true);
   const [selectedBusiness, setSelectedBusiness] = useState<DirectoryBusiness | null>(null);
   const [businesses, setBusinesses] = useState<DirectoryBusiness[]>([]);
-  const [signupCategory, setSignupCategory] = useState<DirectoryCategory | "">("");
   const [directoryStatus, setDirectoryStatus] = useState("Cargando negocios aprobados...");
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-
-    const storedFavorites = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
-    if (!storedFavorites) return [];
-
-    try {
-      const parsed = JSON.parse(storedFavorites);
-      return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
-    } catch {
-      window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
-      return [];
-    }
-  });
+  const [directoryError,setDirectoryError]=useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [authEmail, setAuthEmail] = useState("");
+  const favorites=useFavorites(user?.id);
+  const favoriteIds=favorites.ids;
   const [accountStatus, setAccountStatus] = useState("");
-  const [isAuthLoading, setIsAuthLoading] = useState(false);
-  const [hasSyncedFavorites, setHasSyncedFavorites] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+  const directoryResultsRef = useRef<HTMLElement | null>(null);
+  const primarySearchRef = useRef<HTMLInputElement | null>(null);
+
+  function showDirectoryResults() {
+    window.requestAnimationFrame(() => {
+      directoryResultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function openPrimarySearch() {
+    const target = primarySearchRef.current;
+    if (!target) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+    target.focus({ preventScroll: true });
+  }
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    showDirectoryResults();
+  }
 
   async function loadBusinesses() {
     setIsDirectoryLoading(true);
+    setDirectoryError(false);
 
     try {
       const response = await fetch("/api/negocios", { cache: "no-store" });
@@ -619,6 +611,7 @@ export default function MercauDirectory() {
       setDirectoryStatus("Todavía no hay negocios aprobados para mostrar.");
     } catch (error) {
       setBusinesses([]);
+      setDirectoryError(true);
       setDirectoryStatus("No se pudo cargar el directorio en este momento. Intenta nuevamente en unos minutos.");
     } finally {
       setIsDirectoryLoading(false);
@@ -645,57 +638,11 @@ export default function MercauDirectory() {
       data: { subscription }
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setHasSyncedFavorites(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
-  }, [favoriteIds]);
-
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase || !user || hasSyncedFavorites) return;
-    const supabaseClient = supabase;
-    const currentUser = user;
-
-    async function syncFavorites() {
-      const { data, error } = await supabaseClient
-        .from("favorites")
-        .select("business_id")
-        .eq("user_id", currentUser.id);
-
-      if (error) {
-        setAccountStatus("Tu sesión está activa, pero falta preparar la tabla de favoritos en Supabase.");
-        return;
-      }
-
-      const remoteIds = (data || [])
-        .map((record) => String(record.business_id || ""))
-        .filter(Boolean);
-      const mergedIds = Array.from(new Set([...favoriteIds, ...remoteIds]));
-
-      if (mergedIds.length > remoteIds.length) {
-        await supabaseClient
-          .from("favorites")
-          .upsert(
-            mergedIds.map((businessId) => ({
-              business_id: businessId,
-              user_id: currentUser.id
-            })),
-            { onConflict: "user_id,business_id" }
-          );
-      }
-
-      setFavoriteIds(mergedIds);
-      setHasSyncedFavorites(true);
-      setAccountStatus("Favoritos sincronizados con tu cuenta.");
-    }
-
-    syncFavorites();
-  }, [favoriteIds, hasSyncedFavorites, user]);
 
   useEffect(() => {
     const search = query.trim();
@@ -707,6 +654,7 @@ export default function MercauDirectory() {
         search,
         category: activeCategory
       });
+      trackMetric({type:"directory_search_performed",search,category:activeCategory});
     }, 1200);
 
     return () => window.clearTimeout(timer);
@@ -732,6 +680,7 @@ export default function MercauDirectory() {
           business.municipality,
           business.neighborhood,
           business.description,
+          ...(business.commercialSearchTerms || []),
           business.deliveries,
           ...categoryTerms
         ].join(" ")
@@ -759,37 +708,7 @@ export default function MercauDirectory() {
   async function toggleFavorite(business: DirectoryBusiness) {
     const wasFavorite = favoriteIds.includes(business.id);
 
-    setFavoriteIds((current) => {
-      const isFavorite = current.includes(business.id);
-      return isFavorite
-        ? current.filter((id) => id !== business.id)
-        : [...current, business.id];
-    });
-
-    const supabase = getSupabaseBrowserClient();
-    if (supabase && user) {
-      const request = wasFavorite
-        ? supabase
-            .from("favorites")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("business_id", business.id)
-        : supabase
-            .from("favorites")
-            .upsert(
-              {
-                business_id: business.id,
-                user_id: user.id
-              },
-              { onConflict: "user_id,business_id" }
-            );
-
-      const { error } = await request;
-
-      if (error) {
-        setAccountStatus("No se pudo sincronizar este favorito. Quedó guardado en este navegador.");
-      }
-    }
+    await favorites.toggle(business.id);
 
     trackMetric({
       type: wasFavorite ? "Favorito eliminado" : "Favorito guardado",
@@ -797,96 +716,23 @@ export default function MercauDirectory() {
       businessName: business.name,
       category: business.category
     });
+    trackMetric({type:wasFavorite?"business_card_favorite_removed":"business_card_favorite_added",businessId:business.id,businessName:business.name,category:business.category});
   }
 
-  async function signInWithEmail(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsAuthLoading(true);
-    setAccountStatus("Enviando enlace de acceso...");
+  useEffect(()=>{
+    if(!activeCategory&&!activeMunicipality)return;
+    trackMetric({type:"directory_filter_used",category:activeCategory,municipality:activeMunicipality});
+  },[activeCategory,activeMunicipality]);
 
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) {
-      setAccountStatus("Faltan las variables de Supabase para activar cuentas.");
-      setIsAuthLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email: authEmail.trim(),
-      options: {
-        emailRedirectTo: MERCAU_PUBLIC_URL
-      }
-    });
-
-    setIsAuthLoading(false);
-
-    if (error) {
-      setAccountStatus(`No se pudo enviar el enlace: ${error.message}`);
-      return;
-    }
-
-    setAccountStatus("Te enviamos un enlace al correo. Ábrelo para entrar a tu cuenta de Mercáu.");
-  }
-
-  async function signOut() {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return;
-
-    await supabase.auth.signOut();
-    setUser(null);
-    setHasSyncedFavorites(false);
-    setAccountStatus("Saliste de tu cuenta. Tus favoritos de este navegador siguen aquí.");
-  }
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmitting(true);
-    setStatus("Enviando inscripción...");
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const payload: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {
-      ...Object.fromEntries(formData.entries()),
-      secondaryCategories: formData.getAll("secondaryCategories")
-    };
-
-    try {
-      const response = await fetch("/api/inscripciones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "No se pudo enviar.");
-      }
-
-      form.reset();
-      setSignupCategory("");
-      setStatus("Inscripción recibida. Queda pendiente de revisión antes de publicarse.");
-      trackMetric({
-        type: "Inscripcion enviada",
-        businessName: String(payload.businessName || ""),
-        category: String(payload.category || "")
-      });
-      loadBusinesses();
-    } catch (error) {
-      setStatus("No se pudo enviar la inscripción. Revisa la conexión e intenta nuevamente.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   const resultsLabel = isDirectoryLoading
     ? "Cargando resultados"
     : `${sortedBusinesses.length} ${sortedBusinesses.length === 1 ? "resultado" : "resultados"}`;
-  const signupCategoryConfig = directoryCategories.find((category) => category.name === signupCategory);
 
   return (
     <>
-      <div className="min-h-screen overflow-x-hidden bg-[#FCFBF9] pb-24 text-[#1F2937] md:pb-0">
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="min-h-screen overflow-x-hidden bg-[#FCFBF9] pb-24 pt-[65px] text-[#1F2937] md:pb-0 md:pt-[73px]">
+        <header className="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 md:px-6 md:py-3">
             <a href="#" className="flex items-center gap-3" aria-label="Inicio Mercáu">
               <img src="/logo-mercau.png" alt="Mercáu" className="h-11 w-11 rounded-2xl object-cover md:h-12 md:w-12" />
@@ -895,17 +741,43 @@ export default function MercauDirectory() {
                 <span className="block max-w-[12rem] truncate text-[11px] font-semibold text-slate-500 md:max-w-none md:text-sm">Directorio Digital del Bajo Cauca</span>
               </div>
             </a>
-            <nav className="hidden items-center gap-2 text-sm font-black text-slate-700 md:flex">
+            <nav className="hidden items-center gap-2 text-sm font-black text-slate-700 xl:flex">
               <a href="#directorio" className="rounded-xl px-4 py-2 hover:bg-slate-100">Explorar</a>
+              <a href="/nosotros" className="rounded-xl px-4 py-2 hover:bg-slate-100">Conoce Mercáu</a>
               <a href="/enviar" className="rounded-xl border border-[#D82016] px-4 py-2 text-[#D82016] hover:bg-[#FFF1F0]">Solicitar envío</a>
-              <a href="#inscripcion" className="rounded-xl bg-[#D82016] px-4 py-2 text-white hover:bg-[#B91C1C]">Inscribir mi negocio</a>
+              <a href="/negocios/registro" className="rounded-xl bg-[#D82016] px-4 py-2 text-white hover:bg-[#B91C1C]">Inscribir mi negocio</a>
+              <InstallMercau />
               <a href="#favoritos" className="grid h-10 w-10 place-items-center rounded-full hover:bg-[#FFF1F0] hover:text-[#D82016]" aria-label="Favoritos"><HeartIcon filled={favoriteIds.length > 0} /></a>
-              <a href="#cuenta" className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-100">Mi cuenta</a>
+              <a href="/mi-cuenta?entry=general" className="rounded-xl border border-slate-200 px-4 py-2 hover:bg-slate-100">Mi cuenta</a>
             </nav>
-            <button type="button" className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-700 md:hidden" aria-label="Abrir menú">
-              <MenuIcon />
+            <button
+              type="button"
+              className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-700 xl:hidden"
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="menu-movil-mercau"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+            >
+              {mobileMenuOpen ? <CloseMenuIcon /> : <MenuIcon />}
             </button>
           </div>
+          {mobileMenuOpen ? (
+            <nav
+              id="menu-movil-mercau"
+              aria-label="Menú principal móvil"
+              className="border-t border-slate-200 bg-white px-4 py-3 shadow-lg xl:hidden"
+            >
+              <div className="mx-auto grid max-w-md gap-1 text-sm font-black text-slate-800">
+                <a onClick={() => setMobileMenuOpen(false)} href="#directorio" className="rounded-md px-3 py-3 hover:bg-slate-100">Explorar negocios</a>
+                <a onClick={() => setMobileMenuOpen(false)} href="/nosotros" className="rounded-md px-3 py-3 hover:bg-slate-100">Conoce Mercáu</a>
+                <a onClick={() => setMobileMenuOpen(false)} href="/enviar" className="rounded-md px-3 py-3 hover:bg-slate-100">Solicitar envío</a>
+                <a onClick={() => setMobileMenuOpen(false)} href="/negocios/registro" className="rounded-md px-3 py-3 text-[#D82016] hover:bg-[#FFF1F0]">Inscribir mi negocio</a>
+                <InstallMercau compact />
+                <a onClick={() => setMobileMenuOpen(false)} href="#favoritos" className="rounded-md px-3 py-3 hover:bg-slate-100">Favoritos</a>
+                <a onClick={() => setMobileMenuOpen(false)} href="/mi-cuenta?entry=general" className="rounded-md px-3 py-3 hover:bg-slate-100">Mi cuenta</a>
+              </div>
+            </nav>
+          ) : null}
         </header>
 
         <section className="mx-auto grid w-full max-w-7xl min-w-0 gap-0 px-3 pb-4 pt-2 md:grid-cols-[1fr_0.9fr] md:items-center md:gap-6 md:px-6 md:py-8">
@@ -927,17 +799,25 @@ export default function MercauDirectory() {
 
           <div className="relative z-10 -mt-3 min-w-0 md:order-1 md:mt-0">
             <div className="w-full min-w-0 rounded-[1.5rem] border border-slate-200 bg-white p-3 shadow-soft md:rounded-[2rem] md:p-5">
-              <label className="relative block">
-                <span className="sr-only">Buscar negocio o servicio</span>
-                <SearchIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 md:h-6 md:w-6" />
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  type="search"
-                  placeholder="¿Qué estás buscando hoy?"
-                  className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-semibold outline-none ring-[#D82016]/20 placeholder:text-slate-400 focus:border-[#D82016] focus:ring-4 md:h-12 md:pl-12 md:text-base"
-                />
-              </label>
+              <form onSubmit={submitSearch} className="grid min-w-0 grid-cols-[1fr_auto] gap-2">
+                <label className="relative block min-w-0">
+                  <span className="sr-only">Buscar negocio o servicio</span>
+                  <SearchIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 md:h-6 md:w-6" />
+                  <input
+                    ref={primarySearchRef}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    type="search"
+                    enterKeyHint="search"
+                    placeholder="¿Qué estás buscando hoy?"
+                    className="h-11 w-full min-w-0 rounded-2xl border border-slate-200 bg-white pl-11 pr-3 text-sm font-semibold outline-none ring-[#D82016]/20 placeholder:text-slate-400 focus:border-[#D82016] focus:ring-4 md:h-12 md:pl-12 md:pr-4 md:text-base"
+                  />
+                </label>
+                <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C] md:min-h-12 md:px-5">
+                  <SearchIcon className="h-5 w-5" />
+                  <span>Buscar</span>
+                </button>
+              </form>
 
               <div className="mt-3 md:mt-4">
                 <p className="text-xs font-black text-slate-950 md:text-sm">Filtra por municipio</p>
@@ -963,10 +843,7 @@ export default function MercauDirectory() {
                 <a href="#directorio" className="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#D82016] px-5 text-sm font-black text-white hover:bg-[#B91C1C] md:min-h-12 md:text-base">
                   Explorar directorio
                 </a>
-                <a href="/enviar" className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-black text-[#1F2937] hover:bg-slate-100 md:min-h-12 md:text-base">
-                  Solicitar envío
-                </a>
-                <a href="#inscripcion" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#D82016] bg-white px-5 text-sm font-black text-[#D82016] hover:bg-[#FFF1F0] md:min-h-12 md:text-base">
+                <a href="/negocios/registro" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#D82016] bg-white px-5 text-sm font-black text-[#D82016] hover:bg-[#FFF1F0] md:min-h-12 md:text-base">
                   <StoreIcon />
                   Inscribir mi negocio gratis
                 </a>
@@ -979,9 +856,16 @@ export default function MercauDirectory() {
           <div className="min-w-0 rounded-[1.5rem] bg-white p-3 shadow-soft md:rounded-[2rem] md:p-5">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-lg font-black text-[#1F2937] md:text-xl">Categorías principales</h2>
-              <button type="button" onClick={() => setActiveCategory("")} className="text-sm font-black text-[#D82016] underline">Ver todas</button>
+              <button
+                type="button"
+                onClick={() => setShowAllCategories((current) => !current)}
+                aria-expanded={showAllCategories}
+                className="text-sm font-black text-[#D82016] underline md:hidden"
+              >
+                {showAllCategories ? "Ver menos" : "Ver todas"}
+              </button>
             </div>
-            <div className="no-scrollbar mt-3 flex max-w-full gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] md:mt-4 md:grid md:grid-cols-9 md:gap-3 md:overflow-visible">
+            <div className={`mt-3 max-w-full gap-2 pb-1 md:mt-4 md:grid md:grid-cols-9 md:gap-3 ${showAllCategories ? "grid grid-cols-3 overflow-visible" : "no-scrollbar flex overflow-x-auto [-webkit-overflow-scrolling:touch]"}`}>
               {directoryCategories.map((category) => {
                 const theme = categoryTheme[category.name];
                 return (
@@ -992,7 +876,7 @@ export default function MercauDirectory() {
                       setActiveCategory((current) => (current === category.name ? "" : category.name));
                       trackMetric({ type: "Categoria", category: category.name, search: query });
                     }}
-                    className={`grid min-h-20 w-20 shrink-0 place-items-center rounded-2xl border p-2 text-center transition sm:min-h-28 sm:w-28 sm:p-3 md:w-auto ${
+                    className={`grid min-h-20 shrink-0 place-items-center rounded-2xl border p-2 text-center transition sm:min-h-28 sm:p-3 md:w-auto ${showAllCategories ? "w-full" : "w-20 sm:w-28"} ${
                       activeCategory === category.name
                         ? "border-[#D82016] bg-[#FFF1F0] ring-4 ring-[#D82016]/10"
                         : "border-slate-200 bg-white hover:border-[#F3D1CE]"
@@ -1006,10 +890,24 @@ export default function MercauDirectory() {
                 );
               })}
             </div>
+            {activeCategory ? (
+              <div className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-xl bg-[#FFF1F0] px-3 text-sm font-black text-[#B91C1C]">
+                <span className="min-w-0 truncate">Categoría: {displayCategory(activeCategory)}</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory("")}
+                  aria-label={`Quitar filtro ${displayCategory(activeCategory)}`}
+                  title="Quitar filtro"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-2xl leading-none hover:bg-white"
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
 
-        <section id="directorio" className="mx-auto mt-4 grid w-full max-w-7xl min-w-0 gap-4 px-3 md:mt-6 md:grid-cols-[18rem_1fr] md:gap-5 md:px-6">
+        <section ref={directoryResultsRef} id="directorio" className="scroll-mt-4 mx-auto mt-4 grid w-full max-w-7xl min-w-0 gap-4 px-3 md:mt-6 md:grid-cols-[18rem_1fr] md:gap-5 md:px-6">
           <aside className="hidden self-start rounded-[2rem] bg-white p-5 shadow-soft md:block">
             <h2 className="text-lg font-black text-[#1F2937]">Filtros</h2>
             <div className="mt-5">
@@ -1100,9 +998,11 @@ export default function MercauDirectory() {
               <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-soft sm:px-4 sm:text-sm">Ordenar por relevancia</span>
             </div>
 
-            <div className="mt-3 grid min-w-0 gap-2.5 md:mt-4 md:gap-3">
+            <div className="mt-3 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 md:mt-4 md:gap-2.5 xl:grid-cols-4">
               {isDirectoryLoading ? (
-                <div className="rounded-[2rem] bg-white p-6 text-center font-bold text-slate-600 shadow-soft">Cargando negocios...</div>
+                <DirectorySkeleton />
+              ) : directoryError ? (
+                <div className="col-span-full rounded-md border border-red-200 bg-white p-6 text-center"><h3 className="text-xl font-black">No pudimos cargar los negocios</h3><p className="mt-2 text-sm text-slate-600">Revisa tu conexión e intenta nuevamente.</p><button type="button" onClick={loadBusinesses} className="mt-4 min-h-11 rounded-md bg-[#D82016] px-4 font-black text-white">Intentar de nuevo</button></div>
               ) : sortedBusinesses.length > 0 ? (
                 sortedBusinesses.map((business) => (
                   <BusinessCard
@@ -1114,12 +1014,7 @@ export default function MercauDirectory() {
                   />
                 ))
               ) : (
-                <EmptyState
-                  query={query}
-                  municipality={activeMunicipality}
-                  onClearMunicipality={() => setActiveMunicipality("")}
-                  onClearSearch={() => setQuery("")}
-                />
+                <div className="col-span-full"><EmptyState query={query} municipality={activeMunicipality} onClearMunicipality={()=>setActiveMunicipality("")} onClearSearch={()=>setQuery("")}/></div>
               )}
             </div>
           </div>
@@ -1135,6 +1030,7 @@ export default function MercauDirectory() {
                   Por ahora se guardan en este navegador. Cuando conectemos cuentas, podrás recuperarlos desde otro celular o computador.
                 </p>
               </div>
+              <BackToAccount />
               <span className="rounded-full bg-[#FFF1F0] px-4 py-2 text-sm font-black text-[#D82016]">
                 {favoriteBusinesses.length} guardados
               </span>
@@ -1160,215 +1056,24 @@ export default function MercauDirectory() {
           </div>
         </section>
 
-        <section id="cuenta" className="mx-auto mt-8 max-w-7xl px-4 md:px-6">
-          <div className="grid gap-4 rounded-[2rem] bg-[#1F2937] p-5 text-white shadow-soft md:grid-cols-[0.8fr_1.2fr] md:p-7">
-            <div>
-              <p className="text-sm font-black uppercase tracking-normal text-white/70">Mi cuenta</p>
-              <h2 className="mt-2 text-3xl font-black leading-tight md:text-4xl">Próximo paso: guardar y administrar desde tu cuenta</h2>
-              <p className="mt-3 leading-7 text-white/75">
-                La búsqueda seguirá siendo pública. Tu cuenta sirve para conservar favoritos y preparar la futura administración de negocios.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
-                <h3 className="text-lg font-black">Quiero explorar y guardar</h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Entra con tu correo para sincronizar favoritos. La búsqueda y el contacto por WhatsApp siguen libres.
-                </p>
-                {user ? (
-                  <div className="mt-4 grid gap-2">
-                    <p className="rounded-xl bg-[#FFF1F0] p-3 text-xs font-black text-[#D82016]">
-                      Sesión activa: {user.email}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={signOut}
-                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-900 hover:bg-slate-200"
-                    >
-                      Cerrar sesión
-                    </button>
-                  </div>
-                ) : (
-                  <form onSubmit={signInWithEmail} className="mt-4 grid gap-2">
-                    <label className="grid gap-1 text-xs font-black text-slate-700">
-                      Correo electrónico
-                      <input
-                        value={authEmail}
-                        onChange={(event) => setAuthEmail(event.target.value)}
-                        type="email"
-                        required
-                        placeholder="tunombre@correo.com"
-                        className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20"
-                      />
-                    </label>
-                    <button
-                      type="submit"
-                      disabled={isAuthLoading}
-                      className="inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C] disabled:opacity-60"
-                    >
-                      {isAuthLoading ? "Enviando..." : "Enviar enlace de acceso"}
-                    </button>
-                  </form>
-                )}
-              </div>
-              <div className="rounded-2xl bg-white p-4 text-[#1F2937]">
-                <h3 className="text-lg font-black">Tengo un negocio</h3>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                  Si ya activaste tu acceso desde el link privado, entra para ver tu ficha y solicitar cambios.
-                </p>
-                <a href="/mi-negocio" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#D82016] px-4 text-sm font-black text-white hover:bg-[#B91C1C]">
-                  Entrar a Mi negocio
-                </a>
-                <a href="#inscripcion" className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-black text-slate-900 hover:bg-slate-200">
-                  Inscribir mi negocio
-                </a>
-              </div>
-              {accountStatus ? (
-                <p className="rounded-2xl bg-white/10 p-4 text-sm font-semibold leading-6 text-white/80 sm:col-span-2">
-                  {accountStatus}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </section>
 
-        <section id="inscripcion" className="mx-auto mt-8 max-w-7xl px-4 pb-10 md:px-6">
-          <div className="grid gap-6 rounded-[2rem] bg-white p-5 shadow-soft md:grid-cols-[0.85fr_1.15fr] md:p-7">
-            <div>
-              <p className="text-sm font-black uppercase tracking-normal text-[#D82016]">Inscripción gratuita</p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-[#1F2937] md:text-4xl">
-                Inscribe tu negocio en Mercáu
-              </h2>
-              <p className="mt-3 leading-7 text-slate-600">
-                El formulario está pensado para celular. Tu solicitud queda en revisión y se publica cuando Mercáu apruebe la información.
-              </p>
-            </div>
 
-            <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Nombre del negocio
-                <input name="businessName" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Nombre del propietario / administrador
-                <input name="ownerName" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                WhatsApp
-                <input name="whatsapp" required inputMode="tel" placeholder="Ej: 3001234567" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Categoría principal
-                <select
-                  name="category"
-                  required
-                  value={signupCategory}
-                  onChange={(event) => setSignupCategory(event.target.value as DirectoryCategory | "")}
-                  className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20"
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {directoryCategories.map((category) => (
-                    <option key={category.name} value={category.name}>{displayCategory(category.name)}</option>
-                  ))}
-                </select>
-              </label>
-              {signupCategoryConfig ? (
-                <label className="grid gap-2 text-sm font-black text-slate-800">
-                  Subcategoría
-                  <select name="subcategory" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
-                    <option value="">Seleccionar subcategoría</option>
-                    {signupCategoryConfig.subcategories.map((subcategory) => (
-                      <option key={subcategory} value={subcategory}>{subcategory}</option>
-                    ))}
-                    <option value="Otra actividad">Otra actividad</option>
-                  </select>
-                </label>
-              ) : null}
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Municipio
-                <select name="municipality" required className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
-                  <option value="">Seleccionar municipio</option>
-                  {directoryMunicipalities.map((municipality) => (
-                    <option key={municipality} value={municipality}>{municipality}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Dirección del negocio
-                <input name="neighborhood" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800 sm:col-span-2">
-                Descripción corta del negocio
-                <textarea name="description" required rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              {signupCategory ? (
-                <fieldset className="grid gap-2 rounded-2xl border border-slate-200 p-4 sm:col-span-2">
-                  <legend className="px-1 text-sm font-black text-slate-800">Categorías secundarias opcionales</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {directoryCategories
-                      .filter((category) => category.name !== signupCategory)
-                      .map((category) => (
-                        <label key={category.name} className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                          <input type="checkbox" name="secondaryCategories" value={category.name} className="h-4 w-4 accent-[#D82016]" />
-                          {category.name}
-                        </label>
-                      ))}
-                  </div>
-                </fieldset>
-              ) : null}
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Etiquetas o servicios
-                <input name="tags" placeholder="Ej: domicilios, repuestos, papelería" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Otra actividad
-                <input name="otherActivity" placeholder="Si no encaja, escríbela aquí" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Horario
-                <input name="hours" placeholder="Ej: lunes a sábado" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Domicilios
-                <select name="deliveries" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
-                  <option>Consultar</option>
-                  <option value="Si">Sí</option>
-                  <option>No</option>
-                </select>
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Instagram o usuario
-                <input name="instagram" type="text" placeholder="@minegocio" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800">
-                Facebook o página
-                <input name="facebook" type="text" placeholder="Mi Negocio" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20" />
-              </label>
-              <label className="grid gap-2 text-sm font-black text-slate-800 sm:col-span-2">
-                ¿Quieres vender en Mercáu?
-                <select name="wantsMarketplace" className="min-h-12 rounded-2xl border border-slate-200 px-4 font-semibold outline-none focus:border-[#D82016] focus:ring-4 focus:ring-[#D82016]/20">
-                  <option value="Si">Sí</option>
-                  <option value="Después">Después</option>
-                </select>
-              </label>
-              <button type="submit" disabled={isSubmitting} className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#D82016] px-5 py-4 font-black text-white hover:bg-[#B91C1C] disabled:opacity-60 sm:col-span-2">
-                {isSubmitting ? "Enviando..." : "Enviar inscripción para revisión"}
-              </button>
-              {status ? <p className="rounded-2xl bg-[#FFF1F0] p-4 font-bold text-[#1F2937] sm:col-span-2">{status}</p> : null}
-            </form>
-          </div>
-        </section>
+
 
         <footer className="border-t border-slate-200 bg-[#D82016] text-white">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-5 text-sm font-bold md:px-6">
             <strong className="text-2xl font-black">Mercáu</strong>
             <span>Cáceres · Caucasia · El Bagre · Nechí · Tarazá · Zaragoza</span>
-            <span>Negocios locales, más oportunidades.</span>
+            <nav className="flex flex-wrap gap-4" aria-label="Pie de página">
+              <a href="/nosotros">Conoce Mercáu</a>
+              <a href="/terminos-y-condiciones">Términos</a>
+              <a href="/politica-de-tratamiento-de-datos">Datos personales</a>
+            </nav>
           </div>
         </footer>
       </div>
 
-      <BottomNav />
+      <BottomNav onSearch={openPrimarySearch} />
 
       {selectedBusiness ? (
         <BusinessDetailModal

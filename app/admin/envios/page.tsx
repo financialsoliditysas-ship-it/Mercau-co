@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import AdminShell from "@/components/admin/AdminShell";
 
 type AdminOrder = {
   id: string;
@@ -9,11 +10,14 @@ type AdminOrder = {
   customer_name: string;
   pickup_address: string;
   delivery_address: string;
+  delivery_latitude: number | null;
+  delivery_longitude: number | null;
   status: string;
   shipday_status: string | null;
   shipday_order_id: string | null;
   shipday_tracking_url: string | null;
   delivery_fee: number;
+  courier_name?: string | null;
 };
 
 export default function AdminDeliveriesPage() {
@@ -21,6 +25,7 @@ export default function AdminDeliveriesPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => { setPassword(sessionStorage.getItem("mercau_admin_password") || ""); }, []);
 
   async function loadOrders(event?: FormEvent) {
     event?.preventDefault();
@@ -38,6 +43,7 @@ export default function AdminDeliveriesPage() {
     }
 
     setOrders(payload.orders || []);
+    sessionStorage.setItem("mercau_admin_password", password);
     setStatus(`${payload.orders?.length || 0} envíos cargados.`);
   }
 
@@ -64,10 +70,7 @@ export default function AdminDeliveriesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FCFBF9] p-4 text-[#1F2937]">
-      <main className="mx-auto max-w-6xl">
-        <h1 className="text-3xl font-black">Envíos Mercáu</h1>
-        <p className="mt-2 font-semibold text-slate-600">Panel mínimo para pruebas logísticas.</p>
+    <AdminShell active="envios" title="Envíos" description="Supervisa solicitudes, direcciones, estados de Shipday y problemas de integración.">
 
         <form onSubmit={loadOrders} className="mt-5 flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-soft sm:flex-row">
           <input
@@ -94,6 +97,7 @@ export default function AdminDeliveriesPage() {
                 <th className="p-3">Estado Mercáu</th>
                 <th className="p-3">Estado Shipday</th>
                 <th className="p-3">Shipday ID</th>
+                <th className="p-3">Mensajero</th>
                 <th className="p-3">Tarifa</th>
                 <th className="p-3">Acciones</th>
               </tr>
@@ -105,10 +109,23 @@ export default function AdminDeliveriesPage() {
                   <td className="p-3">{new Date(order.created_at).toLocaleString("es-CO")}</td>
                   <td className="p-3">{order.customer_name}</td>
                   <td className="p-3">{order.pickup_address}</td>
-                  <td className="p-3">{order.delivery_address}</td>
+                  <td className="p-3">
+                    <span className="block">{order.delivery_address}</span>
+                    {order.delivery_latitude !== null && order.delivery_longitude !== null ? (
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${order.delivery_latitude},${order.delivery_longitude}`)}&travelmode=driving`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex font-black text-[#D82016]"
+                      >
+                        Abrir ubicación en Google Maps
+                      </a>
+                    ) : null}
+                  </td>
                   <td className="p-3">{order.status}</td>
                   <td className="p-3">{order.shipday_status || "-"}</td>
                   <td className="p-3">{order.shipday_order_id || "-"}</td>
+                  <td className="p-3 font-bold">{order.courier_name || "No informado"}</td>
                   <td className="p-3">${Number(order.delivery_fee || 0).toLocaleString("es-CO")}</td>
                   <td className="grid gap-1 p-3">
                     <button onClick={() => action(order.id, "history")} className="rounded-lg bg-slate-100 px-3 py-2 font-black">Ver</button>
@@ -131,7 +148,6 @@ export default function AdminDeliveriesPage() {
             {JSON.stringify(selected, null, 2)}
           </pre>
         ) : null}
-      </main>
-    </div>
+    </AdminShell>
   );
 }

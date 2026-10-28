@@ -67,6 +67,27 @@ async function airtableList(params: {
   return { response, result };
 }
 
+async function airtableListAll(params: {
+  token: string;
+  baseId: string;
+  tableId: string;
+  query: URLSearchParams;
+}) {
+  const records: Array<{ id?: string; createdTime?: string; fields?: Record<string, unknown> }> = [];
+  let offset = "";
+
+  do {
+    const query = new URLSearchParams(params.query);
+    if (offset) query.set("offset", offset);
+    const page = await airtableList({ ...params, query });
+    if (!page.response.ok) return { ...page, records };
+    records.push(...(page.result.records || []));
+    offset = cleanText(page.result.offset, 160);
+  } while (offset);
+
+  return { response: new Response(null, { status: 200 }), result: { records }, records };
+}
+
 function increment(map: Record<string, number>, key: string) {
   if (!key) return;
   map[key] = (map[key] || 0) + 1;
@@ -99,13 +120,13 @@ export async function POST(request: NextRequest) {
   });
 
   const [negociosResult, metricasResult] = await Promise.all([
-    airtableList({
+    airtableListAll({
       token: currentConfig.token,
       baseId: currentConfig.baseId,
       tableId: currentConfig.negociosTableId,
       query: negociosQuery
     }),
-    airtableList({
+    airtableListAll({
       token: currentConfig.token,
       baseId: currentConfig.baseId,
       tableId: currentConfig.metricasTableId,
@@ -126,6 +147,7 @@ export async function POST(request: NextRequest) {
   const categoryCounts: Record<string, number> = {};
   const searchCounts: Record<string, number> = {};
   const whatsappByBusiness: Record<string, number> = {};
+  const campaignSources: Record<string, number> = {};
 
   businesses.forEach((record: { fields?: Record<string, unknown> }) => {
     const fields = record.fields || {};
@@ -138,21 +160,42 @@ export async function POST(request: NextRequest) {
     const category = publicCategory(cleanText(fields[METRICAS_FIELD_IDS.category], 80));
     const search = cleanText(fields[METRICAS_FIELD_IDS.search], 120);
     const businessName = cleanText(fields[METRICAS_FIELD_IDS.businessName], 120);
+    const notes = cleanText(fields[METRICAS_FIELD_IDS.notes], 300);
+    const source = notes.match(/(?:^|; )source=([^;]+)/)?.[1]?.trim() || "";
 
     if (type === "Categoria") increment(categoryCounts, category);
     if (search) increment(searchCounts, search.toLowerCase());
     if (type === "Clic WhatsApp") increment(whatsappByBusiness, businessName || "Sin negocio");
+    if (source) increment(campaignSources, source);
   });
 
+  const countType = (type: string) => events.filter(
+    (record: { fields?: Record<string, unknown> }) =>
+      selectName((record.fields || {})[METRICAS_FIELD_IDS.type]) === type
+  ).length;
+  const visitasQrTarjeta = events.filter((record: { fields?: Record<string, unknown> }) => {
+    const fields = record.fields || {};
+    const type = selectName(fields[METRICAS_FIELD_IDS.type]);
+    const notes = cleanText(fields[METRICAS_FIELD_IDS.notes], 300);
+    return type === "Pagina instalacion visitada"
+      && /(?:^|; )source=tarjeta_fisica(?:;|$)/.test(notes)
+      && /(?:^|; )medium=qr(?:;|$)/.test(notes);
+  }).length;
+
   const summary = {
-    visitas: events.filter(
-      (record: { fields?: Record<string, unknown> }) =>
-        selectName((record.fields || {})[METRICAS_FIELD_IDS.type]) === "Visita"
-    ).length,
-    clicsWhatsApp: events.filter(
-      (record: { fields?: Record<string, unknown> }) =>
-        selectName((record.fields || {})[METRICAS_FIELD_IDS.type]) === "Clic WhatsApp"
-    ).length,
+    visitas: countType("Visita"),
+    clicsWhatsApp: countType("Clic WhatsApp"),
+    visitasQrTarjeta,
+    instalacionesIniciadas: countType("Instalacion iniciada"),
+    instalacionesAndroidConfirmadas: countType("Instalacion Android confirmada"),
+    instalacionesActivasEstimadas: countType("App instalada activa"),
+    registrosIniciados: countType("Registro usuario iniciado"),
+    cuentasConfirmadas: countType("Cuenta confirmada"),
+    menusVistos: countType("Menu visto"),
+    productosAgregados: countType("Producto agregado"),
+    carritosIniciados: countType("Carrito iniciado"),
+    pedidosRevisados: countType("Pedido revisado"),
+    pedidosConfirmados: countType("Pedido confirmado"),
     negociosInscritos: businesses.length,
     negociosAprobados: businesses.filter((record: { fields?: Record<string, unknown> }) => {
       const status = selectName((record.fields || {})[NEGOCIOS_FIELD_IDS.status]);
@@ -171,6 +214,7 @@ export async function POST(request: NextRequest) {
     statusCounts: top(statusCounts),
     categoriasMasBuscadas: top(categoryCounts),
     busquedas: top(searchCounts),
+    fuentesCampana: top(campaignSources),
     whatsappPorNegocio: top(whatsappByBusiness),
     ultimosEventos: events.slice(0, 12).map(
       (record: { createdTime?: string; fields?: Record<string, unknown> }) => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { directoryCategories } from "@/data/directory";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 const FIELD_IDS = {
   businessName: "fldZAuId3Z7tmNg1y",
@@ -82,6 +83,16 @@ function appUrl(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const accessToken = request.headers.get("authorization")?.match(/^Bearer (.+)$/i)?.[1];
+  if (!accessToken) return NextResponse.json({ error: "Entra a tu cuenta para inscribir tu negocio." }, { status: 401 });
+  let userId='';
+  try {
+    const { data, error } = await getSupabaseAdminClient().auth.getUser(accessToken);
+    if (error || !data.user?.email_confirmed_at) return NextResponse.json({ error: "Tu sesión no es válida. Confirma el correo y entra nuevamente." }, { status: 401 });
+    userId=data.user.id;
+  } catch {
+    return NextResponse.json({ error: "No se pudo comprobar la sesión. Intenta más tarde." }, { status: 503 });
+  }
   const token = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const tableId = process.env.AIRTABLE_NEGOCIOS_TABLE_ID;
@@ -192,8 +203,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let linked=false;
+  if(/^rec[A-Za-z0-9]{14}$/.test(result.id)){
+    try{const link=await getSupabaseAdminClient().from('business_admins').insert({user_id:userId,business_id:result.id,business_name:businessName,owner_name:ownerName,owner_whatsapp:whatsapp,private_token:updateToken,status:'Activo'});linked=!link.error;}catch{linked=false;}
+  }
   return NextResponse.json(
-    { ok: true, recordId: result.id, status: "Pendiente" },
+    { ok: true, recordId: result.id, status: "Pendiente",linked,message:linked?'Inscripción recibida y vinculada a tu cuenta.':'Inscripción recibida. La vinculación está pendiente; no repitas el registro y contacta a Mercáu.' },
     { status: 201 }
   );
 }

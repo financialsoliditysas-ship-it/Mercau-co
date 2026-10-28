@@ -1,0 +1,16 @@
+node_modules
+.next
+.next-*
+.vercel
+.env*
+*.log
+tsconfig.tsbuildinfo
+scripts
+docs
+supabase
+account-*.png
+npm-runtime
+npm-*.tgz
+location-*.png
+*-staged-*.png
+*-production-*.png

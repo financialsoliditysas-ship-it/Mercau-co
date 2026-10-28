@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import AdminShell from "@/components/admin/AdminShell";
 
 type CountItem = {
   label: string;
@@ -11,6 +12,17 @@ type MetricsData = {
   summary: {
     visitas: number;
     clicsWhatsApp: number;
+    visitasQrTarjeta: number;
+    instalacionesIniciadas: number;
+    instalacionesAndroidConfirmadas: number;
+    instalacionesActivasEstimadas: number;
+    registrosIniciados: number;
+    cuentasConfirmadas: number;
+    menusVistos: number;
+    productosAgregados: number;
+    carritosIniciados: number;
+    pedidosRevisados: number;
+    pedidosConfirmados: number;
     negociosInscritos: number;
     negociosAprobados: number;
   };
@@ -18,6 +30,7 @@ type MetricsData = {
   categoriasMasBuscadas: CountItem[];
   busquedas: CountItem[];
   whatsappPorNegocio: CountItem[];
+  fuentesCampana: CountItem[];
   ultimosEventos: Array<{
     tipo: string;
     negocio: string;
@@ -33,6 +46,17 @@ const emptyData: MetricsData = {
   summary: {
     visitas: 0,
     clicsWhatsApp: 0,
+    visitasQrTarjeta: 0,
+    instalacionesIniciadas: 0,
+    instalacionesAndroidConfirmadas: 0,
+    instalacionesActivasEstimadas: 0,
+    registrosIniciados: 0,
+    cuentasConfirmadas: 0,
+    menusVistos: 0,
+    productosAgregados: 0,
+    carritosIniciados: 0,
+    pedidosRevisados: 0,
+    pedidosConfirmados: 0,
     negociosInscritos: 0,
     negociosAprobados: 0
   },
@@ -40,6 +64,7 @@ const emptyData: MetricsData = {
   categoriasMasBuscadas: [],
   busquedas: [],
   whatsappPorNegocio: [],
+  fuentesCampana: [],
   ultimosEventos: []
 };
 
@@ -96,6 +121,7 @@ export default function AdminMetricasPage() {
   const [status, setStatus] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isUnlocked, setIsUnlocked] = useState(false);
+  useEffect(() => { setPassword(sessionStorage.getItem("mercau_admin_password") || ""); }, []);
 
   async function loadMetrics(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -115,6 +141,7 @@ export default function AdminMetricasPage() {
       }
 
       setData(result);
+      sessionStorage.setItem("mercau_admin_password", password);
       setIsUnlocked(true);
       setStatus("Metricas actualizadas.");
     } catch (error) {
@@ -126,25 +153,7 @@ export default function AdminMetricasPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbfaf6] py-10">
-      <div className="container">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-extrabold uppercase tracking-normal text-emerald-700">
-              Panel privado
-            </p>
-            <h1 className="mt-2 text-4xl font-black leading-tight text-emerald-950 md:text-6xl">
-              Metricas Mercáu
-            </h1>
-          </div>
-          <a
-            href="/"
-            className="inline-flex min-h-11 items-center rounded-lg bg-emerald-100 px-4 font-extrabold text-emerald-950"
-          >
-            Ver directorio
-          </a>
-        </header>
-
+    <AdminShell active="metricas" title="Métricas" description="Consulta visitas, contactos, búsquedas y actividad de los negocios en Mercáu.">
         <form
           onSubmit={loadMetrics}
           className="mt-8 grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-soft sm:grid-cols-[1fr_auto]"
@@ -176,7 +185,66 @@ export default function AdminMetricasPage() {
 
         {isUnlocked ? (
           <>
+            <section className="mt-8">
+              <div className="mb-4">
+                <h2 className="text-2xl font-black text-emerald-950">Adquisición e instalación</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">Android confirmado usa el evento del navegador. Instalaciones activas es una estimación basada en la primera apertura desde el icono.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <MetricCard
+                  label="Visitas desde QR físico"
+                  value={data.summary.visitasQrTarjeta}
+                  helper="Llegadas desde tarjetas con fuente tarjeta_fisica y medio qr."
+                />
+                <MetricCard
+                  label="Clics en instalar"
+                  value={data.summary.instalacionesIniciadas}
+                  helper="Personas que tocaron Instalar Mercáu."
+                />
+                <MetricCard
+                  label="Android confirmadas"
+                  value={data.summary.instalacionesAndroidConfirmadas}
+                  helper="Instalaciones confirmadas por Chrome."
+                />
+                <MetricCard
+                  label="Instalaciones activas"
+                  value={data.summary.instalacionesActivasEstimadas}
+                  helper="Primera apertura detectada desde el icono."
+                />
+                <MetricCard
+                  label="Registros iniciados"
+                  value={data.summary.registrosIniciados}
+                  helper="Formularios de cuenta enviados correctamente."
+                />
+                <MetricCard
+                  label="Cuentas confirmadas"
+                  value={data.summary.cuentasConfirmadas}
+                  helper="Confirmaciones detectadas en el mismo navegador."
+                />
+              </div>
+            </section>
+
             <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricCard
+                label="Menús vistos"
+                value={data.summary.menusVistos}
+                helper="Entradas registradas a menús y catálogos."
+              />
+              <MetricCard
+                label="Productos agregados"
+                value={data.summary.productosAgregados}
+                helper="Productos incorporados a pedidos."
+              />
+              <MetricCard
+                label="Carritos iniciados"
+                value={data.summary.carritosIniciados}
+                helper="Personas que avanzaron a los datos de entrega."
+              />
+              <MetricCard
+                label="Pedidos confirmados"
+                value={data.summary.pedidosConfirmados}
+                helper="Pedidos enviados al negocio, todavía no ventas entregadas."
+              />
               <MetricCard
                 label="Visitas"
                 value={data.summary.visitas}
@@ -214,6 +282,11 @@ export default function AdminMetricasPage() {
                 title="Busquedas escritas"
                 items={data.busquedas}
                 empty="Todavia no hay busquedas escritas registradas."
+              />
+              <Ranking
+                title="Origen de campañas"
+                items={data.fuentesCampana}
+                empty="Todavía no hay campañas con utm_source."
               />
               <Ranking
                 title="Estados de negocios"
@@ -259,7 +332,6 @@ export default function AdminMetricasPage() {
             </section>
           </>
         ) : null}
-      </div>
-    </main>
+    </AdminShell>
   );
 }

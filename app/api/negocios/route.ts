@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { loadDirectoryBusinesses } from "@/lib/airtable-directory";
+import { catalogBusinessAvailability } from '@/lib/catalog-availability';
+import { withPublicBusinessLinks } from '@/lib/business-public-links';
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const businesses = await loadDirectoryBusinesses();
-    return NextResponse.json({ businesses });
+    const businesses = await withPublicBusinessLinks(await loadDirectoryBusinesses());
+    const catalogs=await catalogBusinessAvailability(businesses.map(business=>business.id));
+    return NextResponse.json({ businesses:businesses.map(business=>{const catalog=catalogs.get(business.id);return {...business,hasCatalog:Boolean(catalog?.count),catalogItemCount:catalog?.count || 0,commercialSearchTerms:catalog?.searchTerms || []};}) });
   } catch (error) {
     return NextResponse.json(
       {

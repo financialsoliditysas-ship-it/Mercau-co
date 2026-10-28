@@ -1,0 +1,14 @@
+.page { min-height: 100vh; background: #f8fafc; color: #1f2937; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem max(1rem, calc((100% - 900px) / 2)); background: #fff; border-bottom: 1px solid #e5e7eb; }
+.brand { color: #d82016; font-size: 1.35rem; font-weight: 800; text-decoration: none; }
+.back { color: #1f2937; font-weight: 700; text-decoration: none; }
+.document { width: min(100% - 2rem, 900px); margin: 0 auto; padding: 3rem 0; }
+.eyebrow { color: #d82016; font-size: .8rem; font-weight: 800; text-transform: uppercase; }
+.document h1 { max-width: 720px; margin: .5rem 0 1rem; font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.05; }
+.intro { color: #4b5563; font-size: 1.1rem; }
+.document section { margin-top: 2.5rem; }
+.document h2 { margin-bottom: .8rem; font-size: 1.35rem; line-height: 1.25; }
+.document p { margin: .8rem 0; line-height: 1.75; }
+.links { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 1.5rem; padding: 1.5rem; background: #fff; border-top: 1px solid #e5e7eb; }
+.links a { color: #b91c1c; font-weight: 700; }
+@media (max-width: 520px) { .document { width: min(100% - 1.5rem, 900px); padding: 2rem 0; } .document section { margin-top: 2rem; } }

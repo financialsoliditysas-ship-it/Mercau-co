@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { getDeliveryHistory, getDeliveryOrderByPublicId } from "@/lib/deliveries";
 import DeliveryAutoRefresh from "@/components/DeliveryAutoRefresh";
+import BackToAccount from "@/components/BackToAccount";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -60,7 +61,7 @@ export default async function DeliveryTrackingPage({
               <span className="block text-xs font-semibold text-slate-500">Seguimiento de envío</span>
             </div>
           </Link>
-          <Link href="/enviar" className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black">Nuevo envío</Link>
+          <div className="flex flex-wrap justify-end gap-2"><Link href="/enviar" className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black">Nuevo envío</Link><BackToAccount /></div>
         </div>
       </header>
 

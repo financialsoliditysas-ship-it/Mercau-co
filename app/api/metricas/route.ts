@@ -25,7 +25,31 @@ const allowedTypes = new Set([
   "Clic WhatsApp",
   "Categoria",
   "Busqueda",
-  "Inscripcion enviada"
+  "Inscripcion enviada",
+  "Pagina instalacion visitada",
+  "Instalacion iniciada",
+  "Guia iOS abierta",
+  "Guia Android abierta",
+  "Instalacion Android aceptada",
+  "Instalacion Android confirmada",
+  "App instalada activa",
+  "Registro usuario iniciado",
+  "Cuenta confirmada",
+  "Menu visto",
+  "Producto visto",
+  "Producto agregado",
+  "Carrito iniciado",
+  "Pedido revisado",
+  "Pedido confirmado",
+  "business_card_viewed",
+  "business_card_whatsapp_clicked",
+  "business_card_favorite_added",
+  "business_card_favorite_removed",
+  "menu_opened",
+  "catalog_opened",
+  "business_info_opened",
+  "directory_filter_used",
+  "directory_search_performed"
 ]);
 
 function cleanText(value: unknown, max = 240) {
