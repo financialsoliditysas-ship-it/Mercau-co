@@ -1,14 +1,15 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
 const {chromium}=require('C:/Users/isver/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright');
 const {businesses}=require('./presentation-navigation-fixtures.cjs');
-const home=process.argv.includes('--home'),production=process.argv.includes('--production');
+const home=process.argv.includes('--home'),production=process.argv.includes('--production'),pwa=process.argv.includes('--pwa');
 if(production&&!home)throw Error('Production verification requires --home; the review route is intentionally unavailable.');
-const root=path.resolve(__dirname,'..'),base='http://127.0.0.1:3084',entry=home?'/':'/presentacion-revision',out=path.join(root,'outputs',home?'home-integration'+(production?'-production':''):'presentation-navigation');
+if(pwa&&!home)throw Error('PWA verification requires --home.');
+const root=path.resolve(__dirname,'..'),base='http://127.0.0.1:3084',entry=home?'/':'/presentacion-revision',out=path.join(root,'outputs',pwa?'pwa-entry'+(production?'-production':''):home?'home-integration'+(production?'-production':''):'presentation-navigation');
 async function main(){
   fs.mkdirSync(out,{recursive:true});
   const env={...process.env};
   for(const key of Object.keys(env))if(/SUPABASE|NEXT_PUBLIC_|AIRTABLE|SHIPDAY|RESEND|VAPID|SECRET|API_KEY|OPENAI|META_/.test(key))delete env[key];
-  Object.assign(env,{NODE_ENV:production?'production':'development',MERCAU_NAVIGATION_TEST:'1',MERCAU_PRESENTATION_REVIEW:'1',MERCAU_BUYER_PREVIEW:'0',NEXT_TELEMETRY_DISABLED:'1',NEXT_DIST_DIR:production?'.next-home-build':'.next-presentation-navigation',AIRTABLE_API_KEY:'qa-not-a-real-key',AIRTABLE_BASE_ID:'qa-navigation',AIRTABLE_NEGOCIOS_TABLE_ID:'businesses',NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:54329',SUPABASE_SERVICE_ROLE_KEY:'qa-not-a-real-key'});
+  Object.assign(env,{NODE_ENV:production?'production':'development',MERCAU_NAVIGATION_TEST:'1',MERCAU_PRESENTATION_REVIEW:'1',MERCAU_BUYER_PREVIEW:'0',NEXT_TELEMETRY_DISABLED:'1',NEXT_DIST_DIR:production?(pwa?'.next-pwa-build':'.next-home-build'):'.next-presentation-navigation',AIRTABLE_API_KEY:'qa-not-a-real-key',AIRTABLE_BASE_ID:'qa-navigation',AIRTABLE_NEGOCIOS_TABLE_ID:'businesses',NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:54329',SUPABASE_SERVICE_ROLE_KEY:'qa-not-a-real-key'});
   const log=fs.openSync(path.join(out,'server.log'),'w');
   const app=spawn(process.execPath,['--require',path.join(root,'qa/presentation-navigation-fixtures.cjs'),'node_modules/next/dist/bin/next',production?'start':'dev','-p','3084','--hostname','127.0.0.1'],{cwd:root,env,stdio:['ignore',log,log],windowsHide:true});
   let browser;const results=[];
@@ -16,6 +17,7 @@ async function main(){
     let ready=false;for(let i=0;i<90;i++){try{if((await fetch(base+entry,{signal:AbortSignal.timeout(5000)})).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,1000));}
     assert(ready,'QA server not ready');
     browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+    if(pwa)await require('./pwa-entry-checks.cjs').verifyPwa(browser,base,out);
     for(const width of [390,1440])for(const anchors of [false,true])for(const [i,kind]of ['restaurantes','comercios'].entries()){
       const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block'}),page=await context.newPage(),errors=[];
       page.setDefaultTimeout(90000);page.on('pageerror',e=>errors.push(e.message));

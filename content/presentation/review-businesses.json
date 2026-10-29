@@ -2,7 +2,8 @@
   "checkedAt": "2026-10-28",
   "source": "Airtable, campos públicos del directorio; Supabase, lectura limitada autorizada de productos publicados y fotos.",
   "catalogStatusVerified": true,
-  "catalogVerifiedAt": "2026-10-28",
+  "catalogVerifiedAt": "2026-10-29",
+  "featuredDirectoryVerifiedAt": "2026-10-29",
   "municipalityCounts": {
     "Nechí": 44
   },

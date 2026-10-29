@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import AppLifecycleMetrics from "@/components/AppLifecycleMetrics";
 import MarketingConsent from "@/components/MarketingConsent";
+import { pwaLaunchScript } from '@/lib/pwa-launch';
 
 const siteUrl = "https://www.mercau.co";
 
@@ -71,6 +72,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
+      <head><script id="mercau-pwa-entry" dangerouslySetInnerHTML={{ __html: pwaLaunchScript }} /></head>
       <body className="min-h-screen bg-white text-slate-900 antialiased">
         <Script id="mercau-install-capture" strategy="beforeInteractive">{`
           window.__mercauInstallPrompt = null;
