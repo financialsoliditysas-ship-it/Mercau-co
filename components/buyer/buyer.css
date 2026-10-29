@@ -74,7 +74,7 @@
 .buyer-header-actions{display:flex;align-items:center;gap:14px}.buyer-header .buyer-public-home{display:inline-flex;gap:4px;font-size:12px;font-weight:650;min-height:44px;color:#a21c16}
 
 /* Home-only brand treatment; other buyer screens retain their existing styles. */
-.buyer-home{--buyer-red:#e21412;color:#191b20}
+.buyer-home{--buyer-red:#e21412;color:#191b20;font-family:Arial,Helvetica,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .buyer-home .buyer-header{padding-top:8px;padding-bottom:8px;gap:12px}
 .buyer-home .buyer-content{padding-top:10px}
 .buyer-home .buyer-destination{min-height:56px;padding:8px 12px;border:1px solid #f9dfdf;border-radius:8px;background:#fff2f2}
