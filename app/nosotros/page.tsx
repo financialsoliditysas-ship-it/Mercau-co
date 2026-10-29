@@ -161,7 +161,7 @@ export default function Page() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-20">
+      <section id="contacto" className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-20">
         <p className="text-sm font-black uppercase text-[#D82016]">Contacto</p>
         <h2 className="mt-2 text-3xl font-black">Hablemos</h2>
         <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-700">Para soporte, registro de negocios, alianzas o información sobre cobertura, utiliza nuestros canales oficiales.</p>
