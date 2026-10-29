@@ -1,0 +1,65 @@
+{
+  "checkedAt": "2026-10-28",
+  "source": "Airtable, campos públicos del directorio; Supabase, lectura limitada autorizada de productos publicados y fotos.",
+  "catalogStatusVerified": true,
+  "catalogVerifiedAt": "2026-10-28",
+  "municipalityCounts": {
+    "Nechí": 44
+  },
+  "businesses": [
+    {
+      "id": "recZQzu4If5VE0Egr",
+      "name": "Asados el Choli Bar & Grill",
+      "category": "Comidas y bebidas",
+      "municipality": "Nechí",
+      "status": "Verificado",
+      "photoUrl": "/presentation/choli-product.webp",
+      "logoUrl": "/presentation/choli.webp",
+      "photoAlt": "Punta de anca publicada en el menú de Asados el Choli Bar & Grill",
+      "publishedItemCount": 22,
+      "photoKind": "photo",
+      "hasCatalog": true,
+      "neighborhood": "",
+      "description": "",
+      "hours": "",
+      "whatsapp": "",
+      "source": "Airtable"
+    },
+    {
+      "id": "rece62hjPb3DM0l8P",
+      "name": "Kikirikí y Quesudos",
+      "category": "Comidas y bebidas",
+      "municipality": "Nechí",
+      "status": "Verificado",
+      "photoUrl": "/presentation/kikiriki-product.webp",
+      "logoUrl": "/presentation/kikiriki.webp",
+      "photoAlt": "Pollo broaster publicado en el menú de Kikirikí y Quesudos",
+      "publishedItemCount": 5,
+      "photoKind": "photo",
+      "hasCatalog": true,
+      "neighborhood": "",
+      "description": "",
+      "hours": "",
+      "whatsapp": "",
+      "source": "Airtable"
+    },
+    {
+      "id": "recUVIMp2TSDKQ79F",
+      "name": "SanStiSar",
+      "category": "Moda y accesorios",
+      "municipality": "Nechí",
+      "status": "Verificado",
+      "photoUrl": "/presentation/sanstisar-product.webp",
+      "logoUrl": "/presentation/sanstisar.webp",
+      "photoAlt": "Conjunto infantil publicado en el catálogo de SanStiSar",
+      "publishedItemCount": 1,
+      "photoKind": "photo",
+      "hasCatalog": true,
+      "neighborhood": "",
+      "description": "",
+      "hours": "",
+      "whatsapp": "",
+      "source": "Airtable"
+    }
+  ]
+}
