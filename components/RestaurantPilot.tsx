@@ -572,7 +572,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       {!menu.length && <p>No hay productos disponibles para pedir.</p>}
       <nav className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
         <button key={c} aria-pressed={c === category} onClick={() => setCategory(c)}>{c}</button>)}</nav>
-      <div className={preview&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map(p => {
+      <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map(p => {
         const count = cart.filter(l => l.productId === p.id).reduce((sum,line)=>sum+line.quantity,0);
         return <article key={p.id}>
           {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={!enabled || busy}/>}
