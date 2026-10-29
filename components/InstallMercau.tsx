@@ -15,7 +15,7 @@ declare global {
   }
 }
 
-export default function InstallMercau({ compact = false, prominent = false }: { compact?: boolean; prominent?: boolean }) {
+export default function InstallMercau({ compact = false, prominent = false, inlineHelp = false }: { compact?: boolean; prominent?: boolean; inlineHelp?: boolean }) {
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [isIos, setIsIos] = useState(false);
@@ -77,21 +77,27 @@ export default function InstallMercau({ compact = false, prominent = false }: { 
       trackPublicMetric("Guia Android abierta");
       return;
     }
-    if (!promptEvent) {
-      if (isIos || isAndroid) {
+    const availablePrompt = window.__mercauInstallPrompt === undefined ? promptEvent : window.__mercauInstallPrompt;
+    if (!availablePrompt) {
+      if (isIos || isAndroid || inlineHelp) {
         setShowHelp(true);
         trackPublicMetric(isIos ? "Guia iOS abierta" : "Guia Android abierta");
       }
       return;
     }
-    await promptEvent.prompt();
-    const choice = await promptEvent.userChoice;
-    if (choice.outcome === "accepted") {
-      setInstalled(true);
-      trackPublicMetric("Instalacion Android aceptada");
+    try {
+      await availablePrompt.prompt();
+      const choice = await availablePrompt.userChoice;
+      if (choice.outcome === "accepted") {
+        setInstalled(true);
+        trackPublicMetric("Instalacion Android aceptada");
+      }
+    } catch {
+      setShowHelp(true);
+    } finally {
+      window.__mercauInstallPrompt = null;
+      setPromptEvent(null);
     }
-    window.__mercauInstallPrompt = null;
-    setPromptEvent(null);
   }
 
   async function copyMercauLink() {

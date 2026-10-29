@@ -2,6 +2,10 @@ import type { DirectoryBusiness } from '@/data/directory';
 import { isFoodBusiness } from './catalog-validation';
 
 export type BuyerBusiness = DirectoryBusiness & { commercialKind?: 'menu' | 'catalog' | 'services' };
+export function compareDirectoryPresentation(a: BuyerBusiness, b: BuyerBusiness) {
+  return Number(Boolean(b.hasCatalog)) - Number(Boolean(a.hasCatalog))
+    || Number(Boolean(b.photoUrl)) - Number(Boolean(a.photoUrl));
+}
 export type QuickCategory = '' | 'tiendas' | 'mercados' | 'farmacias' | 'servicios';
 export const quickCategoryNames = { tiendas:'Tiendas',mercados:'Mercados',farmacias:'Farmacias',servicios:'Servicios' };
 export function commercialLabel(business: BuyerBusiness) {

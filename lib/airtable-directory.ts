@@ -167,7 +167,7 @@ export async function loadDirectoryBusinesses() {
       "OR({Estado} = 'Verificado', {Estado} = 'Destacado', {Estado} = 'Publicado')"
   });
 
-  const response = await fetch(
+  const [response,appliedUpdates] = await Promise.all([fetch(
     `https://api.airtable.com/v0/${baseId}/${tableId}?${params.toString()}`,
     {
       headers: {
@@ -175,7 +175,7 @@ export async function loadDirectoryBusinesses() {
       },
       cache: "no-store"
     }
-  );
+  ),loadAppliedUpdates({ token, baseId, updateTableId })]);
 
   const result = await response.json();
 
@@ -183,8 +183,6 @@ export async function loadDirectoryBusinesses() {
     const detail = result?.error?.message || result?.error || "Error desconocido";
     throw new Error(`No se pudo cargar el directorio desde Airtable. ${detail}`);
   }
-
-  const appliedUpdates = await loadAppliedUpdates({ token, baseId, updateTableId });
 
   return ((result.records || []) as Array<{ id: string; fields?: Record<string, unknown> }>)
     .map((record): DirectoryBusiness | null => {

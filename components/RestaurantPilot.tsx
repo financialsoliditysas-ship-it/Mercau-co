@@ -94,6 +94,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [enabled, setEnabled] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<'MERCAU'|'OWN'>('MERCAU');
   const [category, setCategory] = useState('Todo');
+  const [visibleCategory,setVisibleCategory]=useState('Todo');
+  const categoriesRef=useRef<HTMLElement|null>(null);
   const [cart, setCart] = useState<Line[]>([]);
   const [customizing,setCustomizing]=useState<PilotProduct|null>(null);
   const [customSelections,setCustomSelections]=useState<Record<string,string[]>>({});
@@ -132,6 +134,26 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const cartStorageKey = live && restaurantId ? `mercau:catalog-cart:${restaurantId}:v1` : '';
   const [cartRestored, setCartRestored] = useState(false);
   const previewSession = useRef('');
+  useEffect(()=>{
+    if(!visualMenu||checkout||currentOrderId||category!=='Todo')return;
+    let frame=0;
+    const update=()=>{
+      frame=0;const nav=categoriesRef.current;if(!nav)return;
+      const bounds=nav.getBoundingClientRect();if(bounds.top>innerHeight||bounds.bottom<0)return;
+      const articles=nav.parentElement?.querySelectorAll<HTMLElement>('.pilot-menu article[data-menu-category]');
+      const first=Array.from(articles||[]).find(article=>article.getBoundingClientRect().bottom>bounds.bottom+8);
+      if(first)setVisibleCategory(first.dataset.menuCategory||'Todo');
+    };
+    const schedule=()=>{if(!frame)frame=requestAnimationFrame(update);};
+    schedule();window.addEventListener('scroll',schedule,{passive:true});window.addEventListener('resize',schedule);
+    return()=>{cancelAnimationFrame(frame);window.removeEventListener('scroll',schedule);window.removeEventListener('resize',schedule);};
+  },[visualMenu,checkout,currentOrderId,category,menu]);
+  useEffect(()=>{
+    const nav=categoriesRef.current;if(!visualMenu||!nav||nav.scrollWidth<=nav.clientWidth)return;
+    const bounds=nav.getBoundingClientRect();if(bounds.top<0||bounds.bottom>innerHeight)return;
+    const active=category==='Todo'?visibleCategory:category;
+    Array.from(nav.querySelectorAll<HTMLButtonElement>('button')).find(button=>button.dataset.category===active)?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});
+  },[visibleCategory,category,visualMenu]);
   useEffect(() => {
     if (!cartStorageKey) { setCartRestored(true); return; }
     try {
@@ -570,11 +592,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       {live && deliveryMode==='OWN' && <p className="pilot-delivery-owner"><strong>Entrega realizada por el negocio.</strong> El pedido será llevado por el equipo de {title}, no por un domiciliario de Mercáu.</p>}
       {embedded && !enabled && <p role="status">Pedidos pausados.</p>}
       {!menu.length && <p>No hay productos disponibles para pedir.</p>}
-      <nav className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
-        <button key={c} aria-pressed={c === category} onClick={() => setCategory(c)}>{c}</button>)}</nav>
+      <nav ref={categoriesRef} className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
+        <button key={c} data-category={c} aria-pressed={c === (visualMenu&&category==='Todo'?visibleCategory:category)} onClick={() => {setCategory(c);setVisibleCategory(c);if(visualMenu)requestAnimationFrame(()=>categoriesRef.current?.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));}}>{c}</button>)}</nav>
       <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map(p => {
         const count = cart.filter(l => l.productId === p.id).reduce((sum,line)=>sum+line.quantity,0);
-        return <article key={p.id}>
+        return <article key={p.id} data-menu-category={p.category}>
           {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={!enabled || busy}/>}
           <div className="pilot-product-image aspect-[4/3] w-full overflow-hidden bg-gray-100"><CatalogProductImage name={p.name} imageUrl={p.image} /></div><div className="pilot-product-body"><h2>{p.name}</h2>{p.description && <p className="text-sm menu-product-description">{p.description}</p>}<p className="pilot-product-price">{money(p.price)}</p>
           {p.optionGroups.length>0 && <p className="pilot-customizable">Personalizable</p>}

@@ -6,3 +6,4 @@
 @keyframes menu-added-feedback{0%,88%{opacity:1;visibility:visible}100%{opacity:0;visibility:hidden}}
 @media(max-width:760px){.pilot-visual-menu .menu-visual-cover{height:172px}.pilot-visual-menu :is(button,a,input,textarea){scroll-margin-bottom:calc(96px + env(safe-area-inset-bottom,0px))}}
 @media(prefers-reduced-motion:reduce){.pilot-visual-menu .menu-added-toast{animation-timing-function:step-end}}
+.pilot-visual-menu .pilot-categories{position:sticky;top:0;z-index:25;background:#fff;flex-wrap:nowrap;overflow-x:auto;padding-block:10px;scroll-padding-inline:8px}.pilot-visual-menu .pilot-categories button{flex-shrink:0;min-height:44px}.pilot-visual-menu .pilot-menu article{scroll-margin-top:72px}

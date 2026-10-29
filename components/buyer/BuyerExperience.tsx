@@ -11,6 +11,8 @@ import { useAccount } from '@/components/account/AccountSession';
 import BuyerOrderList from './BuyerOrderList';
 import { BuyerHeader, BuyerNavigation } from './BuyerChrome';
 import CategoryIcon from './CategoryIcon';
+import { recentBuyerDirectory, refreshBuyerDirectory } from '@/lib/buyer-directory-client';
+import { compareDirectoryPresentation } from '@/lib/buyer-commercial';
 import type { CustomerOrder } from '@/lib/customer-order-status';
 import { commercialLabel, matchesQuickCategory, quickCategoryNames, type BuyerBusiness, type QuickCategory } from '@/lib/buyer-commercial';
 
@@ -44,10 +46,13 @@ export default function BuyerExperience({section,quickFilter=''}:{section:string
     observer.observe(nav);return()=>observer.disconnect();
   },[]);
   useEffect(()=>{
-    const controller=new AbortController();setLoading(true);setError('');
-    fetch('/api/comprador/negocios',{cache:'no-store',signal:controller.signal}).then(async r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{if(!controller.signal.aborted){setBusinesses(data.businesses || []);setPreview(data.preview===true);}}).catch(()=>{if(!controller.signal.aborted)setError('No pudimos cargar los negocios. Intenta nuevamente.');}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
-    return()=>controller.abort();
-  },[retry]);
+    if(['pedidos','cuenta'].includes(section))return;
+    let active=true;const cached=recentBuyerDirectory();
+    if(cached){setBusinesses(cached.businesses);setPreview(cached.preview===true);}
+    setLoading(!cached);setError('');
+    refreshBuyerDirectory().then(data=>{if(active){setBusinesses(data.businesses);setPreview(data.preview===true);}}).catch(()=>{if(active)setError('No pudimos cargar los negocios. Intenta nuevamente.');}).finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;};
+  },[retry,section]);
   useEffect(()=>{
     if(locationOpen)dialogRef.current?.showModal();else dialogRef.current?.close();
   },[locationOpen]);
@@ -83,6 +88,7 @@ export default function BuyerExperience({section,quickFilter=''}:{section:string
     if(!['explorar','favoritos'].includes(section)&&!b.hasCatalog)return false;
     return (!category||b.category===category)&&(!query||normalized([b.name,b.description,b.category,...(b.commercialSearchTerms||[])].join(' ')).includes(normalized(query)));
   });
+  if(section==='explorar')visible.sort(compareDirectoryPresentation);
   const listing=!['pedidos','cuenta'].includes(section);
   function search(event:FormEvent<HTMLFormElement>){event.preventDefault();(document.activeElement as HTMLElement)?.blur();resultsRef.current?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});}
   const title=section==='inicio'?'¿Qué quieres pedir hoy?':section==='restaurantes'?'Restaurantes':section==='comercios'?'Comercios':section==='favoritos'?'Tus favoritos':'Explora tu territorio';

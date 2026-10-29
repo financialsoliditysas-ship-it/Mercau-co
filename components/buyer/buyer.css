@@ -71,3 +71,4 @@
 .buyer-order-dialog::backdrop{background:#20252d80}.buyer-order-dialog-heading{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;padding:10px 0;border-bottom:1px solid #e9ebee}.buyer-order-dialog-heading h2{font-size:18px}.buyer-order-dialog-heading button{display:grid;place-items:center;min-width:44px;min-height:44px;color:var(--buyer-red)}
 .buyer-orders .buyer-order-dialog .customer-order-visual{border:0;border-radius:0;padding:18px 0 0}.buyer-order-dialog :is(button,a){scroll-margin-top:80px;scroll-margin-bottom:20px}
 .buyer-profile-content{max-width:800px;padding-top:24px}.buyer-profile-shell .buyer-bottom a[aria-current=page]{color:#d82016}.buyer-profile-shell .buyer-bottom a{font-size:11px}
+.buyer-header-actions{display:flex;align-items:center;gap:14px}.buyer-header .buyer-public-home{display:inline-flex;gap:4px;font-size:12px;font-weight:650;min-height:44px;color:#a21c16}
