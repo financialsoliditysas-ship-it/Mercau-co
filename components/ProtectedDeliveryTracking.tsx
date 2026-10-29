@@ -36,6 +36,6 @@ export default function ProtectedDeliveryTracking({ publicId }: { publicId: stri
     {tracking && <section aria-live="polite"><h2 className="text-xl font-bold">{tracking.publicId}</h2>
       <p className="my-4 font-bold text-[#D82016]">{tracking.label}</p>
       <p className="text-sm">Última actualización: {new Date(tracking.updatedAt).toLocaleString('es-CO')}</p></section>}
-    <nav className="mt-6 flex flex-wrap gap-4"><Link href="/mi-cuenta/pedidos" className="font-bold text-[#D82016]">Entrar y ver mis pedidos</Link><Link href="/contacto">Necesito ayuda</Link></nav>
+    <nav className="mt-6 flex flex-wrap gap-4"><Link href="/mi-cuenta/pedidos" className="font-bold text-[#D82016]">Entrar y ver mis pedidos</Link><Link href="/nosotros#contacto">Necesito ayuda</Link></nav>
   </main>;
 }

@@ -8,6 +8,8 @@ function save(){fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(re
 function run(name,args){const log=fs.openSync(path.join(out,name+'.log'),'w');try{execFileSync(process.execPath,args,{cwd:root,env,stdio:['ignore',log,log],timeout:360000});results.commands.push({name,passed:true});console.log('PASS '+name);}catch(error){results.commands.push({name,passed:false,status:error.status});throw error;}finally{fs.closeSync(log);save();}}
 async function main(){
  for(const file of ['lib/pilot-checkout.ts','lib/pilot-order-validation.ts','components/buyer/BuyerCheckout.tsx','supabase/drafts/buyer_checkout.sql','app/api/comprador/prueba-pedidos/route.ts'])assert(!fs.existsSync(path.join(root,file)),'Unapproved prototype in release '+file);
+ assert(fs.readFileSync(path.join(root,'components/ProtectedDeliveryTracking.tsx'),'utf8').includes('href="/nosotros#contacto"'),'Protected tracking must use existing support, not the old example form');
+ assert(fs.readFileSync(path.join(root,'app/nosotros/page.tsx'),'utf8').includes('id="contacto"'),'Support anchor missing');
  const original=fs.readFileSync(path.join(root,'tsconfig.json'));
  try{
   run('suite',['--require','./qa/local-only-network.cjs','scripts/test-account-suite.cjs']);
