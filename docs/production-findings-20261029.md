@@ -13,11 +13,11 @@ Estado: cambios locales para revision antes de desplegar. No autoriza push, publ
 
 ## Choli: diagnostico de solo lectura
 
-El endpoint publico consultado en produccion devuelve para `recZQzu4If5VE0Egr`: HTTP 200, live true, enabled false, 22 productos. Kikiriki devuelve enabled true y 5 productos; el restaurante de demostracion enabled true y 9 productos.
+La primera lectura del endpoint publico de `recZQzu4If5VE0Egr` devolvio HTTP 200, live true, enabled false, 22 productos. Una reconsulta posterior, sin escrituras por el asistente, devolvio enabled true tanto en SQL de solo lectura como en la API publica. Kikiriki devolvio enabled true y 5 productos; el restaurante de demostracion enabled true y 9 productos.
 
 El boton bloqueado de Choli coincide con la pausa guardada, no demuestra un fallo del carrito. En /admin/negocios hay un checkbox Recibir pedidos y una accion Guardar configuracion separada. El servidor exige ficha vinculada, telefono operativo, direccion de recogida cuando utiliza Mercau y al menos un producto publicado disponible. Los errores se muestran y no habilitan pedidos si falta un requisito.
 
-No se pudo verificar con esta lectura si el usuario no guardo, recibio una validacion o alguien pauso despues. No se consultaron clientes, propietarios, pedidos, secretos ni historial privado. No se cambio enabled ni se retiraron validaciones.
+No se pudo verificar por que cambio el estado entre lecturas. No se consultaron clientes, propietarios, pedidos, secretos ni historial privado. No se cambio enabled ni se retiraron validaciones. Una comprobacion posterior en el menu publico con navegador nuevo encontro 22 botones habilitados y abrio el detalle del primer producto. Se bloquearon escrituras y no se confirmo ningun pedido.
 
 Impacto si se autoriza activar Choli posteriormente: permitira recibir solicitudes reales y utilizara sus condiciones/logistica vigentes al despachar. Esa operacion no forma parte de estos cambios visuales y no se ejecuto.
 
@@ -25,8 +25,8 @@ Impacto si se autoriza activar Choli posteriormente: permitira recibir solicitud
 
 Sin servicios, dependencias, mapas, planes o suscripciones nuevos. Se reutiliza la infraestructura actual; las lecturas existentes pueden consumir su cuota. No se modifican pagos, QR, comisiones, API de pedidos ni Shipday.
 
-## Verificacion prevista
+## Verificacion ejecutada
 
-Suite existente, contrato productivo, typecheck, lint y build en exportacion limpia del commit. Test adicional de ranking, TTL, solicitudes concurrentes y modo de demostracion. Navegador emulado en 320/390/768/1440: prompt simulado y ayuda sin evento, mismo URL, retorno Portada solo en navegador, categorias sticky, cambio activo por scroll sin filtrar y filtro manual preservado. No equivale a una instalacion real en Redmi Note 15 Pro o iPhone.
+Pasaron las 22 suites existentes, contrato productivo, typecheck, lint y build en exportacion limpia de 66da6e7. Paso el test adicional de ranking, TTL, solicitudes concurrentes y modo de demostracion. Pasaron los recorridos integrales y las restricciones QA de produccion local. El navegador emulado en 320/390/768/1440 verifico prompt simulado y ayuda sin evento, mismo URL, retorno Portada solo en navegador, categorias sticky, cambio activo por scroll sin filtrar y filtro manual preservado. No equivale a una instalacion real en Redmi Note 15 Pro o iPhone. No se midio la velocidad de estas mejoras en produccion, porque no se han publicado.
 
 No generar pedidos, cobros o despachos. Presentar resultados y el punto de Choli pendiente antes de solicitar autorizacion de publicacion.
