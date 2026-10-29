@@ -67,7 +67,7 @@ const pageMocks = {
   '@/lib/public-business-settings': { publicBusinessSettings: async()=>null },
   '@/lib/business-gallery': { businessGallery: async()=>[] },
   '@/lib/catalog-availability': { catalogBusinessIds: async ids => new Set(ids) },
-  '@/lib/catalog-validation': { catalogLabel: () => 'Ver catálogo', catalogNoun: () => 'Catálogo' }
+  '@/lib/catalog-validation': { catalogLabel: () => 'Ver catálogo', catalogNoun: () => 'Catálogo', isFoodBusiness: load('lib/catalog-validation.ts').isFoodBusiness }
 };
 const listing = load('app/negocios/[id]/page.tsx', pageMocks);
 const catalog = load('app/negocios/[id]/catalogo/page.tsx', {
