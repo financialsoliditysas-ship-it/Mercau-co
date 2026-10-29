@@ -72,3 +72,44 @@
 .buyer-orders .buyer-order-dialog .customer-order-visual{border:0;border-radius:0;padding:18px 0 0}.buyer-order-dialog :is(button,a){scroll-margin-top:80px;scroll-margin-bottom:20px}
 .buyer-profile-content{max-width:800px;padding-top:24px}.buyer-profile-shell .buyer-bottom a[aria-current=page]{color:#d82016}.buyer-profile-shell .buyer-bottom a{font-size:11px}
 .buyer-header-actions{display:flex;align-items:center;gap:14px}.buyer-header .buyer-public-home{display:inline-flex;gap:4px;font-size:12px;font-weight:650;min-height:44px;color:#a21c16}
+
+/* Home-only brand treatment; other buyer screens retain their existing styles. */
+.buyer-home{--buyer-red:#e21412;color:#191b20}
+.buyer-home .buyer-header{padding-top:8px;padding-bottom:8px;gap:12px}
+.buyer-home .buyer-content{padding-top:10px}
+.buyer-home .buyer-destination{min-height:56px;padding:8px 12px;border:1px solid #f9dfdf;border-radius:8px;background:#fff2f2}
+.buyer-home .buyer-destination small{color:#5e626c;line-height:1.5}
+.buyer-home .buyer-location-entry{background:#fff2f2;border:1px solid #f9dfdf;border-radius:8px;padding:10px 12px;margin:0 0 10px}
+.buyer-home .buyer-location-actions{margin-top:8px}
+.buyer-home .buyer-location-actions button{min-height:44px}
+.buyer-home .buyer-title{margin:14px 0 10px}
+.buyer-home .buyer-title h1 span{color:var(--buyer-red)}
+.buyer-home .buyer-search{background:#fff;border-color:#c9bdbe;gap:8px;padding:3px 4px 3px 12px}
+.buyer-home .buyer-search:focus-within{border-color:var(--buyer-red);box-shadow:0 0 0 2px #fce4e4}
+.buyer-home .buyer-search input{min-height:44px;color:#191b20}
+.buyer-home .buyer-search input::placeholder{color:#68616a;opacity:1}
+.buyer-home .buyer-search button{min-width:44px;min-height:44px;flex-shrink:0}
+.buyer-home .buyer-search button[type=submit]{background:var(--buyer-red);color:#fff;border-radius:6px}
+.buyer-home .buyer-gateways{margin:12px 0 14px;gap:10px}
+.buyer-home .buyer-gateways>a{background:#fff1f1;border:1px solid #f9dfdf}
+.buyer-home .buyer-gateways>a+a{background:#fff7f4;border-color:#f5e4df}
+.buyer-home .buyer-gateway-image{height:104px;background:#fff}
+.buyer-home .buyer-gateway-image img,.buyer-home .buyer-gateways>a:last-child .buyer-gateway-image img{object-fit:cover;object-position:70% 50%;transform:none;filter:none}
+.buyer-home .buyer-gateways span{gap:5px;padding:8px 9px 0;font-size:16px;font-weight:800}
+.buyer-home .buyer-gateways strong{min-width:0;overflow-wrap:normal}
+.buyer-home .buyer-gateways span .buyer-gateway-arrow{display:block;margin-left:auto;flex-shrink:0;color:#aa1010}
+.buyer-home .buyer-gateways p{padding:4px 9px 10px;color:#514750;line-height:1.4}
+.buyer-home .buyer-shortcuts{margin:12px 0 8px}
+.buyer-home .buyer-category-rail{padding-top:8px;padding-bottom:6px}
+.buyer-home .buyer-category-rail a{flex-basis:82px;min-height:72px;padding:8px 6px;gap:5px;background:#fff5f5;color:#4a353b;border:1px solid #f9e8e8}
+.buyer-home .buyer-section-heading{gap:8px}
+.buyer-home .buyer-count{color:#5e626c;margin-bottom:10px}
+.buyer-home .buyer-bottom{background:#fff}
+.buyer-home .buyer-bottom a{position:relative;isolation:isolate;min-height:52px;color:#5f626c}
+.buyer-home .buyer-bottom a[aria-current=page]{color:#c51110}
+.buyer-home .buyer-bottom a[aria-current=page]::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:52px;height:31px;border-radius:18px;background:#ffe9e9;z-index:-1}
+.buyer-home .buyer-bottom svg{margin-top:3px}
+.buyer-home :is(button,a,input):focus-visible{outline:3px solid #8c1010;outline-offset:3px}
+@media(max-width:359px){.buyer-home .buyer-gateways span{font-size:14px;gap:3px}.buyer-home .buyer-gateways span .buyer-gateway-arrow{width:13px}.buyer-home .buyer-title h1{font-size:24px}.buyer-home .buyer-gateways p{font-size:11px}}
+@media(min-width:640px){.buyer-home .buyer-gateway-image{height:146px}.buyer-home .buyer-gateways span{font-size:19px}.buyer-home .buyer-gateways{margin-bottom:16px}}
+@media(min-width:1000px){.buyer-home .buyer-gateway-image{height:120px}.buyer-home .buyer-gateways span{padding:12px 16px 0}.buyer-home .buyer-gateways p{padding:4px 16px 12px}}
