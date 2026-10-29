@@ -1,4 +1,5 @@
 import type { DeliveryOrder } from "@/lib/delivery-types";
+import { merchantPickupText } from '@/lib/shipday-pickup-text';
 
 export type LogisticsCreateResult = {
   provider: "SHIPDAY";
@@ -63,7 +64,7 @@ export class ShipdayProvider implements LogisticsProvider {
     const mapsUrl = deliveryMapsUrl(order);
     const pickupUrl = pickupMapsUrl(order);
     const pickupInstruction = [
-      order.pickup_instructions,
+      merchantPickupText(order.pickup_instructions),
       pickupUrl ? `Ubicación exacta de recogida: ${pickupUrl}` : ""
     ].filter(Boolean).join("\n");
     const deliveryInstruction = [

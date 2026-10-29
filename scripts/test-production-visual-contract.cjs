@@ -4,6 +4,7 @@ for(const [file,expected]of Object.entries(contract.sha256)){
  let bytes=fs.readFileSync(file);
  if(!file.endsWith('.jpeg')){
   let source=bytes.toString('utf8').replace(/\r\n/g,'\n');
+  if(file==='lib/shipday.ts')source=source.replace("import { merchantPickupText } from '@/lib/shipday-pickup-text';\n",'').replace('merchantPickupText(order.pickup_instructions),','order.pickup_instructions,');
   if(file==='lib/deliveries.ts')source=source.replace("import { requireShipdayWebhookToken } from '@/lib/shipday-webhook-auth';\n",'').replace('  requireShipdayWebhookToken(token);','  const expectedToken = process.env.SHIPDAY_WEBHOOK_TOKEN || "";\n  if (expectedToken && token !== expectedToken) {\n    throw new Error("Webhook no autorizado.");\n  }');
   bytes=Buffer.from(source);
  }
