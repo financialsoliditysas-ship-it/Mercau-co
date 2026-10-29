@@ -18,13 +18,14 @@ async function main(){
    await page.goto(base+'/negocios/restaurante-qa-ficticio/catalogo',{waitUntil:'networkidle'});
    const images=page.locator('.pilot-menu img');await images.first().waitFor();assert.equal(await images.count(),8);
    await images.first().evaluate(img=>img.decode());
-   assert(await images.first().evaluate(img=>img.currentSrc.includes('w=320')));
+   const selectedWidth=await images.first().evaluate(img=>Number(new URL(img.currentSrc).searchParams.get('w')));
+   assert([320,640,960].includes(selectedWidth),'Browser must select a bounded thumbnail variant');
    assert.equal(await images.nth(0).getAttribute('loading'),'eager');assert.equal(await images.nth(2).getAttribute('loading'),'lazy');
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await page.screenshot({path:path.join(out,`menu-${width}.png`)});
    await page.goto(base+'/negocios/comercio-qa-ficticio/catalogo',{waitUntil:'networkidle'});await page.getByRole('img',{name:'Foto de Producto QA 1',exact:true}).evaluate(img=>img.decode());
    assert.equal(await page.locator('img[srcset]').count(),8);assert.deepEqual(errors,[]);
-   results.screens.push({width,menuAndCatalogRender:true,thumbnails:true,lazyBelow:true,noOverflow:true});await context.close();
+   results.screens.push({width,selectedWidth,menuAndCatalogRender:true,thumbnails:true,lazyBelow:true,noOverflow:true});await context.close();
   }
   const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:'block'}),page=await context.newPage();
   await context.route('**/*',route=>new URL(route.request().url()).origin===base&&route.request().method()==='GET'?route.continue():route.abort());

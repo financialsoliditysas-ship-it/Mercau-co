@@ -4,6 +4,7 @@ if(process.env.MERCAU_IMAGE_TEST==='1'){
  const source=fs.readFileSync(process.env.MERCAU_QA_IMAGE);
  globalThis.fetch=async(input,options)=>{
   const url=new URL(typeof input==='string'||input instanceof URL?String(input):input.url);
+  if(process.env.MERCAU_IMAGE_TRACE==='1'&&url.hostname==='api.airtable.com'&&url.pathname==='/v0/qa-navigation/businesses')console.log('QA_PUBLIC_DIRECTORY_READ');
   if(url.hostname==='api.airtable.com'&&/\/businesses\/rec[QS]{14}$/.test(url.pathname))return Response.json({fields:{fldyyLYvoyMdiK13C:'Publicado'}});
   if(url.origin==='http://127.0.0.1:54329'&&url.pathname.startsWith('/storage/v1/object/'))return new Response(source,{headers:{'Content-Type':'image/jpeg'}});
   const response=await previous(input,options);
