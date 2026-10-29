@@ -1,0 +1,12 @@
+const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),sha=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
+const base=path.join(root,'outputs/integral-launch-20261029'),target=path.join(base,sha.slice(0,12));
+fs.mkdirSync(base,{recursive:true});
+if(fs.existsSync(target))throw Error('Exact export already exists. Refusing to overlay another version.');
+fs.mkdirSync(target);
+const archive=path.join(base,sha.slice(0,12)+'.tar');
+execFileSync('git',['archive','--format=tar','--output='+archive,sha],{cwd:root});
+execFileSync('tar',['-xf',archive,'-C',target]);
+fs.symlinkSync(fs.realpathSync(path.join(root,'node_modules')),path.join(target,'node_modules'),'junction');
+fs.writeFileSync(path.join(base,'source.json'),JSON.stringify({commit:sha,target,gitArchive:true,uncommittedFilesCopied:false,secretsCopied:false},null,2));
+console.log(target);
