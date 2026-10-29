@@ -150,7 +150,7 @@ async function loadAppliedUpdates(config: {
   return updates;
 }
 
-export const loadDirectoryBusinesses = cache(async () => {
+async function readDirectoryBusinesses() {
   const token = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const tableId = process.env.AIRTABLE_NEGOCIOS_TABLE_ID;
@@ -263,7 +263,10 @@ export const loadDirectoryBusinesses = cache(async () => {
       } satisfies DirectoryBusiness;
     })
     .filter((business): business is DirectoryBusiness => Boolean(business));
-});
+}
+
+// RSC supports request-local cache; standalone React/route tests retain the original reader.
+export const loadDirectoryBusinesses=typeof cache==='function'?cache(readDirectoryBusinesses):readDirectoryBusinesses;
 
 export async function loadDirectoryBusiness(id: string) {
   const businesses = await loadDirectoryBusinesses();
