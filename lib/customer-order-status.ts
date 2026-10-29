@@ -6,7 +6,7 @@ export type CustomerOrder = {
   delivery_mode?: 'MERCAU'|'OWN';
   delivery: { status: string } | null;
 };
-export const customerOrderSteps = ['Pedido recibido', 'En preparación', 'Listo para recoger',
+export const customerOrderSteps = ['Solicitud recibida', 'En preparación', 'Listo para recoger',
   'Mensajero asignado', 'Recogido', 'En camino', 'Entregado'];
 
 export function customerOrderProgress(order: Pick<CustomerOrder, 'status' | 'delivery'>) {

@@ -1,6 +1,6 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Bell, ChevronDown, Eye, EyeOff, LockKeyhole, MapPin, Plus, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { useAccount } from "./AccountSession";
 import { emptyAccountProfile } from "@/lib/account-model";
 import { directoryMunicipalities } from "@/data/directory";
@@ -77,14 +77,16 @@ export default function AccountProfile() {
     }
   }
   return (
-    <>
+    <div className="ma-profile-visual" onInvalidCapture={event=>{const section=(event.target as HTMLElement).closest('details');if(section)section.open=true;}}>
       <div className="ma-page-heading">
         <p className="ma-eyebrow">MI PERFIL</p>
         <h1>Tus datos, a tu manera</h1>
         <p>Completa una dirección cuando la necesites para una entrega.</p>
       </div>
       <form className="ma-form ma-profile-form" onSubmit={save}>
-        <h2>Información personal</h2>
+        <details className="ma-profile-section" data-profile-section="personal">
+        <summary><UserRound size={22}/><span><strong>Información personal</strong><small>{profile.name || 'Nombre, teléfonos y municipio'}</small></span><ChevronDown size={19}/></summary>
+        <div className="ma-profile-section-body">
         <div className="ma-form-grid">
           {(
             [
@@ -123,7 +125,11 @@ export default function AccountProfile() {
             </select>
           </label>
         </div>
-        <h2>Direcciones de entrega</h2>
+        </div>
+        </details>
+        <details className="ma-profile-section" data-profile-section="addresses">
+        <summary><MapPin size={22}/><span><strong>Direcciones de entrega</strong><small>{profile.address || 'Dirección principal y direcciones frecuentes'}</small></span><ChevronDown size={19}/></summary>
+        <div className="ma-profile-section-body">
         <label>
           Dirección principal (opcional)
           <input
@@ -232,7 +238,11 @@ export default function AccountProfile() {
           <Plus size={18} />
           Agregar dirección
         </button>
-        <h2>Preferencias de notificaciones</h2>
+        </div>
+        </details>
+        <details className="ma-profile-section" data-profile-section="notifications">
+        <summary><Bell size={22}/><span><strong>Preferencias de notificaciones</strong><small>Pedidos, envíos y novedades</small></span><ChevronDown size={19}/></summary>
+        <div className="ma-profile-section-body">
         {(
           [
             ["orders", "Actualizaciones de pedidos"],
@@ -261,15 +271,18 @@ export default function AccountProfile() {
           Estas preferencias se guardan en tu cuenta. No activan un servicio
           nuevo de correo o WhatsApp.
         </p>
+        </div>
+        </details>
         <button type="submit" className="ma-button primary" disabled={busy}>
           Guardar mis datos
         </button>
       </form>
+      <details className="ma-profile-section" data-profile-section="security">
+      <summary><LockKeyhole size={22}/><span><strong>Acceso y seguridad</strong><small>Correo electrónico y contraseña</small></span><ChevronDown size={19}/></summary>
       <form
-        className="ma-form ma-profile-form ma-divider"
+        className="ma-form ma-profile-form ma-profile-section-body"
         onSubmit={credentials}
       >
-        <h2>Acceso y seguridad</h2>
         <label>
           Correo electrónico
           <input
@@ -306,8 +319,10 @@ export default function AccountProfile() {
           Actualizar acceso
         </button>
       </form>
-      <section className="ma-divider">
-        <h2>Privacidad</h2>
+      </details>
+      <details className="ma-profile-section" data-profile-section="privacy">
+        <summary><ShieldCheck size={22}/><span><strong>Privacidad</strong><small>Ayuda y tratamiento de datos</small></span><ChevronDown size={19}/></summary>
+        <div className="ma-profile-section-body">
         <p>
           Para consultar, corregir o solicitar la eliminación de tus datos, usa
           la ayuda de Mercáu.
@@ -315,12 +330,13 @@ export default function AccountProfile() {
         <a href="/mi-cuenta/ayuda" className="ma-text-button">
           Consultar ayuda y privacidad
         </a>
-      </section>
+        </div>
+      </details>
       {notice && (
         <p className="ma-notice" role="status">
           {notice}
         </p>
       )}
-    </>
+    </div>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAccount } from "./AccountSession";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { BuyerProfileFrame } from "@/components/buyer/BuyerChrome";
 export default function AccountShell({
   section,
   children,
@@ -79,6 +80,7 @@ export default function AccountShell({
       Icon: LifeBuoy,
     },
   ];
+  if(section === "perfil" && !owner)return <BuyerProfileFrame>{children}</BuyerProfileFrame>;
   return (
     <div className="ma">
       <header className="ma-topbar">

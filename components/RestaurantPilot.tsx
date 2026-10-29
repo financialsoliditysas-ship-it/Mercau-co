@@ -2,6 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CustomerOrderCard from './CustomerOrderCard';
+import OrderReviewPresentation from './buyer/OrderReviewPresentation';
+import './buyer/order-visual.css';
+import { ArrowLeft, Plus } from 'lucide-react';
+import './buyer/menu-visual.css';
 import BackToAccount from './BackToAccount';
 import PilotPublicationControls from './PilotPublicationControls';
 import CatalogProductImage from './CatalogProductImage';
@@ -71,8 +75,9 @@ function createOrderChimeUrl() {
   return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
 }
 
-export default function RestaurantPilot({ manager = false, restaurantId, businessName, embedded = false, returnPath = '' }: {
-  manager?: boolean; restaurantId?: string; businessName?: string; embedded?: boolean; returnPath?: string;
+export default function RestaurantPilot({ manager = false, restaurantId, businessName, embedded = false, returnPath = '', preview = false, visualMenu = false, coverImage = '', legacyPreview = false, previewDeliveryProfile }: {
+  manager?: boolean; restaurantId?: string; businessName?: string; embedded?: boolean; returnPath?: string; preview?: boolean; visualMenu?: boolean; coverImage?: string;
+  legacyPreview?:boolean;previewDeliveryProfile?:{name:string;phone:string;address:string;neighborhood:string;instructions:string};
 }) {
   const live = Boolean(restaurantId);
   const title = businessName || 'Restaurante Mercado';
@@ -82,6 +87,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
+  const [addedNoticeId, setAddedNoticeId] = useState(0);
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<PilotProduct[]>([]);
   const [fee, setFee] = useState(0);
@@ -121,9 +127,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [locating, setLocating] = useState(false);
   const checkoutRef = useRef<HTMLFormElement | null>(null);
   const reviewRef = useRef<HTMLElement | null>(null);
+  const reviewSavedData = useRef(false);
   const menuViewTracked = useRef(false);
   const cartStorageKey = live && restaurantId ? `mercau:catalog-cart:${restaurantId}:v1` : '';
   const [cartRestored, setCartRestored] = useState(false);
+  const previewSession = useRef('');
   useEffect(() => {
     if (!cartStorageKey) { setCartRestored(true); return; }
     try {
@@ -141,6 +149,10 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   }, [cart, cartRestored, cartStorageKey]);
   useEffect(() => {
     if (!checkout) return;
+    if (!review && reviewSavedData.current && checkoutRef.current) {
+      reviewSavedData.current = false;
+      if (checkoutRef.current.checkValidity()) { checkoutRef.current.requestSubmit(); return; }
+    }
     const target = review ? reviewRef.current : checkoutRef.current;
     const frame = window.requestAnimationFrame(() => {
       target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -151,12 +163,12 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [checkout, review]);
+  }, [checkout, review, preview, legacyPreview]);
   useEffect(() => {
-    if (manager || !live || !menu.length || menuViewTracked.current || !restaurantId) return;
+    if (preview || manager || !live || !menu.length || menuViewTracked.current || !restaurantId) return;
     menuViewTracked.current = true;
     trackCommerceEvent('Menu visto','ViewContent',{businessId:restaurantId,businessName:title});
-  }, [live,manager,menu.length,restaurantId,title]);
+  }, [live,manager,menu.length,restaurantId,title,preview]);
   useEffect(() => {
     const profile = session?.user.user_metadata?.delivery_profile;
     if (!profile || manager) return;
@@ -168,6 +180,13 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       instructions: current.instructions || (typeof profile.instructions === 'string' ? profile.instructions : '') }));
   }, [session?.user.id, manager]);
   useEffect(() => {
+    if (preview) {
+      const id = '33333333-3333-4333-8333-333333333333';
+      currentUser.current = id;
+      setSession({user:{id,user_metadata:previewDeliveryProfile?{delivery_profile:previewDeliveryProfile}:{}},access_token:''} as Session);
+      setAuthReady(true);
+      return;
+    }
     if (!supabase) { setAuthReady(true); setNotice('Las cuentas no estan configuradas.'); return; }
     let active = true;
     function updateSession(next: Session | null) {
@@ -186,7 +205,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     supabase.auth.getSession().then(({ data }) => updateSession(data.session)).catch(() => updateSession(null));
     const { data } = supabase.auth.onAuthStateChange((_event, next) => updateSession(next));
     return () => { active = false; currentUser.current = null; data.subscription.unsubscribe(); };
-  }, [supabase]);
+  }, [supabase, preview, previewDeliveryProfile]);
   useEffect(() => () => {
     highlightTimers.current.forEach(timer => window.clearTimeout(timer));
     orderAlertAudio.current?.pause();
@@ -230,12 +249,16 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const query = new URLSearchParams(path.replace(/^\?/, ''));
     if (restaurantId) query.set('restaurant', restaurantId);
-    const response = await fetch('/api/piloto/restaurante?' + query.toString(), { ...options, cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) } });
+    if (preview && !previewSession.current) {
+      try { previewSession.current = sessionStorage.getItem('mercau.preview.session') || crypto.randomUUID(); sessionStorage.setItem('mercau.preview.session',previewSession.current); }
+      catch { previewSession.current = crypto.randomUUID(); }
+    }
+    const response = await fetch((preview ? '/api/comprador/prueba-pedidos?' : '/api/piloto/restaurante?') + query.toString(), { ...options, cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', ...(preview ? {'x-preview-session':previewSession.current} : session ? { Authorization: `Bearer ${session.access_token}` } : {}) } });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || 'No se pudo completar la solicitud.');
     return result;
-  }, [session, restaurantId]);
+  }, [session, restaurantId, preview]);
   const pushApi = useCallback(async (options: RequestInit = {}) => {
     const business = restaurantId || 'restaurante-mercado';
     const response = await fetch(`/api/push/subscription?business=${encodeURIComponent(business)}`, { ...options, cache: 'no-store',
@@ -424,7 +447,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     setRequestKey('');
   }
   function openCustomization(product:PilotProduct) {
-    if(live&&restaurantId)trackCommerceEvent('Producto visto','ViewContent',{businessId:restaurantId,businessName:title,productId:product.id,productName:product.name,value:product.price});
+    if(!preview&&live&&restaurantId)trackCommerceEvent('Producto visto','ViewContent',{businessId:restaurantId,businessName:title,productId:product.id,productName:product.name,value:product.price});
     setCustomizing(product);setCustomNote('');setCustomQuantity(1);
     setCustomSelections(Object.fromEntries(product.optionGroups.map(group=>[group.id,group.choices.filter(choice=>choice.defaultSelected).map(choice=>choice.id)])));
   }
@@ -444,8 +467,9 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     if(incomplete){setNotice(`Completa “${incomplete.name}” antes de agregar el producto.`);return;}
     setCart(current=>[...current,{lineId:crypto.randomUUID(),productId:customizing.id,quantity:customQuantity,
       selections:customizing.optionGroups.map(group=>({groupId:group.id,choiceIds:customSelections[group.id] || []})),note:customNote.trim()}]);
-    if(live&&restaurantId)trackCommerceEvent('Producto agregado','AddToCart',{businessId:restaurantId,businessName:title,productId:customizing.id,productName:customizing.name,value:(customizing.price+customizing.optionGroups.reduce((sum,group)=>sum+group.choices.filter(choice=>(customSelections[group.id] || []).includes(choice.id)).reduce((subtotal,choice)=>subtotal+choice.priceDelta,0),0))*customQuantity,quantity:customQuantity});
+    if(!preview&&live&&restaurantId)trackCommerceEvent('Producto agregado','AddToCart',{businessId:restaurantId,businessName:title,productId:customizing.id,productName:customizing.name,value:(customizing.price+customizing.optionGroups.reduce((sum,group)=>sum+group.choices.filter(choice=>(customSelections[group.id] || []).includes(choice.id)).reduce((subtotal,choice)=>subtotal+choice.priceDelta,0),0))*customQuantity,quantity:customQuantity});
     setCustomizing(null);setRequestKey('');setNotice('Producto agregado a tu pedido.');
+    if(visualMenu)setAddedNoticeId(value=>value+1);
   }
   function configuredUnitPrice(line:Line) {
     const product=menu.find(item=>item.id===line.productId);if(!product)return 0;
@@ -488,6 +512,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${customer.deliveryLatitude},${customer.deliveryLongitude}`)}` : '';
   const subtotal = cart.reduce((sum, l) => sum + configuredUnitPrice(l) * l.quantity, 0);
   const currentOrder = orders.find(order => order.public_id === currentOrderId);
+  const showPaymentInstructions = currentOrder?.status !== 'rejected' && currentOrder?.delivery?.status !== 'cancelled';
   async function submit() {
     setBusy(true); setNotice('');
     const key = requestKey || crypto.randomUUID(); setRequestKey(key);
@@ -495,7 +520,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       const r = await api('', { method: 'POST', body: JSON.stringify({ ...customer, lines: cart, paymentMethod, requestKey: key, confirmed: true }) });
       setCart([]); setCheckout(false); setReview(false); setRequestKey('');
       setCurrentOrderId(r.public_id);
-      if(live&&restaurantId){
+      if(!preview&&live&&restaurantId){
         trackCommerceEvent('Solicitud de pedido recibida','Lead',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)});
         trackMetaEvent('OrderSubmitted',{content_ids:cart.map(line=>line.productId),content_name:title,content_type:'product',currency:'COP',value:subtotal+fee,num_items:cart.reduce((sum,line)=>sum+line.quantity,0),order_id:r.public_id},true);
       }
@@ -510,16 +535,18 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     } catch (e) { setNotice(e instanceof Error ? e.message : 'No se pudo actualizar.'); }
     finally { setBusy(false); }
   }
-  return <div className="pilot">
+  return <div className={`pilot${preview?' buyer-pilot-preview':''}${(preview||visualMenu)&&checkout?' checkout-open':''}${visualMenu&&!manager?' pilot-visual-menu':''}${visualMenu&&currentOrderId?' order-tracking-open':''}`}>
     {!embedded && <header className="pilot-header"><a href="/" aria-label="Volver a Mercau"><img src="/logo-mercau.png" alt="Mercau" /></a><span>{manager ? 'Panel de mi negocio' : title}</span>
-      <BackToAccount />{session && <button onClick={signOut}>Cerrar sesion</button>}</header>}
+      {preview ? <a href="/comprar">Volver al Inicio</a> : <BackToAccount />}{session && !preview && <button onClick={signOut}>Cerrar sesion</button>}</header>}
+    {preview && <p className="pilot-preview-banner">Vista de prueba · Datos ficticios. No se cobra dinero ni se despachan pedidos.</p>}
     {!live && <div className="pilot-test">Restaurante ficticio de prueba. No se preparan productos. Si eliges Bre-B, la transferencia sí mueve dinero real a Mercáu y debe acordarse previamente.</div>}
-    {notice && <p role="status" className="pilot-notice">{notice}</p>}
+    {notice && !(preview&&checkout) && <p key={visualMenu?addedNoticeId:undefined} role="status" className={visualMenu&&notice==='Producto agregado a tu pedido.'?'pilot-notice menu-added-toast':'pilot-notice'}>{notice}</p>}
     {ordersError && <p role="status" className="pilot-notice">{ordersError}</p>}
-    {!manager && <p><a href="/mi-cuenta/pedidos">Ver mis pedidos</a></p>}
+    {!manager && !preview && <p><a href="/mi-cuenta/pedidos">Ver mis pedidos</a></p>}
     {!manager && session && currentOrderId && <section id="mis-pedidos" className="pilot-orders" aria-label="Seguimiento de tu pedido actual"><h2>Tu pedido actual</h2>
       <button onClick={refresh} disabled={busy}>Actualizar seguimiento</button>
-      {currentOrder ? <><CustomerOrderCard order={currentOrder} />{currentOrder.payment_method === 'BREB_QR' && <p className="pilot-payment-info">Elegiste transferencia contra entrega. El mensajero te mostrará el QR de Mercáu. Verifica que el destinatario sea Financial Solidity S.A.S.</p>}{currentOrder.payment_method === 'CASH' && <p className="pilot-payment-info">Elegiste efectivo contra entrega. Ten disponible el valor exacto del pedido.</p>}</> : <p role="status">Pedido {currentOrderId} recibido. Consultando su estado...</p>}
+      {preview && <div className="pilot-preview-actions" aria-label="Simular estados de prueba">{[['accepted','Simular aceptación'],['in_transit','Simular en camino'],['delivered','Simular entrega'],['failed','Simular novedad']].map(([status,label])=><button key={status} disabled={busy} onClick={async()=>{try{await api('',{method:'PATCH',body:JSON.stringify({publicId:currentOrderId,status})});await refresh();}catch{setNotice('No se pudo simular el estado.');}}}>{label}</button>)}</div>}
+      {currentOrder ? <><CustomerOrderCard order={currentOrder} visual={visualMenu} />{showPaymentInstructions && currentOrder.payment_method === 'BREB_QR' && <p className="pilot-payment-info">Elegiste transferencia contra entrega. El mensajero te mostrará el QR de Mercáu. Verifica que el destinatario sea Financial Solidity S.A.S.</p>}{showPaymentInstructions && currentOrder.payment_method === 'CASH' && <p className="pilot-payment-info">Elegiste efectivo contra entrega. Ten disponible el valor exacto del pedido.</p>}</> : <p role="status">Pedido {currentOrderId} recibido. Consultando su estado...</p>}
       <button onClick={() => { ordersRequest.current++; setCurrentOrderId(null); setOrders([]); setOrdersError(''); setNotice(''); }}>Hacer otro pedido</button>
     </section>}
     {manager && session && !live && <PilotPublicationControls accessToken={session.access_token} />}
@@ -532,32 +559,42 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
           {live && <a className="pilot-create-account" href={`/mi-cuenta?mode=register&intent=buyer&returnTo=${encodeURIComponent(returnPath || '/')}`}><UserPlus size={18} aria-hidden="true" />Crear mi cuenta para pedir</a>}</div></form>
       {!live && <p>Acceso solo para cuentas invitadas a esta prueba.</p>}</section>}
     {!manager && !currentOrderId && <>
+      {visualMenu && !checkout && <section className="menu-visual-identity" aria-label="Información del restaurante">
+        {coverImage && <div className="menu-visual-cover"><img src={coverImage} alt=""/></div>}
+        <a className="menu-visual-back" href="/comprar" aria-label="Volver al Inicio"><ArrowLeft size={25}/></a>
+        <div className="menu-visual-title"><h1>{title}</h1><p>Menú</p></div>
+      </section>}
       {!embedded && <section className="pilot-intro"><h1>{title}</h1>{!live && <><p>Hamburguesas, parrilla y malteadas · Nechi</p><p>Horario de referencia: 5:00 p. m. a 10:00 p. m.</p></>}
         {!enabled && <p>Pedidos pausados.</p>}</section>}
-      {live && <p>Solo casco urbano de Nechí. Puedes pagar en efectivo contra entrega o mediante Bre-B. El negocio debe confirmar tu pedido.</p>}
+      {live && <p className="pilot-coverage">Solo casco urbano de Nechí. Puedes pagar en efectivo contra entrega o mediante Bre-B. El negocio debe confirmar tu pedido.</p>}
       {live && deliveryMode==='OWN' && <p className="pilot-delivery-owner"><strong>Entrega realizada por el negocio.</strong> El pedido será llevado por el equipo de {title}, no por un domiciliario de Mercáu.</p>}
       {embedded && !enabled && <p role="status">Pedidos pausados.</p>}
       {!menu.length && <p>No hay productos disponibles para pedir.</p>}
       <nav className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
         <button key={c} aria-pressed={c === category} onClick={() => setCategory(c)}>{c}</button>)}</nav>
-      <div className="pilot-shop"><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map(p => {
+      <div className={preview&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map(p => {
         const count = cart.filter(l => l.productId === p.id).reduce((sum,line)=>sum+line.quantity,0);
-        return <article key={p.id}><div className="pilot-product-image aspect-[4/3] w-full overflow-hidden bg-gray-100"><CatalogProductImage name={p.name} imageUrl={p.image} /></div><div className="pilot-product-body"><h2>{p.name}</h2>{p.description && <p className="text-sm">{p.description}</p>}<p className="pilot-product-price">{money(p.price)}</p>
+        return <article key={p.id}>
+          {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={!enabled || busy}/>}
+          <div className="pilot-product-image aspect-[4/3] w-full overflow-hidden bg-gray-100"><CatalogProductImage name={p.name} imageUrl={p.image} /></div><div className="pilot-product-body"><h2>{p.name}</h2>{p.description && <p className="text-sm menu-product-description">{p.description}</p>}<p className="pilot-product-price">{money(p.price)}</p>
           {p.optionGroups.length>0 && <p className="pilot-customizable">Personalizable</p>}
           {count>0 && <p className="text-center text-sm font-bold text-[#D82016]">{count} en tu pedido</p>}
-          <button className="pilot-primary w-full" disabled={!enabled || busy} onClick={()=>openCustomization(p)}>{p.optionGroups.length?'Personalizar y agregar':'Agregar al pedido'}</button></div></article>;
+          <button className="pilot-primary w-full" aria-label={visualMenu?`Agregar ${p.name}`:undefined} disabled={!enabled || busy} onClick={()=>openCustomization(p)}>{visualMenu?<Plus size={24}/>:p.optionGroups.length?'Personalizar y agregar':'Agregar al pedido'}</button></div></article>;
       })}</section>
-      <aside className="pilot-cart" id="tu-pedido"><h2>Tu pedido</h2>{!cart.length && <p>Elige productos del menu.</p>}{cart.map(l => {const product=menu.find(p=>p.id===l.productId);return <div key={l.lineId} className="pilot-cart-line"><p><strong>{l.quantity} x {product?.name}</strong> · {money(configuredUnitPrice(l)*l.quantity)}</p>
+      <aside className="pilot-cart" id="tu-pedido"><div hidden={(preview||visualMenu)&&checkout}><h2>Tu pedido</h2>{!cart.length && (visualMenu?<div className="menu-empty-cart"><ShoppingCart size={30} aria-hidden="true"/><p>Tu pedido está vacío</p></div>:<p>Elige productos del menu.</p>)}{cart.map(l => {const product=menu.find(p=>p.id===l.productId);return <div key={l.lineId} className="pilot-cart-line"><p><strong>{l.quantity} x {product?.name}</strong> · {money(configuredUnitPrice(l)*l.quantity)}</p>
         {selectedLineOptions(l).map(choice=><p key={choice.id} className="pilot-line-detail">{choice.groupName}: {choice.name}{choice.priceDelta>0&&<> <strong>+{money(choice.priceDelta)} c/u</strong></>}</p>)}
         {l.note && <p className="pilot-line-detail">Observación: {l.note}</p>}
         <div className="pilot-quantity"><button disabled={busy} aria-label={`Quitar ${product?.name}`} onClick={()=>quantity(l.lineId,-1)}>-</button><output>{l.quantity}</output><button disabled={busy || l.quantity>=10} aria-label={`Agregar ${product?.name}`} onClick={()=>quantity(l.lineId,1)}>+</button></div></div>;})}
-        <p>Productos <strong>{money(subtotal)}</strong></p><p>Domicilio <strong>{money(fee)}</strong></p><p>Total <strong>{money(subtotal + fee)}</strong></p>
+        {cart.length>0&&<><p>Productos <strong>{money(subtotal)}</strong></p><p>Domicilio <strong>{money(fee)}</strong></p><p>Total <strong>{money(subtotal + fee)}</strong></p></>}
         <button className="pilot-primary" disabled={!cart.length || !enabled || busy} onClick={() => {
           if (!session) { document.querySelector<HTMLElement>('.pilot-login')?.scrollIntoView({ behavior:'smooth', block:'start' }); return; }
-          if(live&&restaurantId)trackCommerceEvent('Carrito iniciado','InitiateCheckout',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)}); setCheckout(true); setReview(false);
+          if(!preview&&live&&restaurantId)trackCommerceEvent('Carrito iniciado','InitiateCheckout',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)});
+          reviewSavedData.current = visualMenu && Boolean(session?.user.user_metadata?.delivery_profile);
+          setCheckout(true); setReview(false);
         }}>{session ? 'Continuar' : 'Entrar o crear cuenta para continuar'}</button>
         {!session && <p>Tu selección quedará guardada temporalmente en este celular mientras creas la cuenta.</p>}
-        {checkout && (!review ? <form ref={checkoutRef} className="pilot-checkout-form" onSubmit={e => { e.preventDefault(); if(live&&restaurantId)trackCommerceEvent('Pedido revisado','ReviewOrder',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)},true); setReview(true); }}>
+        </div>
+        {checkout && (!review ? <form ref={checkoutRef} className="pilot-checkout-form" onSubmit={e => { e.preventDefault(); if(!preview&&live&&restaurantId)trackCommerceEvent('Pedido revisado','ReviewOrder',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)},true); setReview(true); }}>
           <h3>Datos de entrega</h3>
           {([['name','Nombre'], ['phone','Celular'], ['address','Direccion de entrega'], ['neighborhood','Barrio / sector'], ['instructions','Referencia (opcional)']] as const).map(([key,label]) =>
             <label key={key}>{label}<input maxLength={key === 'instructions' ? 500 : 240} type={key === 'phone' ? 'tel' : 'text'} required={key !== 'instructions'}
@@ -578,16 +615,17 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
           </section>
           <fieldset className="pilot-payment-choice"><legend>Pago contra entrega</legend><label><input type="radio" name="payment" checked={paymentMethod === 'CASH'} onChange={() => { setPaymentMethod('CASH'); setRequestKey(''); }}/> Pagar en efectivo</label><label><input type="radio" name="payment" checked={paymentMethod === 'BREB_QR'} onChange={() => { setPaymentMethod('BREB_QR'); setRequestKey(''); }}/> Pagar por transferencia Bre-B</label></fieldset>
           <p>{live ? 'Solo casco urbano de Nechí.' : 'Solo casco urbano de Nechi. La prueba no recauda dinero real.'}</p>
-          <button className="pilot-primary" disabled={busy}>Revisar solicitud</button></form> : <section ref={reviewRef} className="pilot-review"><h3>Revisa tu solicitud</h3>
+          <button className="pilot-primary" disabled={busy}>Revisar solicitud</button></form> : <section ref={reviewRef} className="pilot-review">{visualMenu?<OrderReviewPresentation businessName={title} lines={cart.map(line=>({...line,name:menu.find(item=>item.id===line.productId)?.name || '',unitPrice:configuredUnitPrice(line),options:selectedLineOptions(line)}))} subtotal={subtotal} fee={fee} customer={customer} paymentMethod={paymentMethod} hasPoint={Boolean(customerMapsUrl)} live={live} busy={busy} canConfirm={enabled&&Boolean(session)} onConfirm={()=>void submit()} onEdit={()=>setReview(false)}/>:<><h3>Revisa tu solicitud</h3>
           <p>{customer.name} · {customer.phone}</p><p>{customer.address}, {customer.neighborhood}</p><p>{customer.instructions}</p>
           {customerMapsUrl && <p className="font-bold text-emerald-700">Ubicación exacta agregada</p>}
           <div className="pilot-review-lines"><h4>Resumen del pedido</h4>{cart.map(line=>{const product=menu.find(item=>item.id===line.productId);return <div key={line.lineId} className="pilot-cart-line"><p><strong>{line.quantity} x {product?.name}</strong> · {money(configuredUnitPrice(line)*line.quantity)}</p>{selectedLineOptions(line).map(choice=><p key={choice.id} className="pilot-line-detail">{choice.groupName}: {choice.name}{choice.priceDelta>0&&<> <strong>+{money(choice.priceDelta)} c/u</strong></>}</p>)}{line.note&&<p className="pilot-line-detail">Observación: {line.note}</p>}</div>})}</div>
           <p>Productos: <strong>{money(subtotal)}</strong></p><p>Domicilio: <strong>{money(fee)}</strong></p><p>{live ? 'Total a pagar' : 'Total de prueba'}: <strong>{money(subtotal + fee)}</strong></p><p>Pago contra entrega: {paymentMethod === 'BREB_QR' ? 'transferencia Bre-B; el mensajero mostrará el QR' : 'efectivo'}.</p><p>El restaurante debe confirmar antes del despacho.</p>
-          <button disabled={busy || !enabled || !session} className="pilot-primary" onClick={submit}>{busy ? 'Guardando...' : live ? 'Confirmar pedido' : 'Confirmar pedido de prueba'}</button>
-          <button disabled={busy} onClick={() => setReview(false)}>Corregir datos</button></section>)}
+          <button disabled={busy || !enabled || !session} className="pilot-primary" onClick={()=>void submit()}>{busy ? 'Guardando...' : live ? 'Confirmar pedido' : 'Confirmar pedido de prueba'}</button>
+          <button disabled={busy} onClick={() => setReview(false)}>Corregir datos</button></>}</section>)}
       </aside></div>
       {customizing && <div className="pilot-customizer-backdrop" role="presentation" onMouseDown={()=>setCustomizing(null)}><section className="pilot-customizer" role="dialog" aria-modal="true" aria-labelledby="customizer-title" onMouseDown={event=>event.stopPropagation()}>
         <div className="pilot-customizer-heading"><div><p>Personaliza tu pedido</p><h2 id="customizer-title">{customizing.name}</h2><strong>Desde {money(customizing.price)}</strong></div><button type="button" onClick={()=>setCustomizing(null)} aria-label="Cerrar personalización">×</button></div>
+        {visualMenu && customizing.description && <p className="menu-product-full-description">{customizing.description}</p>}
         {customizing.optionGroups.map(group=><fieldset key={group.id}><legend>{group.name}{group.required?' *':''}</legend><p className="pilot-option-help">{group.type==='single'?'Elige una opción':`Puedes elegir hasta ${group.maxSelections}`}</p>
           {group.choices.map(choice=>{const checked=(customSelections[group.id] || []).includes(choice.id);return <label key={choice.id}><input type={group.type==='single'?'radio':'checkbox'} name={`choice-${group.id}`} checked={checked} onChange={()=>selectChoice(group.id,choice.id,group.type,group.maxSelections)}/><span>{choice.name}</span>{choice.priceDelta>0&&<strong>+ {money(choice.priceDelta)}</strong>}</label>;})}
         </fieldset>)}

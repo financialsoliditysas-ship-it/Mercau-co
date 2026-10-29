@@ -43,7 +43,7 @@ export default async function BusinessCatalogPage({params}:{params:{id:string}})
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-start-2"><CatalogShareActions businessName={business.name} catalogUrl={catalogUrl} noun={catalogNoun(business.category)} /><InstallMercau prominent /></div>
     </section>
       {business.pilotRestaurant && <PilotBusinessNotice />}
-      {liveOrders ? <RestaurantPilot embedded restaurantId={business.id} businessName={business.name} returnPath={catalogPath} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} />}
+      {liveOrders ? <RestaurantPilot embedded visualMenu restaurantId={business.id} businessName={business.name} returnPath={catalogPath} coverImage={catalog?.products.find(product=>product.imageUrl)?.imageUrl || (business.photoKind==='photo'?business.photoUrl:'') || ''} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} />}
     </div>
   </main>;
 }
