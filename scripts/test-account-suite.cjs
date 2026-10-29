@@ -1,6 +1,6 @@
 const { spawnSync } = require("node:child_process");
 const scripts = [
-  "test-buyer-security.cjs",
+  "test-production-visual-contract.cjs",
   "test-buyer-visual.cjs",
   "test-account-age.cjs",
   "test-account-workspace.cjs",

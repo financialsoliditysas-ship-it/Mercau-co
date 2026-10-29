@@ -9,7 +9,6 @@ import {
 } from "@/lib/delivery-types";
 import { getLogisticsProvider } from "@/lib/shipday";
 import { requireShipdayWebhookToken } from '@/lib/shipday-webhook-auth';
-import { createHash } from 'node:crypto';
 
 function cleanText(value: unknown, max = 300) {
   return String(value || "").trim().slice(0, max);
@@ -125,17 +124,9 @@ async function updateDeliveryOrder(
 
 export async function createDeliveryOrder(rawBody: Record<string, unknown>, context: {userId?:string;businessId?:string} = {}) {
   const input = normalizeDeliveryInput(rawBody);
-  const requestKey = String(rawBody.requestKey || '');
-  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(requestKey)) {
-    throw new Error('Actualiza el formulario antes de enviar la solicitud.');
-  }
-  const fingerprint = createHash('sha256').update(JSON.stringify({ input,
-    userId: context.userId || null, businessId: context.businessId || null })).digest('hex');
   const supabase = getSupabaseAdminClient();
 
   const insertPayload = {
-    request_key: requestKey,
-    request_fingerprint: fingerprint,
     service_type: input.serviceType,
     customer_name: input.customerName,
     customer_phone: input.customerPhone,
@@ -172,13 +163,6 @@ export async function createDeliveryOrder(rawBody: Record<string, unknown>, cont
     .select("*")
     .single();
 
-  if (error?.code === '23505') {
-    const existing = await supabase.from('delivery_orders').select('*').eq('request_key', requestKey).maybeSingle();
-    if (existing.error || !existing.data || existing.data.request_fingerprint !== fingerprint) {
-      throw new Error('La solicitud cambió. Revisa su estado antes de intentar nuevamente.');
-    }
-    return { order: existing.data as DeliveryOrder, shipdayCreated: Boolean(existing.data.shipday_order_id) };
-  }
   if (error) throw new Error(error.message);
 
   const order = data as DeliveryOrder;
@@ -192,15 +176,7 @@ export async function createDeliveryOrder(rawBody: Record<string, unknown>, cont
   return syncOrderToShipday(order);
 }
 
-export async function syncOrderToShipday(order: DeliveryOrder): Promise<{order: DeliveryOrder; shipdayCreated: boolean; blocked?: boolean}> {
-  if (order.shipday_order_id) return { order, shipdayCreated: true };
-  const claim = await getSupabaseAdminClient().rpc('claim_delivery_dispatch', { p_order: order.id });
-  if (claim.error) throw new Error('El despacho necesita revisión de configuración. No se envió una nueva solicitud.');
-  if (claim.data !== true) {
-    const current = await getDeliveryOrderById(order.id);
-    if (!current) throw new Error('No se pudo comprobar el despacho.');
-    return { order: current, shipdayCreated: Boolean(current.shipday_order_id), blocked: !current.shipday_order_id };
-  }
+export async function syncOrderToShipday(order: DeliveryOrder) {
   try {
     const provider = getLogisticsProvider();
     const result = await provider.createOrder(order);

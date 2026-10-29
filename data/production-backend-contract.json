@@ -1,0 +1,18 @@
+{
+  "deployment": "dpl_2icwrVFoA54LAmFdAsaq8WBG6yWb",
+  "preservedBase": "4342ee0",
+  "textLineEndings": "LF",
+  "sha256": {
+    "lib/deliveries.ts": "f8b7dd110723e40e1181df639ae6b67c2e808b180387dd1f7340ddf7b9b781f5",
+    "lib/shipday.ts": "2c51e4c12c73e7cad9b8d8468f83daa8ca2d27153130660b130e04001e8de63f",
+    "lib/restaurant-pilot.ts": "096bf04e579b0474a9f573a0d480e432954b4f01dc6bf3344a354f138f653a32",
+    "app/api/piloto/restaurante/route.ts": "1f85d15a8fcf72e598a5c435fee93996d08187f916621c39826c76cc7f23e2c4",
+    "app/api/admin/envios/route.ts": "f845cfd197634b2b87b37e773709b792ee35b05ef6fac3102eae57ba3feeb58b",
+    "app/api/deliveries/route.ts": "37752a4d5f9500ce4f1b684fd6dd3cbea0863f42fb6ca1dc0967f25c60b5c21b",
+    "lib/account-server.ts": "05cf446840e35801eb764194176b73b535759a6a6105808e1a23a287277b69a9",
+    "lib/supabase.ts": "d51db7bc98a88a35bdddc256ada456fdd5f2f507a9f09f4f7e940e6fd368bcd4",
+    "public/pagos/mercau-breb.jpeg": "f93cfc13a3ae1a2477a6e56b7d5717806eaadd84f0cbd1c458ea0aeff94e9895",
+    "app/manifest.ts": "10cf3f63dcd52f94b8a26bb3cb14ae8e1a9efc523fb7fb48a3772426d0f600a9",
+    "public/mercau-sw.js": "e85d9e6e6579d6c974dd8db0946dcc048b68b8b5d6ea86d0adc52ea723caaa9a"
+  }
+}

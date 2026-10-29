@@ -45,7 +45,6 @@ export async function POST(request: Request) {
 
     if (action === "retry_shipday") {
       const result = await syncOrderToShipday(order);
-      if (result.blocked) return NextResponse.json({ok:false,error:'Este despacho ya tuvo un intento. Comprueba su existencia en Shipday antes de autorizar otro envío.'},{status:409});
       return NextResponse.json({ ok: true, order: result.order, shipdayCreated: result.shipdayCreated });
     }
 
