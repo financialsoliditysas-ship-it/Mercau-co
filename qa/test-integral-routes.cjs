@@ -14,7 +14,7 @@ async function main(){
  try{
   let ready=false;for(let i=0;i<60;i++){try{if((await fetch(base+'/')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,500));}assert(ready);
   browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
-  for(const width of [390,1440]){
+  for(const width of [320,390,768,1440]){
    const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block'}),page=await context.newPage();
    const errors=[],writes=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(30000);
    await page.addInitScript(user=>{

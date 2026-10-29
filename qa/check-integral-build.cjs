@@ -25,6 +25,9 @@ async function main(){
   for(const [url,status]of [['/presentacion-revision',404],['/comprar/prueba-pedido',404],['/api/comprador/prueba-pedidos',404],['/qa/authenticated-app',404],['/outputs/final-verification/results.json',404],['/api/mi-cuenta',401],['/api/mi-cuenta/pedidos',401],['/api/comprador/negocios',503]]){
    const response=await fetch(base+url);assert.equal(response.status,status,url);results.guards.push({url,status});
   }
+  const markers=['Asados de prueba','Hamburguesa de prueba','rec00000000000001','Persona de prueba','Plato QA ficticio','Comercio QA ficticio'];let chunks=0;
+  function scan(directory){for(const entry of fs.readdirSync(directory,{withFileTypes:true})){const file=path.join(directory,entry.name);if(entry.isDirectory())scan(file);else if(file.endsWith('.js')){chunks++;const content=fs.readFileSync(file,'utf8');for(const marker of markers)assert(!content.includes(marker),'Synthetic identity exposed in public chunk: '+marker);}}}
+  scan(path.join(root,'.next-pwa-build/static/chunks'));results.publicChunkScan={chunks,markers:markers.length,found:0};
   results.prototypeExcluded=true;results.guardFlagsForcedOn=true;console.log('PASS final production guards');
  }finally{app.kill();fs.closeSync(log);save();}
 }
