@@ -26,10 +26,10 @@ export async function generateMetadata({params}:{params:{id:string}}) {
 export default async function BusinessCatalogPage({params}:{params:{id:string}}) {
   const business=await loadPublicBusiness(params.id);if(!business)notFound();
   if(business.publicSlug && params.id!==business.publicSlug)permanentRedirect(businessCatalogPath(business));
-  let catalog,unavailable=false;
-  try{catalog=await publicCatalog(business.id);}catch{unavailable=true;}
-  let liveOrders = false;
-  try { const restaurant = await pilotRestaurant(business.id); liveOrders = restaurant.is_live === true; } catch { /* Keep the catalog available when ordering is not configured. */ }
+  const [catalogResult,restaurantResult]=await Promise.allSettled([publicCatalog(business.id),pilotRestaurant(business.id)]);
+  const unavailable=catalogResult.status==='rejected';
+  const catalog=catalogResult.status==='fulfilled'?catalogResult.value:null;
+  const liveOrders=restaurantResult.status==='fulfilled'&&restaurantResult.value.is_live===true;
   const catalogPath=businessCatalogPath(business);
   const catalogUrl=`https://www.mercau.co${catalogPath}`;
   return <main className="min-h-screen bg-[#FCFBF9] text-[#1F2937]">

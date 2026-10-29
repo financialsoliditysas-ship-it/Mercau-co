@@ -3,7 +3,7 @@ const fs=require('node:fs');const Module=require('node:module');const ts=require
 const {NextRequest}=require('next/server');
 function load(path,mocks={}) {
   const mod=new Module(path);mod.require=id=>id in mocks?mocks[id]:require(id);
-  mod._compile(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,path+'.cjs');return mod.exports;
+  mod._compile(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,path+'.cjs');return mod.exports;
 }
 const validation=load('lib/catalog-validation.ts'),photo=load('lib/business-photo.ts');
 const businessId='recXRpTxUmzbiZYLO',other='recGLMhJYXTRE46st';
@@ -48,6 +48,7 @@ const mocks={'@/lib/catalog-business-public':{catalogBusinessPublic:async id=>id
 const collection=load('app/api/mi-negocio/[businessId]/catalogo/route.ts',mocks);
 const item=load('app/api/mi-negocio/[businessId]/catalogo/[productId]/route.ts',mocks);
 const upload=load('app/api/mi-negocio/[businessId]/catalogo/[productId]/foto/route.ts',mocks);
+mocks['@/lib/catalog-image']=load('lib/catalog-image.ts');
 const publicPhoto=load('app/api/negocios/[businessId]/catalogo/[productId]/foto/route.ts',mocks);
 const context={params:{businessId,productId:id}};
 const req=(method,body,auth=true)=>new NextRequest('https://example.invalid/catalogo',{method,headers:{...(auth?{Authorization:'Bearer test-only'}:{}),'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});

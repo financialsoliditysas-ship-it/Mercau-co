@@ -9,6 +9,7 @@ import './buyer/menu-visual.css';
 import BackToAccount from './BackToAccount';
 import PilotPublicationControls from './PilotPublicationControls';
 import CatalogProductImage from './CatalogProductImage';
+import { catalogImageSources } from '@/lib/catalog-image-url';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import type { PilotProduct } from '@/lib/restaurant-pilot';
@@ -582,7 +583,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       {!live && <p>Acceso solo para cuentas invitadas a esta prueba.</p>}</section>}
     {!manager && !currentOrderId && <>
       {visualMenu && !checkout && <section className="menu-visual-identity" aria-label="Información del restaurante">
-        {coverImage && <div className="menu-visual-cover"><img src={coverImage} alt=""/></div>}
+        {coverImage && <div className="menu-visual-cover"><img {...catalogImageSources(coverImage)} sizes="(max-width: 639px) 100vw, 960px" fetchPriority="high" decoding="async" alt=""/></div>}
         <a className="menu-visual-back" href="/comprar" aria-label="Volver al Inicio"><ArrowLeft size={25}/></a>
         <div className="menu-visual-title"><h1>{title}</h1><p>Menú</p></div>
       </section>}
@@ -594,11 +595,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       {!menu.length && <p>No hay productos disponibles para pedir.</p>}
       <nav ref={categoriesRef} className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
         <button key={c} data-category={c} aria-pressed={c === (visualMenu&&category==='Todo'?visibleCategory:category)} onClick={() => {setCategory(c);setVisibleCategory(c);if(visualMenu)requestAnimationFrame(()=>categoriesRef.current?.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));}}>{c}</button>)}</nav>
-      <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map(p => {
+      <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map((p,index) => {
         const count = cart.filter(l => l.productId === p.id).reduce((sum,line)=>sum+line.quantity,0);
         return <article key={p.id} data-menu-category={p.category}>
           {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={!enabled || busy}/>}
-          <div className="pilot-product-image aspect-[4/3] w-full overflow-hidden bg-gray-100"><CatalogProductImage name={p.name} imageUrl={p.image} /></div><div className="pilot-product-body"><h2>{p.name}</h2>{p.description && <p className="text-sm menu-product-description">{p.description}</p>}<p className="pilot-product-price">{money(p.price)}</p>
+          <div className="pilot-product-image aspect-[4/3] w-full overflow-hidden bg-gray-100"><CatalogProductImage name={p.name} imageUrl={p.image} priority={index<2} sizes={visualMenu?'(max-width: 639px) 112px, 160px':undefined} /></div><div className="pilot-product-body"><h2>{p.name}</h2>{p.description && <p className="text-sm menu-product-description">{p.description}</p>}<p className="pilot-product-price">{money(p.price)}</p>
           {p.optionGroups.length>0 && <p className="pilot-customizable">Personalizable</p>}
           {count>0 && <p className="text-center text-sm font-bold text-[#D82016]">{count} en tu pedido</p>}
           <button className="pilot-primary w-full" aria-label={visualMenu?`Agregar ${p.name}`:undefined} disabled={!enabled || busy} onClick={()=>openCustomization(p)}>{visualMenu?<Plus size={24}/>:p.optionGroups.length?'Personalizar y agregar':'Agregar al pedido'}</button></div></article>;

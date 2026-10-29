@@ -1,4 +1,5 @@
 import { DirectoryBusiness, toDirectoryCategory } from "@/data/directory";
+import { cache } from 'react';
 import { photoDetails, photoFieldId } from './business-photo';
 import { isPilotBusinessNote } from './pilot-directory-data';
 
@@ -149,7 +150,7 @@ async function loadAppliedUpdates(config: {
   return updates;
 }
 
-export async function loadDirectoryBusinesses() {
+export const loadDirectoryBusinesses = cache(async () => {
   const token = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const tableId = process.env.AIRTABLE_NEGOCIOS_TABLE_ID;
@@ -262,7 +263,7 @@ export async function loadDirectoryBusinesses() {
       } satisfies DirectoryBusiness;
     })
     .filter((business): business is DirectoryBusiness => Boolean(business));
-}
+});
 
 export async function loadDirectoryBusiness(id: string) {
   const businesses = await loadDirectoryBusinesses();
