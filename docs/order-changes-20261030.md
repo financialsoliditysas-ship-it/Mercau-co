@@ -1,6 +1,23 @@
 # Propuestas de cambio y avisos al comprador
 
-Estado: desarrollo local, NO publicado. No se ejecutaron migraciones productivas ni se enviaron pedidos, mensajes, cobros o despachos reales. Rama `feat/order-change-proposals-20261030`, sobre el corte publicado `217c140` y su registro de activacion local `5326703`.
+Estado actual: publicado con autorizacion, segun el cierre siguiente. Rama `feat/order-change-proposals-20261030`, sobre el corte `217c140` y su registro de activacion `5326703`. Se conserva mas abajo la documentacion de diseno y validacion local anterior a publicar.
+
+## Publicacion autorizada, 30 de octubre de 2026
+
+Este cierre sustituye el estado local inicial del desarrollo. El usuario autorizo publicar despues de aprobar el resumen compacto.
+
+- Commit publicado: `be724dd33c31f1646d2c4ba062c997bdf86c41b3`. Rama propia subida sin forzar ni cambiar main.
+- Vercel: `dpl_7kskyMWCnP2pwVbQx2htGoDMbRyq`, `mercau-d0t56p17m-financial-soliditys-projects.vercel.app`, READY y asignado a www.mercau.co y mercau.co. Se utilizo el despliegue Git autorizado `dpl_B4LQtMXGNFKVCnfgYhfwGAL3teTn` como origen y se reconstruyo expresamente con target production mediante create_deployment/deploymentId. No se falsearon autorias ni se cambiaron miembros, planes o conexiones para evitar el bloqueo previo del CLI.
+- Migracion aplicada por MCP: version remota `20261030190918`, nombre `order_change_proposals`, archivo local `20261030174526_order_change_proposals.sql`, SHA256 `8FD059C87E6508AEDD4F3CA1D27CC3361C9E15374D6E4DD98B38A3E9CA1657FF`.
+- Configuracion nueva no secreta: ORDER_CHANGES_ENABLED=true, unicamente production, creada antes del build. Las claves WEB_PUSH actuales se comprobaron por metadatos, sin leer ni modificar sus valores. Sin nuevos proveedores, planes, facturacion, claves ni suscripciones.
+- Preflight de solo lectura: 47 pedidos y 47 snapshots, 46 envios entregados y uno cancelado, sin envios activos. Columnas y permisos del esquema actual compatibles. Se verificaron las funciones existentes de transicion y snapshot financiero; sus definiciones conservaron las huellas anteriores tras el SQL.
+- Verificacion de permisos productivos: tablas nuevas con RLS, sin SELECT para anon/authenticated ni DELETE para service_role; el servidor puede actualizar status, pero no old_lines de la auditoria. Tres funciones SECURITY INVOKER con search_path vacio, ejecutables por el servidor y no por clientes; trigger de bloqueo habilitado.
+- Las huellas de pedidos, finanzas e historiales anteriores permanecieron iguales. No se generaron pedidos, cobros, avisos ni despachos reales durante la publicacion.
+- HTTP publico: /, /comprar, /comprar/pedidos y /piloto/restaurante 200; /api/push/comprador sin sesion 401; POST sin sesion a /api/pedidos/cambios y webhook 401; /qa y /api/qa 404. Los once scripts publicos del piloto incluyen el detalle compacto y su accion; /mercau-sw.js sirve ambos eventos push con public, max-age=0, must-revalidate. La consulta agrupada de errores/fatales del despliegue no devolvio grupos en los diez minutos consultados.
+- Pruebas previas: 29 suites, lint con advertencias anteriores, typecheck y build, mas Chrome emulado en 320/390 px. No equivalen a probar la entrega del push ni dispositivos fisicos.
+- Pendientes: primer pedido/propuesta real coordinado y permiso/recepcion en Android/iPhone. El telefono que mostraba el panel anterior sigue igual; su minimizacion por tipo de entrega requiere una decision separada.
+- Advisors: solo dos avisos informativos nuevos de RLS sin politicas para las tablas de servidor, sin acceso de clientes. Se mantienen dos advertencias anteriores de search_path y una de proteccion de contrasenas filtradas; no se cambiaron fuera de este alcance. Referencias: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy y https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
+- Reversion identificada: `dpl_B7FLn59GVmayW3w3exw2SPKhVXAX`. Antes de revertir o apagar la opcion, comprobar que no quedan propuestas pending/declined y resolverlas mediante acciones autorizadas. Conservar tablas e historial. No quitar el trigger para forzar un despacho. La version previa conserva los controles de duplicidad, pero no ofrece interfaz para estas propuestas.
 
 ## Funcionamiento
 
