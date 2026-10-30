@@ -47,3 +47,4 @@ Aplicar por MCP apply_migration, conservando su registro del servidor. No ejecut
 Ante fallo crítico de acceso o pedidos, el despliegue anterior es restaurable. Conservar recibos, marcas e historial; no revertir datos ni borrar columnas. La versión anterior no usa las reservas nuevas: volver a ella reintroduce la limitación de duplicados anterior y requiere restringir operativamente reintentos mientras se corrige. No presentar un rollback como si conservara todos los controles nuevos.
 
 El pedido real controlado y las comprobaciones físicas Android/iPhone requieren coordinación posterior; no forman parte de esta publicación automática.
+Revisado por el propietario para continuar la publicación.
