@@ -3,6 +3,8 @@ import { getDeliveryOrderById, syncOrderToShipday } from './deliveries';
 import { sendNewOrderPush } from './business-push';
 import { catalogOptionGroups, type CatalogOptionGroup } from './catalog-validation';
 import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finance';
+import { orderChangesEnabled } from './order-changes-config';
+import { changeSelection, type OrderChange } from './order-changes-model';
 
 export const pilotId = 'restaurante-mercado';
 export class PilotError extends Error {
@@ -165,7 +167,7 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
 export async function listPilotOrders(userId: string, manager: boolean, restaurantId = pilotId, publicId?: string) {
   await pilotMember(userId, manager, restaurantId);
   let query = getSupabaseAdminClient().from('pilot_food_orders')
-    .select(pilotOrderSelection(manager))
+    .select((pilotOrderSelection(manager)+(orderChangesEnabled()?`,changes:food_order_change_proposals(${changeSelection})`:'')) as ReturnType<typeof pilotOrderSelection>)
     .eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(50);
   if (!manager) query = query.eq('customer_id', userId);
   if(publicId){
@@ -180,7 +182,8 @@ export async function listPilotOrders(userId: string, manager: boolean, restaura
     status: o.status, created_at: o.created_at, address: o.address, payment_method: o.payment_method,
     delivery_mode: o.delivery_mode,
     payment_reference: o.payment_reference, payment_reported_at: o.payment_reported_at, finance: customerPaymentFinance(o.finance),
-    delivery: o.delivery ? { status: o.delivery.status } : null
+    delivery: o.delivery ? { status: o.delivery.status } : null,
+    ...(orderChangesEnabled()?{changes:(o as typeof o & {changes?:OrderChange[]}).changes||[]}: {})
   });
 }
 

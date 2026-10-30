@@ -16,7 +16,7 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/mi-cuenta/negocio", orderId: data.orderId || "" },
   });
   const alertOpenClients = clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-    windows.forEach((client) => client.postMessage({ type: "MERCAU_NEW_ORDER_PUSH", orderId: data.orderId || "" }));
+    windows.forEach((client) => client.postMessage({ type: data.kind === "CUSTOMER_ORDER_CHANGE" ? "MERCAU_CUSTOMER_ORDER_CHANGE" : "MERCAU_NEW_ORDER_PUSH", orderId: data.orderId || "" }));
   });
   event.waitUntil(Promise.all([notification, alertOpenClients]));
 });

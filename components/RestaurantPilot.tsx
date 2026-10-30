@@ -2,6 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CustomerOrderCard from './CustomerOrderCard';
+import OrderChangePanel from './OrderChangePanel';
+import CustomerPushOptIn from './CustomerPushOptIn';
+import { unresolvedChange, type OrderChange } from '@/lib/order-changes-model';
 import OrderReviewPresentation from './buyer/OrderReviewPresentation';
 import './buyer/order-visual.css';
 import { ArrowLeft, Plus } from 'lucide-react';
@@ -28,9 +31,10 @@ type Customer = { name: string; phone: string; address: string; neighborhood: st
 const EMPTY_CUSTOMER: Customer = { name: '', phone: '', address: '', neighborhood: '', instructions: '',
   deliveryLatitude: null, deliveryLongitude: null, deliveryLocationAccuracyM: null, deliveryLocationCapturedAt: null };
 type Order = { id?: string; public_id: string; customer_name?: string; customer_phone?: string;
+  changes?: OrderChange[];
   address: string; neighborhood?: string; instructions?: string;
   delivery_latitude?: number | null; delivery_longitude?: number | null;
-  lines: { name: string; unitPrice: number; quantity: number; selections?:{groupName:string;choices:{name:string;priceDelta:number}[]}[];note?:string }[];
+  lines: { lineId?:string; name: string; unitPrice: number; quantity: number; selections?:{groupName:string;choices:{name:string;priceDelta:number}[]}[];note?:string }[];
   subtotal: number; delivery_fee: number; status: string; created_at: string;
   payment_method?: 'CASH' | 'BREB_QR'; payment_reference?: string | null; payment_reported_at?: string | null;
   delivery_mode?: 'MERCAU' | 'OWN';
@@ -44,6 +48,7 @@ function applicationServerKey(value: string) {
   return Uint8Array.from(Array.from(raw).map(character => character.charCodeAt(0)));
 }
 const statuses: Record<string, string> = { pending: 'Esperando confirmacion', accepted: 'En preparacion', rejected: 'No aceptado',
+  change_proposed:'Cambio propuesto al comprador',change_accepted:'Cambio aceptado por el comprador',change_declined:'Cambio no aceptado por el comprador',change_withdrawn:'Propuesta retirada',
   ready: 'Listo para recoger', out_for_delivery: 'En camino', created: 'Solicitud de mensajero recibida', sent_to_shipday: 'Buscando mensajero',
   assigned: 'Mensajero asignado', picked_up: 'Recogido', in_transit: 'En camino', delivered: 'Entregado',
   cancelled: 'Cancelado', failed: 'Entrega no completada', integration_error: 'Despacho en revision' };
@@ -317,6 +322,13 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     api('?mode=menu').then(r => { setMenu(r.menu); setFee(r.fee); setEnabled(r.enabled); setDeliveryMode(r.deliveryMode || 'MERCAU'); })
       .catch(e => setNotice(e.message));
   }, [api, manager]);
+  const orderChangesActive=manager&&orders.some(order=>order.changes!==undefined);
+  useEffect(()=>{
+    if(!orderChangesActive)return;
+    let active=true;
+    api('?mode=menu').then(result=>{if(active)setMenu(result.menu||[]);}).catch(()=>{if(active)setNotice('No se pudieron cargar las alternativas del menú. Actualiza antes de proponer un reemplazo.');});
+    return()=>{active=false;};
+  },[api,orderChangesActive]);
   const refresh = useCallback(async () => {
     if (!session || (!manager && !currentOrderId)) return;
     const userId = session.user.id;
@@ -347,6 +359,12 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     const timer = setInterval(refresh, 12000);
     return () => clearInterval(timer);
   }, [refresh, session, manager, currentOrderId]);
+  useEffect(()=>{
+    const update=()=>{void refresh();};
+    const push=(event:MessageEvent)=>{if(!manager&&event.data?.type==='MERCAU_CUSTOMER_ORDER_CHANGE')update();};
+    window.addEventListener('mercau:order-updated',update);navigator.serviceWorker?.addEventListener('message',push);
+    return()=>{window.removeEventListener('mercau:order-updated',update);navigator.serviceWorker?.removeEventListener('message',push);};
+  },[refresh,manager]);
   useEffect(() => {
     if (!manager || !session || !('serviceWorker' in navigator)) return;
     const receivePush = (event: MessageEvent) => {
@@ -612,6 +630,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     {ordersError && <p role="status" className="pilot-notice">{ordersError}</p>}
     {!manager && !preview && <p><a href="/mi-cuenta/pedidos">Ver mis pedidos</a></p>}
     {!manager && session && currentOrderId && <section id="mis-pedidos" className="pilot-orders" aria-label="Seguimiento de tu pedido actual"><h2>Tu pedido actual</h2>
+      {currentOrder?.changes!==undefined&&<CustomerPushOptIn/>}
       <button onClick={refresh} disabled={busy}>Actualizar seguimiento</button>
       {preview && <div className="pilot-preview-actions" aria-label="Simular estados de prueba">{[['accepted','Simular aceptación'],['in_transit','Simular en camino'],['delivered','Simular entrega'],['failed','Simular novedad']].map(([status,label])=><button key={status} disabled={busy} onClick={async()=>{try{await api('',{method:'PATCH',body:JSON.stringify({publicId:currentOrderId,status})});await refresh();}catch{setNotice('No se pudo simular el estado.');}}}>{label}</button>)}</div>}
       {currentOrder ? <><CustomerOrderCard order={currentOrder} visual={visualMenu} />{showPaymentInstructions && currentOrder.payment_method === 'BREB_QR' && <p className="pilot-payment-info">Elegiste transferencia contra entrega. El mensajero te mostrará el QR de Mercáu. Verifica que el destinatario sea Financial Solidity S.A.S.</p>}{showPaymentInstructions && currentOrder.payment_method === 'CASH' && <p className="pilot-payment-info">Elegiste efectivo contra entrega. Ten disponible el valor exacto del pedido.</p>}</> : <p role="status">Pedido {currentOrderId} recibido. Consultando su estado...</p>}
@@ -712,13 +731,14 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
         <ul>{o.lines.map((l,i) => <li key={i}><strong>{l.quantity} x {l.name} · {money(l.unitPrice * l.quantity)}</strong>{l.selections?.map(selection=>selection.choices.map(choice=><span key={`${selection.groupName}-${choice.name}`} className="pilot-order-option">{selection.groupName}: {choice.name}{choice.priceDelta>0&&<> <strong>+{money(choice.priceDelta)} c/u</strong></>}</span>))}{l.note&&<span className="pilot-order-option">Observación: {l.note}</span>}</li>)}</ul>
         <p>Productos: {money(o.subtotal)} · Domicilio: {money(o.delivery_fee)} · Total: {money(o.subtotal + o.delivery_fee)}</p>
         <RestaurantOrderPayout finance={o.finance} status={o.status}/>
+        <OrderChangePanel publicId={o.public_id} manager changes={o.changes} fee={o.delivery_fee} lines={o.lines} menu={menu} canPropose={['pending','accepted'].includes(o.status)&&!o.delivery&&o.lines.every(line=>!!line.lineId)}/>
         <p>Entrega: {o.address}</p>
         {manager && <><p>{o.customer_name} · {o.customer_phone}</p><p>{o.neighborhood} · {o.instructions}</p>
           {o.delivery_latitude !== null && o.delivery_latitude !== undefined && o.delivery_longitude !== null && o.delivery_longitude !== undefined &&
             <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${o.delivery_latitude},${o.delivery_longitude}`)}&travelmode=driving`} target="_blank" rel="noreferrer" className="font-bold text-[#D82016]">Abrir entrega en Google Maps</a>}
-          {o.status === 'pending' && <div className="pilot-actions"><button className="pilot-primary" disabled={busy} onClick={() => action(o, 'accepted')}>Aceptar pedido</button>
+          {o.status === 'pending' && <div className="pilot-actions"><button className="pilot-primary" disabled={busy||unresolvedChange(o.changes)} onClick={() => action(o, 'accepted')}>Aceptar pedido</button>
             <button disabled={busy} onClick={() => action(o, 'rejected')}>Rechazar pedido</button></div>}
-          {o.status === 'accepted' && <button disabled={busy} className="pilot-primary" onClick={() => action(o, 'ready')}>{o.delivery_mode==='OWN'?'Marcar listo para entregar':'Solicitar domiciliario Mercáu'}</button>}
+          {o.status === 'accepted' && <button disabled={busy||unresolvedChange(o.changes)} className="pilot-primary" onClick={() => action(o, 'ready')}>{o.delivery_mode==='OWN'?'Marcar listo para entregar':'Solicitar domiciliario Mercáu'}</button>}
           {o.delivery_mode==='OWN' && o.status==='ready' && <button disabled={busy} className="pilot-primary" onClick={()=>action(o,'out_for_delivery')}>Marcar pedido en camino</button>}
           {o.delivery_mode==='OWN' && o.status==='out_for_delivery' && <button disabled={busy} className="pilot-primary" onClick={()=>action(o,'delivered')}>Marcar pedido entregado</button>}
           {o.delivery?.public_id && <p>Envio {o.delivery.public_id} · Shipday {o.delivery.shipday_order_id || 'pendiente'}</p>}

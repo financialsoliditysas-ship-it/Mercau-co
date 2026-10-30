@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import type { CustomerOrder } from '@/lib/customer-order-status';
 import CustomerOrderCard from './CustomerOrderCard';
+import CustomerPushOptIn from './CustomerPushOptIn';
 import BackToAccount from './BackToAccount';
 import './restaurant-pilot.css';
 
@@ -15,6 +16,7 @@ export default function CustomerOrders() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  useEffect(()=>{const update=()=>setRefresh(value=>value+1);window.addEventListener('mercau:order-updated',update);return()=>window.removeEventListener('mercau:order-updated',update);},[]);
   useEffect(() => {
     if (!client) { setReady(true); return; }
     let active = true;
@@ -49,6 +51,7 @@ export default function CustomerOrders() {
     <h1>Mis pedidos</h1>
     {!ready ? <p role="status">Cargando tu cuenta...</p> : !session ? <p><a href="/mi-cuenta">Entra con tu cuenta para consultar tus pedidos</a></p> : <>
       <button onClick={() => setRefresh(value => value + 1)} disabled={loading}>Actualizar seguimiento</button>
+      {orders.some(order=>order.changes!==undefined)&&<CustomerPushOptIn/>}
       {error && <p role="status" className="pilot-notice">{error}</p>}
       {loading && !orders.length && <p role="status">Cargando tus pedidos...</p>}
       {!loading && !error && !orders.length && <p>Aún no tienes pedidos. <a href="/">Explorar negocios</a></p>}

@@ -1,4 +1,5 @@
 export type CustomerOrder = {
+  changes?: import('./order-changes-model').OrderChange[];
   public_id: string; restaurant_name?: string; business_id?: string;
   status: string; created_at: string; address: string;
   lines: { name: string; unitPrice: number; quantity: number; selections?:{groupName:string;choices:{name:string;priceDelta:number}[]}[];note?:string }[];

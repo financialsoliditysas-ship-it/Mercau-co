@@ -1,0 +1,11 @@
+{
+  "status": "local-only-requires-migration-and-approval",
+  "baseCommit": "217c140559fddf37b5a2f903c2e2fd1a14645908",
+  "flag": "ORDER_CHANGES_ENABLED",
+  "migration": "supabase/migrations/20261030174526_order_change_proposals.sql",
+  "scope": "Optional change projection and separate customer push event; payment policy, QR and Shipday payload unchanged",
+  "sha256": {
+    "lib/restaurant-pilot.ts": "d00e3c91bdf01fbf9268013ddafd15ab17f281ae1606bc091bf5a7564e638dac",
+    "public/mercau-sw.js": "b77922f63a5482bba7aef0fe4a05af9f11f2ca9b8f0ec4d4e285f56f19c11fec"
+  }
+}

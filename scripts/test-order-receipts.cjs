@@ -150,7 +150,8 @@ async function foodService(){
  },async rpc(name,args){queries++;captured=args;if(name==='lookup_order_receipt_v3')return {data:{outcome:'existing',public_id:'PRB-000001'},error:null};
   assert.equal(name,'create_food_order_once_v3');return {data:{outcome,public_id:outcome==='created'||outcome==='existing'?'PRB-000001':undefined,previous_public_id:'PRB-000001'},error:null};}};
  const api=load('lib/restaurant-pilot.ts',{'./supabase-admin':{getSupabaseAdminClient:()=>db},'./deliveries':{},'./business-push':{sendNewOrderPush:async()=>{pushes++;}},
-  './catalog-validation':{catalogOptionGroups:()=>[]},'./pilot-order-finance':load('lib/pilot-order-finance.ts')});
+  './catalog-validation':{catalogOptionGroups:()=>[]},'./pilot-order-finance':load('lib/pilot-order-finance.ts'),
+  './order-changes-config':{orderChangesEnabled:()=>false},'./order-changes-model':{changeSelection:''}});
  const body={confirmed:true,requestKey:key,name:'QA',phone:'3000000000',address:'Ficticia',neighborhood:'QA',paymentMethod:'CASH',
   lines:[{lineId:key,productId:product,quantity:1,unitPrice:1,selections:[],note:''}],customer_id:'foreign',restaurant_id:'foreign'};
  assert.equal((await api.createPilotOrder(uid,body,business)).replayed,false);assert.equal(pushes,1);assert.equal(captured.p_payload.customer_id,uid);assert.equal(captured.p_payload.lines[0].unitPrice,1000);

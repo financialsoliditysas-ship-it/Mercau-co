@@ -60,8 +60,19 @@ export default function BuyerExperience({section,quickFilter=''}:{section:string
     setOrders([]);setOrderError('');
     if(section!=='pedidos'||!account.session)return;
     let active=true;const controller=new AbortController();setOrdersLoading(true);
-    account.request('/api/mi-cuenta/pedidos',{signal:controller.signal}).then(data=>{if(active)setOrders(data.orders || []);}).catch(()=>{if(active)setOrderError('No pudimos consultar tus pedidos. Intenta nuevamente.');}).finally(()=>{if(active)setOrdersLoading(false);});
-    return()=>{active=false;controller.abort();};
+    let loading=false;
+    async function load(){
+      if(loading||!active)return;loading=true;
+      try { const data=await account.request('/api/mi-cuenta/pedidos',{signal:controller.signal});if(active){setOrders(data.orders||[]);setOrderError('');} }
+      catch {if(active)setOrderError('No pudimos consultar tus pedidos. Intenta nuevamente.');}
+      finally{loading=false;if(active)setOrdersLoading(false);}
+    }
+    function refresh(){if(document.visibilityState==='visible')void load();}
+    function push(event:MessageEvent){if(event.data?.type==='MERCAU_CUSTOMER_ORDER_CHANGE')refresh();}
+    void load();const timer=setInterval(refresh,15000);
+    window.addEventListener('mercau:order-updated',refresh);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
+    navigator.serviceWorker?.addEventListener('message',push);
+    return()=>{active=false;controller.abort();clearInterval(timer);window.removeEventListener('mercau:order-updated',refresh);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);navigator.serviceWorker?.removeEventListener('message',push);};
   },[section,account.session,account.request]);
   function closeLocation(){setLocationOpen(false);requestAnimationFrame(()=>locationTrigger.current?.focus());}
   function chooseMunicipality(municipality:BuyerDestination['municipality']){

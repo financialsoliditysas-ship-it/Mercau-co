@@ -2,12 +2,17 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require(
 const contract=JSON.parse(fs.readFileSync('data/production-backend-contract.json'));
 // Retain the published baseline. Only these explicitly versioned safety changes supersede it.
 const safety=JSON.parse(fs.readFileSync('data/logistics-controls-contract.json'));
+const changes=JSON.parse(fs.readFileSync('data/order-changes-contract.json'));
 assert.equal(safety.status,'release-requires-sql-v2-v3');
 for(const [index,source] of ['supabase/drafts/logistics_controls_v2.sql','supabase/drafts/order_receipts_v3.sql'].entries()){
  assert.equal(fs.readFileSync(source,'utf8').replace(/\r\n/g,'\n'),fs.readFileSync(safety.releaseMigrations[index],'utf8').replace(/\r\n/g,'\n'),'Release migration differs from tested SQL');
 }
 for(const [file,expected]of Object.entries(contract.sha256)){
  let bytes=fs.readFileSync(file);
+ if(changes.sha256[file]){
+  assert.equal(crypto.createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g,'\n')).digest('hex'),changes.sha256[file],'Unexpected order-change integration '+file);
+  continue;
+ }
  if(safety.sha256[file]){
   assert.equal(crypto.createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g,'\n')).digest('hex'),safety.sha256[file],'Unexpected safety change '+file);
   continue;
@@ -35,5 +40,5 @@ function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mo
  const db={from(name){let allowed=true;return{select(){return this;},eq(key,value){allowed=allowed&&row[key]===value;return this;},async maybeSingle(){return {data:name==='delivery_orders'&&allowed?row:null,error:null};}};}};
  const tracking=load('lib/delivery-tracking.ts',{'./account-server':{AccountError},'./supabase-admin':{getSupabaseAdminClient:()=>db},'./account-model':{deliveryLabels:{assigned:'Mensajero asignado'}}});
  const own=await tracking.authorizedDeliveryTracking('owner','MCU-000001');assert(!JSON.stringify(own).includes('PRIVATE'));await assert.rejects(()=>tracking.authorizedDeliveryTracking('other','MCU-000001'),error=>error.status===404);
- console.log('PASS unchanged payment QR, authentication, manifest/SW and provider payload; explicit local safety candidate hashes, webhook and private tracking. Candidate REQUIRES approved SQL; no dispatches executed.');
+ console.log('PASS preserved payment QR, authentication, manifest and provider payload; explicit order-change projection/worker contract, logistics hashes, webhook and private tracking. Order changes remain local and REQUIRE approved migration/activation. No dispatches executed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

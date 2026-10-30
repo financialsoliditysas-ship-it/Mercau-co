@@ -3,7 +3,7 @@ import { getSupabaseAdminClient } from "./supabase-admin";
 
 type PushPayload = { businessId: string; orderId: string; customerName: string; total: number };
 
-function configureWebPush() {
+export function configureWebPush() {
   const publicKey = process.env.WEB_PUSH_PUBLIC_KEY;
   const privateKey = process.env.WEB_PUSH_PRIVATE_KEY;
   const subject = process.env.WEB_PUSH_SUBJECT || "mailto:gerencia@financialsolidity.com";

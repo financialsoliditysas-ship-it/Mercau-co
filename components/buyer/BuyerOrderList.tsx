@@ -3,18 +3,23 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronRight, X } from 'lucide-react';
 import CustomerOrderCard from '@/components/CustomerOrderCard';
 import { customerOrderProgress, type CustomerOrder } from '@/lib/customer-order-status';
+import { latestChange } from '@/lib/order-changes-model';
+import CustomerPushOptIn from '@/components/CustomerPushOptIn';
 
 const money=(value:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(value);
 export default function BuyerOrderList({orders}:{orders:CustomerOrder[]}){
   const [selectedId,setSelectedId]=useState('');
   const dialog=useRef<HTMLDialogElement>(null),trigger=useRef<HTMLButtonElement|null>(null);
+  const openedFromLink=useRef('');
   const selected=orders.find(order=>order.public_id===selectedId);
+  useEffect(()=>{const id=new URLSearchParams(window.location.search).get('pedido');if(id&&openedFromLink.current!==id&&orders.some(order=>order.public_id===id)){openedFromLink.current=id;setSelectedId(id);}},[orders]);
   useEffect(()=>{
     if(selected&&!dialog.current?.open)dialog.current?.showModal();
     else if(!selected&&dialog.current?.open)dialog.current.close();
   },[selected]);
   function close(){dialog.current?.close();setSelectedId('');requestAnimationFrame(()=>trigger.current?.focus());}
   return <>
+    {orders.some(order=>order.changes!==undefined)&&<CustomerPushOptIn/>}
     <div className="buyer-order-list">{orders.map(order=>{
       const progress=customerOrderProgress(order),quantity=order.lines.reduce((sum,line)=>sum+line.quantity,0);
       const label=order.status==='rejected'?'El negocio no pudo aceptar tu pedido':progress.label;
@@ -22,7 +27,7 @@ export default function BuyerOrderList({orders}:{orders:CustomerOrder[]}){
         <button type="button" aria-label={`Ver detalle del pedido ${order.public_id}`} onClick={event=>{trigger.current=event.currentTarget;setSelectedId(order.public_id);}}>
           <span className="buyer-order-summary-name">{order.restaurant_name||`Pedido ${order.public_id}`}</span>
           <span className="buyer-order-summary-meta">{order.public_id} · {new Date(order.created_at).toLocaleString('es-CO',{timeZone:'America/Bogota'})}</span>
-          <span className="buyer-order-summary-state">{label}</span>
+          <span className="buyer-order-summary-state">{latestChange(order.changes)?.status==='pending'?'El negocio propone un cambio · Revisa y responde':label}</span>
           <span className="buyer-order-summary-products">{quantity} producto{quantity===1?'':'s'} · {order.lines.map(line=>line.name).join(', ')}</span>
           <span className="buyer-order-summary-footer"><strong>{money(order.subtotal+order.delivery_fee)}</strong><span>Ver detalle<ChevronRight size={17} aria-hidden="true"/></span></span>
         </button>

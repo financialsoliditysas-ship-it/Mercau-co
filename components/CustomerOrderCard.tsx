@@ -1,4 +1,5 @@
 import { customerOrderProgress, customerOrderSteps, type CustomerOrder } from '@/lib/customer-order-status';
+import OrderChangePanel from './OrderChangePanel';
 const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
 export default function CustomerOrderCard({ order, visual=false }: { order: CustomerOrder;visual?:boolean }) {
   const progress = customerOrderProgress(order);
@@ -6,6 +7,7 @@ export default function CustomerOrderCard({ order, visual=false }: { order: Cust
   return <article className={visual?'customer-order customer-order-visual':'customer-order'} aria-label={`Pedido ${order.public_id}`}>
     <header><div><h2>{order.restaurant_name || `Pedido ${order.public_id}`}</h2><p>{order.public_id} · {new Date(order.created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</p></div>
       <strong className="customer-order-state">{label}</strong></header>
+    <OrderChangePanel publicId={order.public_id} changes={order.changes} fee={order.delivery_fee}/>
     {order.status==='pending' && !order.delivery && <p><strong>Esperando al negocio.</strong> Recibimos tu solicitud. Falta que el negocio la acepte.</p>}
     {order.status==='accepted' && !order.delivery && <p>El negocio aceptó tu pedido y está preparándolo.</p>}
     {progress.issue && <p>Tu pedido presenta una novedad. Revisa el detalle o <a href="https://wa.me/573207637511?text=Hola%2C%20necesito%20ayuda%20con%20Merc%C3%A1u." target="_blank" rel="noreferrer">contacta a Mercáu</a>.</p>}
