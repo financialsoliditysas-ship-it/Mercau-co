@@ -1,8 +1,8 @@
-const paymentFields='payment_method,payment_status';
-const merchantFields='product_subtotal,merchant_commission_rate_bps,merchant_commission_total,merchant_net';
+const customerSelection='*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status)';
+const managerSelection='*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status,product_subtotal,merchant_commission_rate_bps,merchant_commission_total,merchant_net)';
 
-export function pilotOrderSelection(manager:boolean) {
-  return `*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(${paymentFields}${manager?','+merchantFields:''})`;
+export function pilotOrderSelection(manager:boolean):typeof customerSelection|typeof managerSelection {
+  return manager?managerSelection:customerSelection;
 }
 
 export function customerPaymentFinance(value:unknown):unknown {
