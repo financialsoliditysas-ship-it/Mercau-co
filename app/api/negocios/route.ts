@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const directory = await loadDirectoryBusinesses();
+    const directory = (await loadDirectoryBusinesses()).filter(business => !business.pilotRestaurant);
     const [businesses,catalogs] = await Promise.all([
       withPublicBusinessLinks(directory),
       catalogBusinessAvailability(directory.map(business=>business.id))

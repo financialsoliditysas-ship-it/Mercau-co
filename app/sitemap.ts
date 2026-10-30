@@ -15,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/contacto`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
   ];
   try {
-    const businesses = await withPublicBusinessLinks(await loadDirectoryBusinesses());
+    const businesses = await withPublicBusinessLinks((await loadDirectoryBusinesses()).filter(business => !business.pilotRestaurant));
     pages.push(...businesses.map(business => ({ url: businessPublicUrl(business), changeFrequency: 'weekly' as const, priority: 0.7 })));
   } catch { /* Keep the basic sitemap available if the directory is temporarily unavailable. */ }
   return pages;
