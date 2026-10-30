@@ -41,6 +41,10 @@ async function main(){
    });
    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(20000);
    await page.goto(base+'/piloto/restaurante',{waitUntil:'networkidle'});
+   const options=page.getByText('Opciones del pedido · Hay un producto agotado',{exact:true});await options.waitFor();
+   assert.equal(await options.evaluate(element=>element.parentElement.open),false,'Business editor must remain collapsed');
+   await page.getByRole('heading',{name:'PRB-000001',exact:true}).scrollIntoViewIfNeeded();
+   const summaryShot=`negocio-opciones-cerradas-${width}.png`;await page.screenshot({path:path.join(out,summaryShot)});shots.push(summaryShot);
    await page.getByText('Opciones del pedido · Hay un producto agotado',{exact:true}).click();
    await page.getByLabel('Qué propones').selectOption('replace');await page.getByLabel('Producto disponible').selectOption('new');
    const sendButton=page.getByRole('button',{name:'Enviar propuesta para aprobación',exact:true});
@@ -52,7 +56,11 @@ async function main(){
    assert.equal(posts,1);
    await page.goto(base+'/comprar/pedidos?pedido=PRB-000001',{waitUntil:'networkidle'});
    const dialog=page.getByRole('dialog',{name:'Detalle del pedido'});await dialog.waitFor();
-   await dialog.getByRole('heading',{name:'El negocio propone un cambio'}).waitFor();
+   await dialog.getByRole('heading',{name:'Cambio propuesto',exact:true}).waitFor();
+   assert.equal(await dialog.locator('.order-change-summary>details').evaluate(element=>element.open),false,'The complete breakdown must be collapsed initially');
+   await dialog.getByText('Ver ingredientes y detalle',{exact:true}).click();
+   await dialog.getByRole('heading',{name:'Pedido original',exact:true}).waitFor();
+   await dialog.getByText('Ver ingredientes y detalle',{exact:true}).click();
    const buyerShot=`comprador-${width}.png`;await page.screenshot({path:path.join(out,buyerShot)});shots.push(buyerShot);
    const acceptButton=dialog.getByRole('button',{name:/Aceptar cambio/});await acceptButton.scrollIntoViewIfNeeded();
    assert(await acceptButton.evaluate(element=>{const r=element.getBoundingClientRect();return r.height>=44&&r.top>=0&&r.bottom<=innerHeight&&element.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));}),'Accept action must be visible and unobscured after dialog scroll');

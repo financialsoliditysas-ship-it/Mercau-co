@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import type { PilotProduct } from '@/lib/restaurant-pilot';
-import { latestChange, type ChangeLine, type OrderChange } from '@/lib/order-changes-model';
+import { latestChange, changedOrderLines, type ChangeLine, type OrderChange } from '@/lib/order-changes-model';
 import './order-changes.css';
 
 const money=(n:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(n);
@@ -36,15 +36,17 @@ export default function OrderChangePanel({publicId,changes,fee,manager=false,lin
   }
   return <section className="order-change" aria-label="Cambios del pedido">
     {change&&<div className="order-change-summary">
-      <h3>{change.status==='pending'?'El negocio propone un cambio':change.status==='accepted'?'Cambio aceptado':change.status==='declined'?'Cambio no aceptado':change.status==='withdrawn'?'Propuesta retirada':'Propuesta cancelada'}</h3>
+      <h3>{change.status==='pending'?'Cambio propuesto':change.status==='accepted'?'Cambio aceptado':change.status==='declined'?'Cambio no aceptado':change.status==='withdrawn'?'Propuesta retirada':'Propuesta cancelada'}</h3>
       {(change.status==='pending'||change.status==='declined'||change.status==='accepted')&&<>
-        <details open={change.status==='pending'}><summary>Ver productos y opciones del cambio</summary>
+        <ul className="order-change-differences" aria-label="Productos que cambian">{changedOrderLines(change).map(item=><li key={item.key}><span>{item.before.quantity} x {item.before.name}</span><strong>{item.after?<>→ {item.after.quantity} x {item.after.name}</>:'Se retira del pedido'}</strong></li>)}</ul>
+        <div className="order-change-price-summary"><span>Antes: {money(change.old_subtotal+fee)}</span><strong>Nuevo total: {money(change.new_subtotal+fee)}</strong></div>
+        <details><summary>Ver ingredientes y detalle</summary>
           <h4>Pedido original</h4><ChangeLines lines={change.old_lines}/>
           <h4>Propuesta</h4><ChangeLines lines={change.new_lines}/>
           <dl><div><dt>Total anterior</dt><dd>{money(change.old_subtotal+fee)}</dd></div><div><dt>Productos propuestos</dt><dd>{money(change.new_subtotal)}</dd></div><div><dt>Domicilio sin cambios</dt><dd>{money(fee)}</dd></div><div><dt>Total propuesto</dt><dd>{money(change.new_subtotal+fee)}</dd></div></dl>
         </details>
-        {change.status==='pending'&&<p>Revisa ingredientes, opciones y precio. El pedido no se modifica sin tu aceptación.</p>}
-        {!manager&&change.status==='pending'&&<div className="order-change-actions"><button disabled={busy} onClick={()=>act('accept')}>Aceptar cambio · {money(change.new_subtotal+fee)}</button><button disabled={busy} onClick={()=>act('decline')}>No aceptar el cambio</button></div>}
+        {change.status==='pending'&&<p>Revisa ingredientes y opciones antes de aceptar.</p>}
+        {!manager&&change.status==='pending'&&<div className="order-change-actions"><button disabled={busy} onClick={()=>act('accept')}>Aceptar cambio</button><button disabled={busy} onClick={()=>act('decline')}>No aceptar</button></div>}
       </>}
       {manager&&unresolved&&<><p>{change.status==='pending'?'Esperando la respuesta del comprador. No solicites domiciliario.':'El comprador no aceptó. Puedes preparar otra propuesta o retirar esta si puedes atender el pedido original.'}</p><button disabled={busy} onClick={()=>act('withdraw')}>Retirar propuesta</button></>}
       {!manager&&change.status==='declined'&&<p>Tu pedido conserva los productos originales. El negocio debe resolver la novedad antes de continuar. <a href="/contacto">Ayuda de Mercáu</a></p>}

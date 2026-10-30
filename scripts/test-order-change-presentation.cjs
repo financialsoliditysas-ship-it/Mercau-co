@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),Module=require('node:module'),ts=require('typescript');
+const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mocks?mocks[id]:require(id);mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,file+'.cjs');return mod.exports;}
+const model=load('lib/order-changes-model.ts');
+const before={lineId:'a',name:'Carne',productId:'carne',quantity:2,unitPrice:10000,selections:[],note:''};
+const after={...before,name:'Pechuga',productId:'pechuga',unitPrice:12000};
+const unchanged={...before,lineId:'b',name:'Bebida sin cambio',productId:'bebida'};
+const change={id:'fake',status:'pending',old_lines:[before,unchanged],new_lines:[after,unchanged],old_subtotal:40000,new_subtotal:44000,created_at:'2026-10-30',responded_at:null};
+assert.deepEqual(model.changedOrderLines(change).map(item=>[item.before.name,item.after?.name]),[['Carne','Pechuga']]);
+assert.equal(model.changedOrderLines({...change,new_lines:[unchanged]})[0].after,undefined);
+assert.equal(model.changedOrderLines({...change,new_lines:change.old_lines}).length,0);
+assert.equal(model.changedOrderLines({...change,old_lines:[{...before,lineId:undefined}]}).length,0,'Do not guess matches for legacy lines without identity');
+assert.equal(model.changedOrderLines({...change,new_lines:[{...before,note:'Sin salsa'},unchanged]}).length,1);
+let network=0;
+const Panel=load('components/OrderChangePanel.tsx',{'@/lib/supabase':{getSupabaseBrowserClient:()=>{network++;throw Error('No request on render');}},'@/lib/order-changes-model':model,'./order-changes.css':{}}).default;
+const html=renderToStaticMarkup(React.createElement(Panel,{publicId:'PRB-000001',changes:[change],fee:5000}));
+assert(html.includes('Cambio propuesto'));assert(html.includes('Ver ingredientes y detalle'));assert(!html.includes('<details open='));
+const summary=html.split('aria-label="Productos que cambian"')[1].split('</ul>')[0];assert(summary.includes('Carne'));assert(summary.includes('Pechuga'));assert(!summary.includes('Bebida sin cambio'));
+assert(html.includes('Nuevo total:'));assert(html.includes('Aceptar cambio'));assert(html.includes('No aceptar'));
+const manager=renderToStaticMarkup(React.createElement(Panel,{publicId:'PRB-000001',changes:[],manager:true,canPropose:true,fee:5000,lines:[before],menu:[]}));
+assert(manager.includes('Opciones del pedido'));assert(!manager.includes('Proponer cambio al comprador'));assert.equal(network,0);
+console.log('PASS compact proposal: affected lines only, removal/options, no guessed legacy match, collapsed detail/editor and unchanged render-side effects.');

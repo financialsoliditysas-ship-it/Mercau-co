@@ -43,4 +43,12 @@ El panel productivo anterior ya muestra telefono, nombre y direccion al administ
 
 La galeria generada en `outputs/order-changes/galeria-cambios-pedido.html` incluye imagenes base64 y solo datos ficticios. Es un artefacto local fuera del paquete de produccion.
 
+### Ajuste visual compacto aprobado
+
+Se muestran primero solamente las lineas afectadas y los totales anterior/propuesto. El pedido completo, ingredientes, personalizaciones y desglose siguen disponibles en Ver ingredientes y detalle, cerrado inicialmente. Los botones Aceptar cambio y No aceptar permanecen fuera del desglose. La edicion del negocio continua plegada en Opciones del pedido. No cambia el POST, la confirmacion explicita, SQL, precios, permisos ni despacho. Si una linea historica no tiene identidad estable, no se inventa una correspondencia: su informacion sigue en el detalle completo.
+
+El archivo `outputs/order-changes/galeria-cambios-pedido-antes-compactar.html` conserva la galeria anterior. `scripts/test-order-change-presentation.cjs` comprueba el resumen, retiros, opciones modificadas y detalle/editor plegados; el recorrido Chrome verifica que el detalle se abre y cierra antes de responder.
+
+Verificacion del ajuste compacto: 29 suites, lint, build y typecheck aprobados. Recorrido Chrome emulado aprobado en 320 y 390 px, incluida apertura/cierre del desglose y las confirmaciones existentes. Galeria actualizada con vistas del negocio cerrado/abierto y del comprador. Sin push, despliegue ni cambios de base de datos.
+
 Resultado local: 28 suites aisladas aprobadas, lint aprobado con advertencias anteriores, build y typecheck aprobados. Prueba adicional del rol service_role: puede proponer/aceptar mediante las funciones autorizadas, pero no reescribir los productos originales de la auditoria. La comprobacion Chrome paso en 320 y 390 px: propuesta del negocio, bloqueo del boton de aceptacion mientras espera, apertura del detalle mediante enlace, confirmacion cancelada sin escritura, aceptacion con una sola respuesta, rechazo del permiso push con alternativa en Mis pedidos y ausencia de desbordamiento horizontal. Se corrigio una interferencia del CSS anterior que ocultaba el texto del boton de enviar; el test ahora verifica su fondo rojo y texto blanco. Se comprobo que la accion de aceptar es accesible mediante desplazamiento del dialogo y no queda tapada. No se enviaron pushes reales ni se probaron dispositivos fisicos.

@@ -4,6 +4,7 @@ const scripts = [
   "test-logistics-controls.cjs",
   "test-order-receipts.cjs",
   "test-order-changes.cjs",
+  "test-order-change-presentation.cjs",
   "test-order-receipt-grants.cjs",
   "test-shipday-pickup-text.cjs",
   "test-owner-order-payout.cjs",

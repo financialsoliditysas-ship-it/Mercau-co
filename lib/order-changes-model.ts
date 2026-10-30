@@ -14,3 +14,12 @@ export function latestChange(changes?: OrderChange[]) {
 export function unresolvedChange(changes?: OrderChange[]) {
   return changes?.some(change=>change.status==='pending'||change.status==='declined')===true;
 }
+export function changedOrderLines(change:OrderChange) {
+  if([...change.old_lines,...change.new_lines].some(line=>!line.lineId))return [];
+  return change.old_lines.flatMap((before,index)=>{
+    const after=before.lineId?change.new_lines.find(line=>line.lineId===before.lineId):undefined;
+    const snapshot=(line:ChangeLine)=>JSON.stringify({productId:line.productId,name:line.name,quantity:line.quantity,unitPrice:line.unitPrice,selections:line.selections||[],note:line.note||''});
+    if(after&&snapshot(before)===snapshot(after))return [];
+    return [{key:before.lineId||String(index),before,after}];
+  });
+}
