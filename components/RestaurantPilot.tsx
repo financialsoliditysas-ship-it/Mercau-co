@@ -9,6 +9,7 @@ import './buyer/menu-visual.css';
 import BackToAccount from './BackToAccount';
 import PilotPublicationControls from './PilotPublicationControls';
 import CatalogProductImage from './CatalogProductImage';
+import RestaurantOrderPayout from './RestaurantOrderPayout';
 import { catalogImageSources } from '@/lib/catalog-image-url';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
@@ -666,6 +667,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
         <strong className="pilot-order-status">{statuses[o.delivery?.status || o.status] || 'Pedido en revision'}</strong><p className={o.finance?.payment_status === 'CONFIRMED' ? 'pilot-payment-confirmed' : ''}>Pago contra entrega: {o.payment_method === 'BREB_QR' ? 'transferencia Bre-B' : 'efectivo'}{o.finance?.payment_status === 'CONFIRMED' ? ' · Confirmado' : ''}</p>
         <ul>{o.lines.map((l,i) => <li key={i}><strong>{l.quantity} x {l.name} · {money(l.unitPrice * l.quantity)}</strong>{l.selections?.map(selection=>selection.choices.map(choice=><span key={`${selection.groupName}-${choice.name}`} className="pilot-order-option">{selection.groupName}: {choice.name}{choice.priceDelta>0&&<> <strong>+{money(choice.priceDelta)} c/u</strong></>}</span>))}{l.note&&<span className="pilot-order-option">Observación: {l.note}</span>}</li>)}</ul>
         <p>Productos: {money(o.subtotal)} · Domicilio: {money(o.delivery_fee)} · Total: {money(o.subtotal + o.delivery_fee)}</p>
+        <RestaurantOrderPayout finance={o.finance} status={o.status}/>
         <p>Entrega: {o.address}</p>
         {manager && <><p>{o.customer_name} · {o.customer_phone}</p><p>{o.neighborhood} · {o.instructions}</p>
           {o.delivery_latitude !== null && o.delivery_latitude !== undefined && o.delivery_longitude !== null && o.delivery_longitude !== undefined &&

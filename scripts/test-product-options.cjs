@@ -3,6 +3,7 @@ const fs=require('node:fs');const Module=require('node:module');const ts=require
 function load(path,mocks={}){const mod=new Module(path);mod.require=id=>id in mocks?mocks[id]:require(id);mod._compile(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,path+'.cjs');return mod.exports;}
 const validation=load('lib/catalog-validation.ts');
 const pilot=load('lib/restaurant-pilot.ts',{
+  './pilot-order-finance':load('lib/pilot-order-finance.ts'),
   './supabase-admin':{},'./deliveries':{},'./business-push':{},'./catalog-validation':validation
 });
 const group={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Adiciones',type:'multiple',required:false,minSelections:0,maxSelections:2,choices:[

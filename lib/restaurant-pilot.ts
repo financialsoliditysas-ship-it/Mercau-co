@@ -2,6 +2,7 @@ import { getSupabaseAdminClient } from './supabase-admin';
 import { getDeliveryOrderById, syncOrderToShipday } from './deliveries';
 import { sendNewOrderPush } from './business-push';
 import { catalogOptionGroups, type CatalogOptionGroup } from './catalog-validation';
+import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finance';
 
 export const pilotId = 'restaurante-mercado';
 export class PilotError extends Error {
@@ -147,7 +148,7 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
 export async function listPilotOrders(userId: string, manager: boolean, restaurantId = pilotId) {
   await pilotMember(userId, manager, restaurantId);
   let query = getSupabaseAdminClient().from('pilot_food_orders')
-    .select('*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status)')
+    .select(pilotOrderSelection(manager))
     .eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(50);
   if (!manager) query = query.eq('customer_id', userId);
   const { data, error } = await query;
@@ -157,7 +158,7 @@ export async function listPilotOrders(userId: string, manager: boolean, restaura
     public_id: o.public_id, lines: o.lines, subtotal: o.subtotal, delivery_fee: o.delivery_fee,
     status: o.status, created_at: o.created_at, address: o.address, payment_method: o.payment_method,
     delivery_mode: o.delivery_mode,
-    payment_reference: o.payment_reference, payment_reported_at: o.payment_reported_at, finance: o.finance,
+    payment_reference: o.payment_reference, payment_reported_at: o.payment_reported_at, finance: customerPaymentFinance(o.finance),
     delivery: o.delivery ? { status: o.delivery.status } : null
   });
 }

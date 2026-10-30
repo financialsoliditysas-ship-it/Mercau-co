@@ -1,0 +1,32 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),Module=require('node:module'),ts=require('typescript'),React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
+function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mocks?mocks[id]:require(id);mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,file+'.cjs');return mod.exports;}
+const finance=load('lib/pilot-order-finance.ts');
+const snapshot={payment_method:'CASH',payment_status:'PENDING',product_subtotal:60000,merchant_commission_rate_bps:1500,merchant_commission_total:9000,merchant_net:51000};
+const a='rec'+'Q'.repeat(14),b='rec'+'S'.repeat(14),demo='restaurante-mercado';
+const rows=[{id:'private-a',restaurant_id:a,customer_id:'customer',public_id:'PRB-TEST-1',subtotal:60000,delivery_fee:5000,lines:[],status:'accepted',created_at:'2026-10-29',address:'Direccion ficticia',finance:snapshot,delivery:{public_id:'private-delivery',status:'assigned',shipday_order_id:'private-provider'}},{id:'private-b',restaurant_id:a,customer_id:'other',public_id:'PRB-TEST-2',subtotal:60000,delivery_fee:5000,lines:[],finance:[{...snapshot,merchant_commission_rate_bps:800,merchant_commission_total:4800,merchant_net:55200}]},{id:'private-c',restaurant_id:b,customer_id:'customer',public_id:'PRB-TEST-3',finance:snapshot},{id:'private-demo',restaurant_id:demo,customer_id:'customer',public_id:'PRB-TEST-4',finance:snapshot}];
+const queries=[];
+const db={from(table){const filters=[],record={table,selection:'',filters};const execute=()=>{
+ if(table==='pilot_restaurants'){const id=filters.find(([key])=>key==='id')?.[1];return {data:{id,name:'Restaurante ficticio',is_live:id!==demo,directory_initialized:id!==demo,directory_business_id:id===demo?null:id,menu:[]},error:null};}
+ if(table==='business_admins')return {data:filters.some(([key,value])=>key==='user_id'&&value==='owner')&&filters.some(([key,value])=>key==='business_id'&&value===a)?{business_id:a}:null,error:null};
+ if(table==='pilot_restaurant_members'){const user=filters.find(([key])=>key==='user_id')?.[1];return {data:user==='owner'?{role:'manager'}:user==='customer'?{role:'customer'}:null,error:null};}
+ if(table==='business_catalog_products')return {data:[],error:null};
+ assert.equal(table,'pilot_food_orders');queries.push(record);return {data:rows.filter(row=>filters.every(([key,value])=>row[key]===value)),error:null};
+ };const query={select(value){record.selection=value;return this;},eq(key,value){filters.push([key,value]);return this;},order(){return this;},limit(){return this;},single:async()=>execute(),maybeSingle:async()=>execute(),then(resolve,reject){return Promise.resolve(execute()).then(resolve,reject);}};return query;}};
+const pilot=load('lib/restaurant-pilot.ts',{'./pilot-order-finance':finance,'./supabase-admin':{getSupabaseAdminClient:()=>db},'./deliveries':{},'./business-push':{},'./catalog-validation':{catalogOptionGroups:groups=>groups}});
+async function main(){
+ const manager=await pilot.listPilotOrders('owner',true,a);assert.equal(manager.length,2);assert.equal(manager[0].finance.merchant_net,51000);assert(queries.at(-1).selection.includes('merchant_net'));assert(!queries.at(-1).filters.some(([key])=>key==='customer_id'));
+ const count=queries.length;await assert.rejects(()=>pilot.listPilotOrders('customer',true,a),error=>error.status===403);await assert.rejects(()=>pilot.listPilotOrders('owner',true,b),error=>error.status===403);await assert.rejects(()=>pilot.listPilotOrders('unknown',true,demo),error=>error.status===403);assert.equal(queries.length,count,'Unauthorized users must not query order/financial rows');
+ assert.equal((await pilot.listPilotOrders('owner',true,demo)).length,1);
+ const customer=await pilot.listPilotOrders('customer',false,a);assert.equal(customer.length,1);assert.equal(customer[0].subtotal,60000);assert.equal(customer[0].delivery_fee,5000);assert.deepEqual(customer[0].finance,{payment_method:'CASH',payment_status:'PENDING'});assert(!queries.at(-1).selection.includes('merchant_net'));assert(!JSON.stringify(customer).includes('merchant_'));assert(!JSON.stringify(customer).includes('private-'));
+ const other=await pilot.listPilotOrders('other',false,a);assert.deepEqual(other[0].finance,[{payment_method:'CASH',payment_status:'PENDING'}]);
+ const payout=finance.merchantOrderPayout(snapshot);assert.deepEqual(payout,{net:51000,subtotal:60000,commission:9000,rateBps:1500});assert.equal(finance.merchantOrderPayout(manager[1].finance).net,55200);
+ assert.equal(finance.merchantOrderPayout({...snapshot,merchant_net:'1'}).net,1);assert.equal(finance.merchantOrderPayout({...snapshot,merchant_net:0}).net,0);assert.equal(finance.merchantOrderPayout({...snapshot,merchant_net:51001}).net,51001,'Must read the recorded amount, not recalculate');
+ for(const value of [null,[],[snapshot,snapshot],{}, {...snapshot,merchant_net:undefined},{...snapshot,merchant_net:-1},{...snapshot,merchant_net:NaN},{...snapshot,merchant_net:''},{...snapshot,merchant_net:Number.MAX_SAFE_INTEGER+1}])assert.equal(finance.merchantOrderPayout(value),null);
+ const Component=load('components/RestaurantOrderPayout.tsx',{'@/lib/pilot-order-finance':finance}).default;
+ const html=renderToStaticMarkup(React.createElement(Component,{finance:snapshot,status:'accepted'}));assert(html.includes('Valor a recibir por productos'));assert(html.includes('51.000'));assert(html.includes('15 %'));assert(html.includes('No incluye el domicilio.'));assert(!html.includes('65.000'));
+ const negotiated=renderToStaticMarkup(React.createElement(Component,{finance:manager[1].finance,status:'pending'}));assert(negotiated.includes('8 %'));assert(negotiated.includes('55.200'));
+ const missing=renderToStaticMarkup(React.createElement(Component,{finance:null,status:'accepted'}));assert(missing.includes('no disponible'));assert(!missing.includes('$'));
+ const rejected=renderToStaticMarkup(React.createElement(Component,{finance:snapshot,status:'rejected'}));assert(rejected.includes('no indica un pago pendiente'));assert(!rejected.includes('Valor a recibir por productos'));
+ console.log('PASS authorized owner/demo access, restaurant/customer isolation, financial fields withheld from buyer, authoritative net including negotiated rates and zero, missing-data state and rendering. Read-only mocked queries; no orders or dispatches.');
+}
+main().catch(error=>{console.error(error.stack);process.exitCode=1;});

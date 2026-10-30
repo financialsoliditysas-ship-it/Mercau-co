@@ -33,3 +33,15 @@
 @media(max-width:350px){.pilot-menu{grid-template-columns:minmax(0,1fr)}}
 .pilot-create-account{display:flex;min-height:46px;align-items:center;justify-content:center;gap:.5rem;border:1px solid #d82016;border-radius:6px;padding:.7rem 1rem;color:#b91c1c;font-weight:800;text-align:center;text-decoration:none}
 .pilot-create-account:hover{background:#fff1f0}
+.pilot-orders .pilot-order-payout{margin:16px 0;padding:14px 12px;border-left:3px solid #e21412;background:#fff3f2;min-width:0}
+.pilot-orders .pilot-payout-total{display:flex;flex-direction:column;gap:4px;margin:0;font-weight:750;line-height:1.4}
+.pilot-orders .pilot-payout-total span{font-size:14px;overflow-wrap:anywhere}
+.pilot-orders .pilot-payout-total strong{color:#b51b14;font-size:24px;overflow-wrap:anywhere}
+.pilot-orders .pilot-order-payout dl{display:grid;gap:5px;margin:10px 0 6px;font-size:13px;line-height:1.5}
+.pilot-orders .pilot-order-payout dl>div{display:flex;justify-content:space-between;gap:12px}
+.pilot-orders .pilot-order-payout dt{min-width:0}
+.pilot-orders .pilot-order-payout dd{margin:0;flex-shrink:0}
+.pilot-orders .pilot-order-payout small{display:block;font-size:12px;line-height:1.5;color:#615459}
+.pilot-orders .pilot-order-payout.is-inactive{border-left-color:#888;background:#f5f5f5}
+.pilot-orders .pilot-order-payout.is-inactive strong{color:#555}
+.pilot-orders .pilot-payout-missing{font-size:13px;line-height:1.5;color:#615459;margin:14px 0}
