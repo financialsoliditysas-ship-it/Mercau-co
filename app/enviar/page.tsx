@@ -5,6 +5,7 @@ import { serviceTypes } from "@/lib/delivery-types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import BackToAccount from "@/components/BackToAccount";
 import { ExternalLink, LocateFixed, MapPin, RotateCcw } from "lucide-react";
+import { pendingOrderIntent, clearOrderIntent, orderIntentStore, readOrderIntent } from '@/lib/order-intent';
 
 const initialForm = {
   serviceType: "Recoger una compra",
@@ -45,10 +46,13 @@ function money(value: number) {
 
 export default function SendPage() {
   const requestKey = useRef('');
+  const pendingScope=useRef('');
   const submitting = useRef(false);
   const [form, setForm] = useState<DeliveryForm>(initialForm);
   const [step, setStep] = useState<"form" | "confirm" | "done">("form");
   const [status, setStatus] = useState("");
+  const [previousRequest,setPreviousRequest]=useState('');
+  const [canRepeatRequest,setCanRepeatRequest]=useState(false);
   const [result, setResult] = useState<{ publicId: string; trackingUrl: string; message: string } | null>(null);
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   const [pickupBusinessId,setPickupBusinessId]=useState('');
@@ -188,24 +192,43 @@ export default function SendPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function submitDelivery() {
+  async function submitDelivery(repeatOf = '') {
     if (submitting.current) return;
     submitting.current = true;
+    setPreviousRequest('');setCanRepeatRequest(false);
     setStatus("Creando solicitud...");
 
     try {
-      requestKey.current ||= sessionStorage.getItem('mercau.delivery.pending-request') || crypto.randomUUID();
-      sessionStorage.setItem('mercau.delivery.pending-request', requestKey.current);
       const client=getSupabaseBrowserClient();
       const session=client?(await client.auth.getSession()).data.session:null;
+      const intentScope = `mercau:delivery-intent:${session?.user.id || 'guest'}`;
+      pendingScope.current=intentScope;
+      const previousIntent=readOrderIntent(orderIntentStore(),intentScope,requestKey.current);
+      requestKey.current = pendingOrderIntent(orderIntentStore(), intentScope, repeatOf ? crypto.randomUUID() : previousIntent, () => crypto.randomUUID());
+      const headers={"Content-Type":"application/json",...(session?{Authorization:`Bearer ${session.access_token}`}:{})};
+      if(previousIntent && !repeatOf){
+        const lookupResponse=await fetch('/api/deliveries',{method:'POST',headers,
+          body:JSON.stringify({source:'WEB',action:'lookup_intent',requestKey:previousIntent})});
+        const lookup=await lookupResponse.json();
+        if(!lookupResponse.ok || !lookup.ok)throw new Error('No se pudo consultar el intento anterior. No se creó otra solicitud.');
+        if(lookup.outcome==='existing'){
+          setResult({publicId:lookup.public_id,trackingUrl:`/envio/${lookup.public_id}`,message:'Tu solicitud ya estaba registrada. No se creó otra.'});
+          clearOrderIntent(orderIntentStore(),intentScope);requestKey.current='';setStep('done');setStatus('');return;
+        }
+        if(lookup.outcome!=='not_found')throw new Error('El intento anterior requiere revisión. No se creó otra solicitud.');
+      }
       const response = await fetch("/api/deliveries", {
         method: "POST",
-        headers: { "Content-Type": "application/json",...(session?{Authorization:`Bearer ${session.access_token}`}:{}) },
-        body: JSON.stringify({ ...form, source: "WEB",pickupBusinessId,requestKey:requestKey.current })
+        headers,
+        body: JSON.stringify({ ...form, source: "WEB",pickupBusinessId,requestKey:requestKey.current,
+          ...(repeatOf?{repeatOf,repeatConfirmed:true}:{}) })
       });
       const payload = await response.json();
 
       if (!response.ok || !payload.ok) {
+        if(typeof payload.previousPublicId==='string' && /^MCU-\d+$/.test(payload.previousPublicId)){
+          setPreviousRequest(payload.previousPublicId);setCanRepeatRequest(payload.canRepeat===true);
+        }
         throw new Error(payload.error || "No se pudo crear la solicitud.");
       }
 
@@ -215,6 +238,7 @@ export default function SendPage() {
         message: payload.message
       });
       setStep("done");
+      clearOrderIntent(orderIntentStore(), intentScope); requestKey.current = '';
       sessionStorage.removeItem('mercau.delivery.pending-request');
       setStatus("");
     } catch (error) {
@@ -312,11 +336,18 @@ export default function SendPage() {
               <p className="text-2xl font-black">{deliveryFee === null ? "Consultando" : money(deliveryFee)}</p>
             </div>
             {status ? <p className="mt-4 rounded-xl bg-slate-100 p-3 text-sm font-bold">{status}</p> : null}
+            {previousRequest && <a href={`/envio/${previousRequest}`} onClick={()=>{
+              clearOrderIntent(orderIntentStore(),pendingScope.current);
+              requestKey.current='';
+            }} className="mt-3 inline-flex min-h-11 items-center font-bold underline">Revisar solicitud anterior · {previousRequest}</a>}
+            {previousRequest && canRepeatRequest && <button onClick={()=>{
+              if(window.confirm('¿Confirmas que quieres crear otra solicitud igual, adicional a la anterior?'))void submitDelivery(previousRequest);
+            }} className="mt-3 min-h-11 px-3 font-bold underline">Hacer otra solicitud igual</button>}
             <div className="mt-5 grid gap-2 sm:grid-cols-2">
               <button onClick={() => setStep("form")} className="min-h-12 rounded-2xl border border-slate-200 px-5 font-black">
                 Corregir datos
               </button>
-              <button onClick={submitDelivery} className="min-h-12 rounded-2xl bg-[#D82016] px-5 font-black text-white hover:bg-[#B91C1C]">
+              <button onClick={()=>void submitDelivery()} className="min-h-12 rounded-2xl bg-[#D82016] px-5 font-black text-white hover:bg-[#B91C1C]">
                 Confirmar y solicitar mensajero
               </button>
             </div>

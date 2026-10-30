@@ -1,0 +1,14 @@
+{
+  "status": "release-requires-sql-v2-v3",
+  "baseCommit": "74023d2d9416c1fcd9d2f63dd20cc5d1411b99c8",
+  "sqlProposal": "supabase/drafts/logistics_controls_v2.sql",
+  "additionalSqlProposal": "supabase/drafts/order_receipts_v3.sql",
+  "releaseMigrations": ["supabase/migrations/20261030132914_logistics_dispatch_controls.sql", "supabase/migrations/20261030133030_order_creation_receipts.sql"],
+  "sha256": {
+    "lib/deliveries.ts": "f1b2909300aba1887b50c1127f3da6f6398652df2cf46d422f203194c9b46add",
+    "lib/restaurant-pilot.ts": "191e396fc137846a7b509dcc9f4c27c5721d63fd2cad6de8755cba1853c933e3",
+    "app/api/admin/envios/route.ts": "1bd6578f46226287d0cec8e8d0cb852fad8592bf8579e54111d246a7fd7095af",
+    "app/api/deliveries/route.ts": "a77e8363c511e01d67463a6a91b715f3840e8771f1363a0ad0be82df0c4fe9fb",
+    "app/api/piloto/restaurante/route.ts": "089c8d0d2ba22aa114b389c1bc1d8d0dbd79a60725eceb7dbb630a592106eec5"
+  }
+}

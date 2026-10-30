@@ -18,6 +18,7 @@ import { BellRing, ExternalLink, LocateFixed, MapPin, RotateCcw, ShoppingCart, U
 import './restaurant-pilot.css';
 import { trackCommerceEvent } from '@/lib/commerce-tracking';
 import { trackMetaEvent } from '@/lib/meta-pixel';
+import { pendingOrderIntent, clearOrderIntent, orderIntentStore, readOrderIntent } from '@/lib/order-intent';
 
 type LineSelection = { groupId:string;choiceIds:string[] };
 type Line = { lineId:string;productId: string; quantity: number; selections:LineSelection[];note:string };
@@ -104,6 +105,12 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [customNote,setCustomNote]=useState('');
   const [customQuantity,setCustomQuantity]=useState(1);
   const [requestKey, setRequestKey] = useState('');
+  const submitInFlight = useRef(false);
+  const pendingIntent = useRef('');
+  const [previousOrderReference, setPreviousOrderReference] = useState('');
+  const [canRepeatOrder,setCanRepeatOrder]=useState(false);
+  const duplicateActionsRef=useRef<HTMLDivElement|null>(null);
+  useEffect(()=>{if(previousOrderReference)duplicateActionsRef.current?.scrollIntoView({block:'center',behavior:'smooth'});},[previousOrderReference]);
   const [checkout, setCheckout] = useState(false);
   const [review, setReview] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -127,6 +134,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [alertActivity, setAlertActivity] = useState('');
   const [customer, setCustomer] = useState<Customer>(EMPTY_CUSTOMER);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'BREB_QR'>('CASH');
+  useEffect(()=>{setPreviousOrderReference('');setCanRepeatOrder(false);},[cart,customer,paymentMethod]);
   const [locationStatus, setLocationStatus] = useState('');
   const [locating, setLocating] = useState(false);
   const checkoutRef = useRef<HTMLFormElement | null>(null);
@@ -216,6 +224,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     function updateSession(next: Session | null) {
       if (!active) return;
       if (currentUser.current !== (next?.user.id || null)) {
+        pendingIntent.current='';setRequestKey('');setPreviousOrderReference('');setCanRepeatOrder(false);
         ordersRequest.current++; setOrders([]); setCurrentOrderId(null); setOrdersError(''); setCheckout(false); setReview(false);
         knownManagerOrders.current.clear(); managerOrdersLoaded.current = false; setNewOrderIds([]); setAlertsEnabled(false);
         alertsEnabledRef.current = false; setAlertActivity('');
@@ -280,7 +289,9 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     const response = await fetch((preview ? '/api/comprador/prueba-pedidos?' : '/api/piloto/restaurante?') + query.toString(), { ...options, cache: 'no-store',
       headers: { 'Content-Type': 'application/json', ...(preview ? {'x-preview-session':previewSession.current} : session ? { Authorization: `Bearer ${session.access_token}` } : {}) } });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'No se pudo completar la solicitud.');
+    if (!response.ok) throw Object.assign(new Error(result.error || 'No se pudo completar la solicitud.'),{
+      previousPublicId:result.previousPublicId,canRepeat:result.canRepeat===true
+    });
     return result;
   }, [session, restaurantId, preview]);
   const pushApi = useCallback(async (options: RequestInit = {}) => {
@@ -311,7 +322,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     const userId = session.user.id;
     const requestId = ++ordersRequest.current;
     try {
-      const r = await api(manager ? '?mode=manager' : '?mode=customer');
+      const r = await api(manager ? '?mode=manager' : `?mode=customer&publicId=${encodeURIComponent(currentOrderId || '')}`);
       if (currentUser.current === userId && ordersRequest.current === requestId) {
         const nextOrders = r.orders as Order[];
         if (manager) {
@@ -537,19 +548,43 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const subtotal = cart.reduce((sum, l) => sum + configuredUnitPrice(l) * l.quantity, 0);
   const currentOrder = orders.find(order => order.public_id === currentOrderId);
   const showPaymentInstructions = currentOrder?.status !== 'rejected' && currentOrder?.delivery?.status !== 'cancelled';
-  async function submit() {
-    setBusy(true); setNotice('');
-    const key = requestKey || crypto.randomUUID(); setRequestKey(key);
+  async function submit(repeatOf = '') {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+    setBusy(true); setNotice('');setPreviousOrderReference('');setCanRepeatOrder(false);
+    const intentScope = `mercau:order-intent:${session?.user.id || 'preview'}:${restaurantId || 'restaurante-mercado'}`;
+    const previousIntent=readOrderIntent(orderIntentStore(),intentScope,pendingIntent.current || requestKey);
+    const key = pendingOrderIntent(orderIntentStore(), intentScope, repeatOf ? crypto.randomUUID() : previousIntent, () => crypto.randomUUID());
+    pendingIntent.current = key; setRequestKey(key);
     try {
-      const r = await api('', { method: 'POST', body: JSON.stringify({ ...customer, lines: cart, paymentMethod, requestKey: key, confirmed: true }) });
+      if(previousIntent && !repeatOf && !preview){
+        const lookup=await api(`?mode=intent&requestKey=${encodeURIComponent(previousIntent)}`);
+        if(lookup.outcome==='existing'){
+          clearOrderIntent(orderIntentStore(),intentScope);pendingIntent.current='';setRequestKey('');
+          setCurrentOrderId(lookup.public_id);setCheckout(false);setReview(false);
+          setNotice('Tu pedido ya estaba registrado. Abrimos el mismo pedido, sin crear otro.');return;
+        }
+        if(lookup.outcome!=='not_found')throw new Error('No se pudo comprobar el intento anterior. No se creó otro pedido.');
+      }
+      const r = await api('', { method: 'POST', body: JSON.stringify({ ...customer, lines: cart, paymentMethod, requestKey: key, confirmed: true,
+        ...(repeatOf?{repeatOf,repeatConfirmed:true}:{}) }) });
+      clearOrderIntent(orderIntentStore(), intentScope); pendingIntent.current = '';
       setCart([]); setCheckout(false); setReview(false); setRequestKey('');
       setCurrentOrderId(r.public_id);
-      if(!preview&&live&&restaurantId){
+      if(!r.replayed&&!preview&&live&&restaurantId){
         trackCommerceEvent('Solicitud de pedido recibida','Lead',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)});
         trackMetaEvent('OrderSubmitted',{content_ids:cart.map(line=>line.productId),content_name:title,content_type:'product',currency:'COP',value:subtotal+fee,num_items:cart.reduce((sum,line)=>sum+line.quantity,0),order_id:r.public_id},true);
       }
-    } catch (e) { setNotice(e instanceof Error ? e.message : 'No se pudo enviar el pedido.'); }
-    finally { setBusy(false); }
+    } catch (e) {
+      setNotice(e instanceof TypeError || e instanceof SyntaxError
+        ? 'No pudimos confirmar el resultado. Conservamos tu referencia; al volver a confirmar consultaremos el pedido anterior.'
+        : e instanceof Error ? e.message : 'No se pudo enviar el pedido.');
+      const previous=(e as {previousPublicId?:unknown})?.previousPublicId;
+      if(typeof previous==='string' && /^PRB-\d+$/.test(previous)){
+        setPreviousOrderReference(previous);setCanRepeatOrder((e as {canRepeat?:unknown}).canRepeat===true);
+      }
+    }
+    finally { submitInFlight.current = false; setBusy(false); }
   }
   async function action(o: Order, value: string) {
     setBusy(true); setNotice('');
@@ -565,6 +600,15 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     {preview && <p className="pilot-preview-banner">Vista de prueba · Datos ficticios. No se cobra dinero ni se despachan pedidos.</p>}
     {!live && <div className="pilot-test">Restaurante ficticio de prueba. No se preparan productos. Si eliges Bre-B, la transferencia sí mueve dinero real a Mercáu y debe acordarse previamente.</div>}
     {notice && !(preview&&checkout) && <p key={visualMenu?addedNoticeId:undefined} role="status" className={visualMenu&&notice==='Producto agregado a tu pedido.'?'pilot-notice menu-added-toast':'pilot-notice'}>{notice}</p>}
+    {previousOrderReference && <div ref={duplicateActionsRef} role="group" aria-label="Pedido reciente"><button disabled={busy} className="pilot-secondary" onClick={()=>{
+      const scope=`mercau:order-intent:${session?.user.id || 'preview'}:${restaurantId || 'restaurante-mercado'}`;
+      clearOrderIntent(orderIntentStore(),scope);pendingIntent.current='';setRequestKey('');
+      setCurrentOrderId(previousOrderReference);setPreviousOrderReference('');setCanRepeatOrder(false);setCheckout(false);setReview(false);
+    }}>Revisar pedido anterior</button>
+      {canRepeatOrder && <button disabled={busy} className="pilot-secondary" onClick={()=>{
+        if(window.confirm('¿Confirmas que quieres hacer otra compra igual, adicional al pedido anterior?'))void submit(previousOrderReference);
+      }}>Hacer otro pedido igual</button>}
+    </div>}
     {ordersError && <p role="status" className="pilot-notice">{ordersError}</p>}
     {!manager && !preview && <p><a href="/mi-cuenta/pedidos">Ver mis pedidos</a></p>}
     {!manager && session && currentOrderId && <section id="mis-pedidos" className="pilot-orders" aria-label="Seguimiento de tu pedido actual"><h2>Tu pedido actual</h2>

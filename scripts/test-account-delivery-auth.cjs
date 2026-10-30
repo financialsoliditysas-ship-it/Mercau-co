@@ -12,6 +12,7 @@ class AccountError extends Error {
 const mod = new Module("delivery-auth-test");
 const mocks = {
   "@/lib/deliveries": {
+    DeliveryControlError: class extends Error {},
     createDeliveryOrder: async (body, context) => {
       calls.push({ body, context });
       return {

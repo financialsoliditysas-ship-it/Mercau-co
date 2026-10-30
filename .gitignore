@@ -7,3 +7,4 @@ node_modules
 *.log
 *.tsbuildinfo
 outputs/
+supabase/.temp/

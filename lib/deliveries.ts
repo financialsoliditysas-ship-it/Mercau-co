@@ -9,6 +9,24 @@ import {
 } from "@/lib/delivery-types";
 import { getLogisticsProvider } from "@/lib/shipday";
 import { requireShipdayWebhookToken } from '@/lib/shipday-webhook-auth';
+import { prepareDispatchFinance } from './dispatch-finance';
+import { queryShipdayOrder } from './shipday-reconciliation';
+
+export class DeliveryControlError extends Error {
+  constructor(message: string, public status = 409, public previousPublicId?: string, public canRepeat = false) { super(message); }
+}
+type DeliveryContext={userId?:string;businessId?:string;guestId?:string};
+function deliveryIntentScope(context: DeliveryContext, source: string) {
+  return context.userId ? `delivery:user:${context.userId}` : source !== 'WEB' ? `delivery:channel:${source}`
+    : context.guestId ? `delivery:guest:${context.guestId}` : '';
+}
+export async function lookupDeliveryIntent(key: string, context: DeliveryContext, source = 'WEB') {
+  const scope=deliveryIntentScope(context,source);
+  if(!scope || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(key))throw new DeliveryControlError('Referencia de solicitud inválida.',400);
+  const {data,error}=await getSupabaseAdminClient().rpc('lookup_order_receipt_v3',{p_scope:scope,p_key:key});
+  if(error || !data)throw new DeliveryControlError('No se pudo consultar el intento anterior. Conserva su referencia; no crees otra solicitud.',503);
+  return data;
+}
 
 function cleanText(value: unknown, max = 300) {
   return String(value || "").trim().slice(0, max);
@@ -80,49 +98,7 @@ export function normalizeDeliveryInput(body: Record<string, unknown>): DeliveryO
   return input;
 }
 
-async function addHistory(params: {
-  deliveryOrderId: string;
-  status: DeliveryStatus;
-  source: string;
-  externalStatus?: string | null;
-  externalEvent?: string | null;
-  dedupeKey?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  const supabase = getSupabaseAdminClient();
-  const payload = {
-    delivery_order_id: params.deliveryOrderId,
-    status: params.status,
-    source: params.source,
-    external_status: params.externalStatus || null,
-    external_event: params.externalEvent || null,
-    dedupe_key: params.dedupeKey || null,
-    metadata: params.metadata || {}
-  };
-
-  const { error } = await supabase.from("delivery_status_history").insert(payload);
-  if (error && !String(error.message || "").includes("duplicate key")) {
-    console.error("delivery_history_insert_error", error.message);
-  }
-}
-
-async function updateDeliveryOrder(
-  id: string,
-  updates: Partial<DeliveryOrder> & Record<string, unknown>
-) {
-  const supabase = getSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("delivery_orders")
-    .update(updates)
-    .eq("id", id)
-    .select("*")
-    .single();
-
-  if (error) throw new Error(error.message);
-  return data as DeliveryOrder;
-}
-
-export async function createDeliveryOrder(rawBody: Record<string, unknown>, context: {userId?:string;businessId?:string} = {}) {
+export async function createDeliveryOrder(rawBody: Record<string, unknown>, context: DeliveryContext = {}) {
   const input = normalizeDeliveryInput(rawBody);
   const supabase = getSupabaseAdminClient();
 
@@ -157,66 +133,87 @@ export async function createDeliveryOrder(rawBody: Record<string, unknown>, cont
     ,...(context.userId ? {customer_user_id:context.userId}:{}),...(context.businessId ? {pickup_business_id:context.businessId}:{})
   };
 
-  const { data, error } = await supabase
-    .from("delivery_orders")
-    .insert(insertPayload)
-    .select("*")
-    .single();
-
-  if (error) throw new Error(error.message);
-
-  const order = data as DeliveryOrder;
-  await addHistory({
-    deliveryOrderId: order.id,
-    status: "created",
-    source: order.source,
-    metadata: { public_id: order.public_id }
+  const requestKey = cleanText(rawBody.requestKey, 36);
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(requestKey)) {
+    throw new DeliveryControlError('Falta una referencia válida para conservar la solicitud al reintentar.',400);
+  }
+  const scope = deliveryIntentScope(context,input.source || 'WEB');
+  if (!scope) throw new DeliveryControlError('No se pudo conservar la sesión de la solicitud. Recarga antes de continuar.',400);
+  const { data, error } = await supabase.rpc('create_delivery_once_v3', {
+    p_scope: scope, p_key: requestKey, p_payload: {...insertPayload,
+      ...(rawBody.repeatConfirmed===true && typeof rawBody.repeatOf==='string' && /^MCU-\d+$/.test(rawBody.repeatOf)?{_repeat_of:rawBody.repeatOf}:{})}
   });
-
+  if (error || !data) throw new DeliveryControlError('No se pudo comprobar la solicitud. Conserva la referencia y reintenta.',503);
+  if (data.outcome === 'conflict') throw new DeliveryControlError('Esta referencia ya se usó con otros datos. Revisa la solicitud anterior antes de crear otra.',409,data.previous_public_id);
+  if(data.outcome==='duplicate')throw new DeliveryControlError('Ya tienes una solicitud reciente igual. ¿Quieres revisarla o hacer otra?',409,data.previous_public_id,true);
+  if(data.outcome==='uncertain')throw new DeliveryControlError('La solicitud anterior tiene un despacho incierto. Revisa su estado o contacta a Mercáu antes de repetirla.',409,data.previous_public_id);
+  const order = data.order as DeliveryOrder;
+  if (data.outcome === 'existing') return { order, shipdayCreated: Boolean(order.shipday_order_id) };
   return syncOrderToShipday(order);
 }
 
+export async function reconcileDeliveryDispatch(id: string) {
+  const order = await getDeliveryOrderById(id);
+  if (!order) throw new DeliveryControlError('Envío no encontrado.',404);
+  if (!order.dispatch_attempted_at) throw new DeliveryControlError('Este envío no tiene un intento externo que conciliar.');
+  let result;
+  try { result = await queryShipdayOrder(order); }
+  catch { result = { outcome: 'unavailable' as const, checkedAt: new Date().toISOString(), count: 0 }; }
+  const recorded = await getSupabaseAdminClient().rpc('record_dispatch_reconciliation_v3', {
+    p_order: order.id, p_attempt: order.dispatch_attempted_at, p_outcome: result.outcome,
+    p_external: 'providerId' in result ? result.providerId || null : null, p_checked_at: result.checkedAt
+  });
+  if (recorded.error || !recorded.data) throw new DeliveryControlError('No se pudo guardar la conciliación. No vuelvas a despachar este envío.',503);
+  const messages = {
+    matched: 'Envío encontrado y vinculado a Shipday. No se creó otro despacho.',
+    not_found: 'Shipday no devolvió coincidencias. Esto no confirma que el envío nunca existió: continúa bloqueado y requiere revisión con el operador.',
+    multiple: 'Hay varias coincidencias en Shipday. Requiere revisión con el operador; no se reenviará.',
+    mismatch: 'Los datos de Shipday no coinciden con el envío. Requiere revisión; no se vinculará ni reenviará.',
+    unavailable: 'No se pudo consultar Shipday. El despacho continúa bloqueado; puedes volver a consultar.'
+  };
+  return { ...recorded.data, message: messages[result.outcome] };
+}
+
 export async function syncOrderToShipday(order: DeliveryOrder) {
-  try {
-    const provider = getLogisticsProvider();
-    const result = await provider.createOrder(order);
-    const updated = await updateDeliveryOrder(order.id, {
-      status: "sent_to_shipday",
-      shipday_order_id: result.externalOrderId,
-      shipday_status: result.externalStatus || null,
-      shipday_tracking_url: result.trackingUrl || null,
-      shipday_last_error: null
-    });
-
-    await addHistory({
-      deliveryOrderId: order.id,
-      status: "sent_to_shipday",
-      source: "SHIPDAY",
-      externalStatus: result.externalStatus || null,
-      externalEvent: "ORDER_INSERTED",
-      dedupeKey: `shipday-insert-${result.externalOrderId}`,
-      metadata: { shipday_order_id: result.externalOrderId, response: result.raw }
-    });
-
-    return { order: updated, shipdayCreated: true };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error desconocido";
-    const updated = await updateDeliveryOrder(order.id, {
-      status: "integration_error",
-      shipday_last_error: message
-    });
-
-    await addHistory({
-      deliveryOrderId: order.id,
-      status: "integration_error",
-      source: "SHIPDAY",
-      externalStatus: null,
-      externalEvent: "SHIPDAY_CREATE_FAILED",
-      metadata: { error: message }
-    });
-
-    return { order: updated, shipdayCreated: false };
+  const supabase = getSupabaseAdminClient();
+  const current = await getDeliveryOrderById(order.id);
+  if (!current) throw new DeliveryControlError('Envío no encontrado.', 404);
+  if (current.shipday_order_id) return { order: current, shipdayCreated: true };
+  if (current.dispatch_attempted_at) {
+    throw new DeliveryControlError('Este envío ya tuvo un intento de despacho. Revisa Shipday antes de volver a enviarlo.');
   }
+  if (!['created', 'integration_error'].includes(current.status)) {
+    throw new DeliveryControlError('El estado del envío no permite solicitar un domiciliario.');
+  }
+  // Validate configuration and recorded collection instructions before taking the one-use claim.
+  const provider = getLogisticsProvider();
+  await prepareDispatchFinance(current);
+  const claim = await supabase.rpc('claim_delivery_dispatch_v2', { p_order: order.id });
+  if (claim.error) throw new DeliveryControlError('No se pudo reservar el despacho. No se contactó a Shipday.', 503);
+  if (!claim.data) {
+    const latest = await getDeliveryOrderById(order.id);
+    if (latest?.shipday_order_id) return { order: latest, shipdayCreated: true };
+    throw new DeliveryControlError('El despacho ya está en proceso, fue cancelado o requiere conciliación.');
+  }
+  let externalId: string;
+  try {
+    const result = await provider.createOrder(claim.data as DeliveryOrder);
+    externalId = result.externalOrderId;
+  } catch {
+    // A timeout does not prove that the provider rejected the request. Never clear the claim.
+    await supabase.from('delivery_orders').update({
+      status: "integration_error",
+      shipday_last_error: 'Resultado de despacho incierto. Conciliar en Shipday antes de reintentar.'
+    }).eq('id', order.id).is('shipday_order_id', null).in('status', ['created', 'integration_error']);
+    const latest = await getDeliveryOrderById(order.id);
+    if (latest?.shipday_order_id) return { order: latest, shipdayCreated: true };
+    return { order: latest || claim.data as DeliveryOrder, shipdayCreated: false };
+  }
+  const completed = await supabase.rpc('complete_delivery_dispatch_v2', { p_order: order.id, p_external: externalId });
+  if (completed.error || !completed.data) {
+    throw new DeliveryControlError('Shipday recibió el envío, pero falta confirmar su registro en Mercáu. Revisa administración; no vuelvas a despacharlo.', 503);
+  }
+  return { order: completed.data as DeliveryOrder, shipdayCreated: true };
 }
 
 export async function getDeliveryOrderByPublicId(publicId: string) {
@@ -268,20 +265,9 @@ export async function getDeliveryOrderById(id: string) {
 }
 
 export async function cancelDeliveryOrder(order: DeliveryOrder) {
-  const updated = await updateDeliveryOrder(order.id, {
-    status: "cancelled",
-    cancelled_at: new Date().toISOString()
-  });
-
-  await addHistory({
-    deliveryOrderId: order.id,
-    status: "cancelled",
-    source: "ADMIN",
-    externalEvent: "ADMIN_CANCELLED",
-    metadata: { previous_status: order.status }
-  });
-
-  return updated;
+  const { data, error } = await getSupabaseAdminClient().rpc('cancel_unsubmitted_delivery_v2', { p_order: order.id });
+  if (error || !data) throw new DeliveryControlError('No se confirmó la cancelación. Si el envío salió o pudo salir, cancélalo en Shipday y espera su confirmación.');
+  return data as DeliveryOrder;
 }
 
 export function mapShipdayEventToStatus(event: string, orderStatus: string): DeliveryStatus {
@@ -291,6 +277,7 @@ export function mapShipdayEventToStatus(event: string, orderStatus: string): Del
   if (normalizedEvent === "ORDER_COMPLETED" || normalizedStatus === "ALREADY_DELIVERED") return "delivered";
   if (normalizedEvent === "ORDER_FAILED" || normalizedEvent === "ORDER_INCOMPLETE" || normalizedStatus === "FAILED_DELIVERY" || normalizedStatus === "INCOMPLETE") return "failed";
   if (normalizedEvent === "ORDER_DELETE") return "cancelled";
+  if (normalizedEvent === "ORDER_UNASSIGNED") return "sent_to_shipday";
   if (normalizedEvent === "ORDER_ONTHEWAY" || normalizedStatus === "READY_TO_DELIVER") return "in_transit";
   if (normalizedEvent === "ORDER_PIKEDUP" || normalizedStatus === "PICKED_UP") return "picked_up";
   if (normalizedEvent === "ORDER_ASSIGNED" || normalizedEvent === "ORDER_ACCEPTED_AND_STARTED" || normalizedStatus === "STARTED") return "assigned";
@@ -300,63 +287,25 @@ export function mapShipdayEventToStatus(event: string, orderStatus: string): Del
 
 export async function applyShipdayWebhook(payload: Record<string, unknown>, token: string | null) {
   requireShipdayWebhookToken(token);
-
   const shipdayOrder = (payload.order || {}) as Record<string, unknown>;
   const shipdayOrderId = cleanText(shipdayOrder.id, 80);
   const publicId = cleanText(shipdayOrder.order_number, 80);
   const event = cleanText(payload.event, 80);
   const externalStatus = cleanText(payload.order_status, 80);
-  const timestamp = cleanText(payload.timestamp, 80);
-  const carrier = (payload.carrier || {}) as Record<string, unknown>;
-  const status = mapShipdayEventToStatus(event, externalStatus);
-  const supabase = getSupabaseAdminClient();
-
-  let query = supabase.from("delivery_orders").select("*");
-  query = shipdayOrderId
-    ? query.eq("shipday_order_id", shipdayOrderId)
-    : query.eq("public_id", publicId);
-
-  const { data: order, error } = await query.single();
-  if (error || !order) throw new Error("Orden Mercau no encontrada para webhook Shipday.");
-
-  const now = new Date().toISOString();
-  const updates: Record<string, unknown> = {
-    status,
-    shipday_status: externalStatus || event || null
-  };
-  if (carrier.id) updates.shipday_carrier_id = cleanText(carrier.id, 80);
-  if (carrier.name) updates.courier_name = cleanText(carrier.name, 160);
-  if (carrier.phone) updates.courier_phone = cleanText(carrier.phone, 40);
-  if (carrier.vehicle_description) updates.courier_vehicle = cleanText(carrier.vehicle_description, 160);
-  if (carrier.plate_number) updates.courier_plate = cleanText(carrier.plate_number, 40);
-
-  if (status === "assigned") updates.assigned_at = now;
-  if (status === "picked_up") updates.picked_up_at = now;
-  if (status === "delivered") updates.delivered_at = now;
-  if (status === "cancelled") updates.cancelled_at = now;
-
-  try {
-    await updateDeliveryOrder(order.id, updates);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (!message.includes("courier_") && !message.includes("shipday_carrier_id")) throw error;
-    delete updates.shipday_carrier_id;
-    delete updates.courier_name;
-    delete updates.courier_phone;
-    delete updates.courier_vehicle;
-    delete updates.courier_plate;
-    await updateDeliveryOrder(order.id, updates);
+  const timestamp = Number(payload.timestamp);
+  if (!shipdayOrderId || !Number.isSafeInteger(timestamp) || timestamp <= 0 || timestamp > Date.now() + 300000) {
+    throw new DeliveryControlError('Evento Shipday sin identificador o fecha válida.', 400);
   }
-
-  await addHistory({
-    deliveryOrderId: order.id,
-    status,
-    source: "SHIPDAY_WEBHOOK",
-    externalStatus,
-    externalEvent: event,
-    dedupeKey: `shipday-${shipdayOrderId || publicId}-${event}-${timestamp}`,
-    metadata: payload
+  const mapped = mapShipdayEventToStatus(event, externalStatus);
+  const known = ['ORDER_INSERTED','ORDER_COMPLETED','ORDER_FAILED','ORDER_INCOMPLETE','ORDER_DELETE',
+    'ORDER_ONTHEWAY','ORDER_PIKEDUP','ORDER_ASSIGNED','ORDER_ACCEPTED_AND_STARTED',
+    'ORDER_UNASSIGNED','ORDER_PIKEDUP_REMOVED','ORDER_ONTHEWAY_REMOVED'].includes(event.toUpperCase());
+  const status = mapped === 'sent_to_shipday' && !known ? 'unknown' : mapped;
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase.rpc('apply_shipday_event_v2', {
+    p_public: publicId, p_external: shipdayOrderId, p_status: status, p_event: event,
+    p_at: new Date(timestamp).toISOString(), p_payload: payload
   });
-
-  return { ok: true, publicId: order.public_id, status };
+  if (error || !data) throw new DeliveryControlError('No se pudo registrar el evento Shipday. Requiere revisión o reintento del proveedor.', 503);
+  return data;
 }

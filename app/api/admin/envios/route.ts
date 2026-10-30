@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import {
   cancelDeliveryOrder,
+  DeliveryControlError,
   getDeliveryHistory,
   getDeliveryOrderById,
   listDeliveryOrders,
+  reconcileDeliveryDispatch,
   syncOrderToShipday
 } from "@/lib/deliveries";
 
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, orders });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudieron cargar los envios.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: error instanceof DeliveryControlError ? error.status : 500 });
   }
 }
 
@@ -47,6 +49,9 @@ export async function POST(request: Request) {
       const result = await syncOrderToShipday(order);
       return NextResponse.json({ ok: true, order: result.order, shipdayCreated: result.shipdayCreated });
     }
+    if (action === 'reconcile_shipday') {
+      return NextResponse.json(await reconcileDeliveryDispatch(order.id));
+    }
 
     if (action === "history") {
       const history = await getDeliveryHistory(order.id);
@@ -61,6 +66,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Accion no soportada." }, { status: 400 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No se pudo procesar la accion.";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: error instanceof DeliveryControlError ? error.status : 500 });
   }
 }

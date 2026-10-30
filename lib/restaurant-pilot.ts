@@ -6,7 +6,7 @@ import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finan
 
 export const pilotId = 'restaurante-mercado';
 export class PilotError extends Error {
-  constructor(message: string, public status = 400) { super(message); }
+  constructor(message: string, public status = 400, public previousPublicId?: string, public canRepeat = false) { super(message); }
 }
 export type PilotProduct = { id: string; name: string; description?: string; category: string; price: number; image: string; optionGroups:CatalogOptionGroup[] };
 
@@ -125,32 +125,53 @@ export async function reportPilotPayment(userId: string, publicId: string, refer
   return { ok: true, message: 'Transferencia reportada. Mercáu verificará el ingreso antes de autorizar la preparación.' };
 }
 
+export async function lookupPilotOrderIntent(userId: string, requestKey: string, restaurantId = pilotId) {
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(requestKey) || (restaurantId !== pilotId && !/^rec[a-zA-Z0-9]{14}$/.test(restaurantId))) {
+    throw new PilotError('Referencia de pedido inválida.');
+  }
+  const {data,error}=await getSupabaseAdminClient().rpc('lookup_order_receipt_v3',{
+    p_scope:`food:${userId}:${restaurantId}`,p_key:requestKey
+  });
+  if(error || !data)throw new PilotError('No se pudo consultar el intento anterior. No crees otra referencia; vuelve a consultar.',503);
+  return data;
+}
+
 export async function createPilotOrder(userId: string, body: Record<string, unknown>, restaurantId = pilotId) {
   await pilotMember(userId, false, restaurantId);
   const db = getSupabaseAdminClient();
   const restaurant = await pilotRestaurant(restaurantId);
   if (!restaurant.enabled) throw new PilotError('La prueba no esta recibiendo pedidos.', 503);
   const input = validatePilotOrder(body, restaurant.menu);
-  const { data, error } = await db.from('pilot_food_orders').insert({ ...input, restaurant_id: restaurantId,
-    customer_id: userId, delivery_fee: restaurant.delivery_fee, delivery_mode: restaurant.delivery_mode,
-    commission_rate_bps: restaurant.commission_rate_bps, customer_markup_bps: restaurant.customer_markup_bps }).select('public_id').single();
-  if (error?.code === '23505') {
-    const existing = await db.from('pilot_food_orders').select('public_id').eq('customer_id', userId).eq('restaurant_id', restaurantId)
-      .eq('request_key', input.request_key).single();
-    if (existing.data) return existing.data;
-  }
+  const repeatOf = typeof body.repeatOf === 'string' ? body.repeatOf : '';
+  if(repeatOf && (!/^PRB-\d+$/.test(repeatOf) || body.repeatConfirmed!==true))throw new PilotError('Confirma explícitamente la compra adicional.');
+  const { data, error } = await db.rpc('create_food_order_once_v3', {
+    p_scope: `food:${userId}:${restaurantId}`, p_key: input.request_key,
+    p_payload: { ...input, restaurant_id: restaurantId, customer_id: userId,
+      delivery_fee: restaurant.delivery_fee, delivery_mode: restaurant.delivery_mode,
+      commission_rate_bps: restaurant.commission_rate_bps, customer_markup_bps: restaurant.customer_markup_bps,
+      ...(repeatOf?{_repeat_of:repeatOf}:{}) }
+  });
   if (error) throw new PilotError('No se pudo guardar el pedido. Puedes reintentar con el mismo carrito.', 503);
+  if (data?.outcome === 'conflict') throw new PilotError('Esta referencia ya se usó con otros datos. Revisa el pedido anterior antes de volver a pedir.',409,data.previous_public_id);
+  if(data?.outcome==='duplicate')throw new PilotError('Ya tienes un pedido reciente igual. ¿Quieres revisarlo o hacer otro?',409,data.previous_public_id,true);
+  if(data?.outcome==='uncertain')throw new PilotError('El pedido anterior está registrado, pero su despacho necesita revisión. Revisa su estado o contacta a Mercáu antes de repetirlo.',409,data.previous_public_id);
+  if (!data?.public_id) throw new PilotError('No se pudo comprobar el pedido. Revisa Mis pedidos antes de reintentar.',503);
+  if (data.outcome === 'existing') return { public_id: data.public_id, replayed: true };
   await sendNewOrderPush({ businessId: restaurantId, orderId: data.public_id,
     customerName: input.customer_name, total: input.subtotal + Number(restaurant.delivery_fee || 0) }).catch(() => undefined);
-  return data;
+  return { public_id: data.public_id, replayed: false };
 }
 
-export async function listPilotOrders(userId: string, manager: boolean, restaurantId = pilotId) {
+export async function listPilotOrders(userId: string, manager: boolean, restaurantId = pilotId, publicId?: string) {
   await pilotMember(userId, manager, restaurantId);
   let query = getSupabaseAdminClient().from('pilot_food_orders')
     .select(pilotOrderSelection(manager))
     .eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(50);
   if (!manager) query = query.eq('customer_id', userId);
+  if(publicId){
+    if(!/^PRB-\d+$/.test(publicId))throw new PilotError('Referencia de pedido inválida.');
+    query=query.eq('public_id',publicId);
+  }
   const { data, error } = await query;
   if (error) throw new PilotError('No se pudieron cargar los pedidos.', 503);
   // Only staff receive internal IDs; customer responses omit operational identifiers.
@@ -175,26 +196,15 @@ export async function transitionPilotOrder(userId: string, id: string, action: s
   });
   if (error) throw new PilotError('El pedido cambio o esta accion no esta disponible. Actualiza la lista.', 409);
   if (data?.dispatch && data.delivery_id) {
-    const payment = await db.from('order_financial_snapshots').select('payment_method,payment_status,product_subtotal,delivery_fee,customer_total,merchant_net').eq('food_order_id', id).single();
-    if (!payment.error) {
-      const prepaid = payment.data.payment_method === 'BREB_QR' && payment.data.payment_status === 'CONFIRMED';
-      const transferOnDelivery = payment.data.payment_method === 'BREB_QR' && !prepaid;
-      await db.from('delivery_orders').update({ commerce_payment_method: payment.data.payment_method,
-        commerce_payment_status: payment.data.payment_status,
-        pickup_instructions: prepaid
-          ? `Recoger pedido confirmado. Entregar al negocio COP ${payment.data.merchant_net}. Pago del cliente confirmado por Mercáu.`
-          : transferOnDelivery
-            ? `Recoger pedido confirmado. Entregar al negocio COP ${payment.data.merchant_net}. Cobro al cliente mediante transferencia Bre-B.`
-            : `Recoger pedido confirmado. Entregar al negocio COP ${payment.data.merchant_net}. Cobro al cliente en efectivo.`,
-        notes: prepaid ? `PAGO CONFIRMADO. No cobrar al cliente. Productos: COP ${payment.data.product_subtotal}. Domicilio: COP ${payment.data.delivery_fee}. Total pagado: COP ${payment.data.customer_total}.`
-          : transferOnDelivery
-            ? `COBRO CONTRA ENTREGA POR TRANSFERENCIA BRE-B. Mostrar al cliente el QR de Mercáu: https://www.mercau.co/pagos/mercau-breb.jpeg. Verificar destinatario Financial Solidity S.A.S. Total a cobrar: COP ${payment.data.customer_total}.`
-            : `Efectivo contra entrega. Productos: COP ${payment.data.product_subtotal}. Domicilio: COP ${payment.data.delivery_fee}. Total a cobrar: COP ${payment.data.customer_total}.`
-      }).eq('id', data.delivery_id);
-    }
+    // The dispatch service validates and persists the same recorded amounts on first send and retries.
     const delivery = await getDeliveryOrderById(data.delivery_id);
     if (!delivery) throw new PilotError('Pedido guardado. Revisa el despacho en administracion.', 503);
-    const result = await syncOrderToShipday(delivery);
+    let result;
+    try {
+      result = await syncOrderToShipday(delivery);
+    } catch {
+      throw new PilotError('Pedido guardado. No se confirmó el despacho. Revisa Admin / Envíos antes de volver a solicitar domiciliario.', 503);
+    }
     return { ok: true, message: result.shipdayCreated ? 'Pedido enviado a Shipday.' :
       'Pedido guardado. El despacho requiere revision en Admin / Envios.' };
   }

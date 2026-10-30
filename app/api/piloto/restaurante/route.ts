@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createPilotOrder, listPilotOrders, pilotId, pilotRestaurant, pilotUser, PilotError, reportPilotPayment, transitionPilotOrder } from '@/lib/restaurant-pilot';
+import { createPilotOrder, listPilotOrders, lookupPilotOrderIntent, pilotId, pilotRestaurant, pilotUser, PilotError, reportPilotPayment, transitionPilotOrder } from '@/lib/restaurant-pilot';
 
 export const dynamic = 'force-dynamic';
 function restaurantId(request: Request) {
@@ -13,7 +13,8 @@ async function userFor(request: Request) {
 }
 function failure(error: unknown) {
   const known = error instanceof PilotError;
-  return NextResponse.json({ error: known ? error.message : 'No se pudo procesar la solicitud.' },
+  return NextResponse.json({ error: known ? error.message : 'No se pudo procesar la solicitud.',
+    ...(known && error.previousPublicId ? {previousPublicId:error.previousPublicId,canRepeat:error.canRepeat} : {}) },
     { status: known ? error.status : 503, headers: { 'Cache-Control': 'no-store' } });
 }
 export async function GET(request: Request) {
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
         { headers: { 'Cache-Control': 'no-store' } });
     }
     const user = await userFor(request);
-    return NextResponse.json({ orders: await listPilotOrders(user.id, mode === 'manager', restaurantId(request)) },
+    if(mode==='intent')return NextResponse.json(await lookupPilotOrderIntent(user.id,new URL(request.url).searchParams.get('requestKey') || '',restaurantId(request)),{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({ orders: await listPilotOrders(user.id, mode === 'manager', restaurantId(request),new URL(request.url).searchParams.get('publicId') || undefined) },
       { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) { return failure(error); }
 }

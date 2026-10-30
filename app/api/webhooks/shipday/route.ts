@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyShipdayWebhook } from "@/lib/deliveries";
+import { applyShipdayWebhook, DeliveryControlError } from "@/lib/deliveries";
 import { requireShipdayWebhookToken, WebhookAuthError } from '@/lib/shipday-webhook-auth';
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     const message = 'No se pudo procesar el webhook.';
-    const status = error instanceof WebhookAuthError ? error.status : 400;
+    const status = error instanceof WebhookAuthError || error instanceof DeliveryControlError ? error.status : 400;
     return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

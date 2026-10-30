@@ -16,6 +16,7 @@ type AdminOrder = {
   shipday_status: string | null;
   shipday_order_id: string | null;
   shipday_tracking_url: string | null;
+  dispatch_attempted_at?: string | null;
   delivery_fee: number;
   courier_name?: string | null;
 };
@@ -47,7 +48,7 @@ export default function AdminDeliveriesPage() {
     setStatus(`${payload.orders?.length || 0} envíos cargados.`);
   }
 
-  async function action(id: string, actionName: "retry_shipday" | "history" | "cancel") {
+  async function action(id: string, actionName: "retry_shipday" | "history" | "cancel" | "reconcile_shipday") {
     setStatus("Procesando...");
     const response = await fetch("/api/admin/envios", {
       method: "POST",
@@ -64,9 +65,9 @@ export default function AdminDeliveriesPage() {
       return;
     }
 
-    setSelected(payload);
-    setStatus("Listo.");
     await loadOrders();
+    setSelected(payload);
+    setStatus(payload.message || 'Listo.');
   }
 
   return (
@@ -129,11 +130,18 @@ export default function AdminDeliveriesPage() {
                   <td className="p-3">${Number(order.delivery_fee || 0).toLocaleString("es-CO")}</td>
                   <td className="grid gap-1 p-3">
                     <button onClick={() => action(order.id, "history")} className="rounded-lg bg-slate-100 px-3 py-2 font-black">Ver</button>
-                    {order.status === "integration_error" ? (
+                    {['created', 'integration_error'].includes(order.status) && !order.dispatch_attempted_at && !order.shipday_order_id ? (
                       <button onClick={() => action(order.id, "retry_shipday")} className="rounded-lg bg-[#D82016] px-3 py-2 font-black text-white">Reintentar</button>
                     ) : null}
-                    {order.status !== "delivered" && order.status !== "cancelled" ? (
+                    {order.dispatch_attempted_at && !order.shipday_order_id && !['cancelled','delivered'].includes(order.status) ? (
+                      <><span className="text-sm font-bold">Despacho por conciliar en Shipday. No reenviar.</span>
+                      <button onClick={() => action(order.id, 'reconcile_shipday')} className="rounded-lg border border-slate-300 px-3 py-2 font-black">Consultar y conciliar</button></>
+                    ) : null}
+                    {['created', 'integration_error'].includes(order.status) && !order.dispatch_attempted_at && !order.shipday_order_id ? (
                       <button onClick={() => action(order.id, "cancel")} className="rounded-lg bg-slate-900 px-3 py-2 font-black text-white">Cancelar</button>
+                    ) : null}
+                    {order.shipday_order_id && !['delivered','cancelled','failed'].includes(order.status) ? (
+                      <span className="text-sm">Para cancelar, hazlo en Shipday y espera su confirmación.</span>
                     ) : null}
                     <a href={`/envio/${order.public_id}`} className="rounded-lg border border-slate-200 px-3 py-2 text-center font-black">Tracking</a>
                   </td>

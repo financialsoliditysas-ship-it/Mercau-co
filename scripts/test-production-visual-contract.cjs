@@ -1,7 +1,17 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require('node:crypto'),Module=require('node:module'),ts=require('typescript');
 const contract=JSON.parse(fs.readFileSync('data/production-backend-contract.json'));
+// Retain the published baseline. Only these explicitly versioned safety changes supersede it.
+const safety=JSON.parse(fs.readFileSync('data/logistics-controls-contract.json'));
+assert.equal(safety.status,'release-requires-sql-v2-v3');
+for(const [index,source] of ['supabase/drafts/logistics_controls_v2.sql','supabase/drafts/order_receipts_v3.sql'].entries()){
+ assert.equal(fs.readFileSync(source,'utf8').replace(/\r\n/g,'\n'),fs.readFileSync(safety.releaseMigrations[index],'utf8').replace(/\r\n/g,'\n'),'Release migration differs from tested SQL');
+}
 for(const [file,expected]of Object.entries(contract.sha256)){
  let bytes=fs.readFileSync(file);
+ if(safety.sha256[file]){
+  assert.equal(crypto.createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g,'\n')).digest('hex'),safety.sha256[file],'Unexpected safety change '+file);
+  continue;
+ }
  if(!file.endsWith('.jpeg')){
   let source=bytes.toString('utf8').replace(/\r\n/g,'\n');
   if(file==='lib/restaurant-pilot.ts')source=source.replace("import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finance';\n",'').replace('.select(pilotOrderSelection(manager))',".select('*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status)')").replace('finance: customerPaymentFinance(o.finance)','finance: o.finance');
@@ -12,7 +22,9 @@ for(const [file,expected]of Object.entries(contract.sha256)){
  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),expected,'Unexpected operational change '+file);
 }
 const deliveries=fs.readFileSync('lib/deliveries.ts','utf8');
-for(const dependency of ['claim_delivery_dispatch','request_fingerprint','dispatch_attempted_at','request_key'])assert(!deliveries.includes(dependency),'Deferred SQL dependency in delivery runtime '+dependency);
+assert(deliveries.includes("rpc('claim_delivery_dispatch_v2'"));
+assert(deliveries.includes("rpc('create_delivery_once_v3'"));
+assert(fs.existsSync('supabase/drafts/order_receipts_v3.sql'),'Receipt SQL must accompany the local candidate');
 assert(deliveries.includes('requireShipdayWebhookToken(token)'),'Do not remove webhook validation');
 function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mocks?mocks[id]:require(id);mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file+'.cjs');return mod.exports;}
 (async()=>{
@@ -23,5 +35,5 @@ function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mo
  const db={from(name){let allowed=true;return{select(){return this;},eq(key,value){allowed=allowed&&row[key]===value;return this;},async maybeSingle(){return {data:name==='delivery_orders'&&allowed?row:null,error:null};}};}};
  const tracking=load('lib/delivery-tracking.ts',{'./account-server':{AccountError},'./supabase-admin':{getSupabaseAdminClient:()=>db},'./account-model':{deliveryLabels:{assigned:'Mensajero asignado'}}});
  const own=await tracking.authorizedDeliveryTracking('owner','MCU-000001');assert(!JSON.stringify(own).includes('PRIVATE'));await assert.rejects(()=>tracking.authorizedDeliveryTracking('other','MCU-000001'),error=>error.status===404);
- console.log('PASS production dispatch/payload/contracts, payment QR, authentication, manifest/SW; retained webhook and private tracking checks. Deferred SQL not required; no dispatches executed.');
+ console.log('PASS unchanged payment QR, authentication, manifest/SW and provider payload; explicit local safety candidate hashes, webhook and private tracking. Candidate REQUIRES approved SQL; no dispatches executed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
