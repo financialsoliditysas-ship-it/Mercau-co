@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cache } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { loadPublicBusiness } from '@/lib/public-business';
 import { businessCatalogPath, businessPath } from '@/lib/business-public-url';
@@ -14,19 +15,25 @@ import CatalogShareActions from '@/components/CatalogShareActions';
 import { Clock3, MapPin, Truck } from 'lucide-react';
 import InstallMercau from '@/components/InstallMercau';
 import {businessSiteUrl} from '@/lib/business-public-url';
+import { menuCover } from '@/lib/menu-cover';
+const loadMenuCatalog=typeof cache==='function'?cache(publicCatalog):publicCatalog;
 export const dynamic='force-dynamic';
 export async function generateMetadata({params}:{params:{id:string}}) {
   const business=await loadPublicBusiness(params.id);
   const description=business?.description || (business ? `Consulta ${catalogNoun(business.category).toLocaleLowerCase('es-CO')} de ${business.name} en Mercáu.` : 'Catálogo en Mercáu');
   const path=business ? businessCatalogPath(business) : '/';
-  const image=business?new URL(`/api/negocios/${business.id}/og?v=${business.photoVersion||'1'}`,businessSiteUrl).href:new URL('/og-mercau.jpg',businessSiteUrl).href;
+  let coverVersion='';
+  if(business&&isFoodBusiness(business.category)) {
+    try {coverVersion=menuCover(business,(await loadMenuCatalog(business.id))?.products || []).version;}catch{/* Keep the business preview if the catalog is temporarily unavailable. */}
+  }
+  const image=business?new URL(coverVersion?`/api/negocios/${business.id}/catalogo/og?v=${coverVersion}`:`/api/negocios/${business.id}/og?v=${business.photoVersion||'1'}`,businessSiteUrl).href:new URL('/og-mercau.jpg',businessSiteUrl).href;
   return {title:business?`${business.name} | ${catalogNoun(business.category)} | Mercáu`:'Catálogo | Mercáu',description,
     ...(business?{alternates:{canonical:path},openGraph:{type:'website',locale:'es_CO',url:path,siteName:'Mercáu',title:`${business.name} en Mercáu`,description,images:[{url:image,width:1200,height:630,alt:`${catalogNoun(business.category)} de ${business.name} en Mercáu`}]},twitter:{card:'summary_large_image',title:`${business.name} en Mercáu`,description,images:[image]}}:{})};
 }
 export default async function BusinessCatalogPage({params}:{params:{id:string}}) {
   const business=await loadPublicBusiness(params.id);if(!business)notFound();
   if(business.publicSlug && params.id!==business.publicSlug)permanentRedirect(businessCatalogPath(business));
-  const [catalogResult,restaurantResult]=await Promise.allSettled([publicCatalog(business.id),pilotRestaurant(business.id)]);
+  const [catalogResult,restaurantResult]=await Promise.allSettled([loadMenuCatalog(business.id),pilotRestaurant(business.id)]);
   const unavailable=catalogResult.status==='rejected';
   const catalog=catalogResult.status==='fulfilled'?catalogResult.value:null;
   const liveOrders=restaurantResult.status==='fulfilled'&&restaurantResult.value.is_live===true;
@@ -43,7 +50,7 @@ export default async function BusinessCatalogPage({params}:{params:{id:string}})
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-start-2"><CatalogShareActions businessName={business.name} catalogUrl={catalogUrl} noun={catalogNoun(business.category)} /><InstallMercau prominent /></div>
     </section>
       {business.pilotRestaurant && <PilotBusinessNotice />}
-      {liveOrders ? <RestaurantPilot embedded visualMenu={isFoodBusiness(business.category)} restaurantId={business.id} businessName={business.name} returnPath={catalogPath} coverImage={catalog?.products.find(product=>product.imageUrl)?.imageUrl || (business.photoKind==='photo'?business.photoUrl:'') || ''} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} />}
+      {liveOrders ? <RestaurantPilot embedded visualMenu={isFoodBusiness(business.category)} restaurantId={business.id} businessName={business.name} returnPath={catalogPath} coverImage={menuCover(business,catalog?.products || []).imageUrl} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} />}
     </div>
   </main>;
 }

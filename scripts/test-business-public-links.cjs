@@ -71,6 +71,7 @@ const pageMocks = {
 };
 const listing = load('app/negocios/[id]/page.tsx', pageMocks);
 const catalog = load('app/negocios/[id]/catalogo/page.tsx', {
+  '@/lib/menu-cover': load('lib/menu-cover.ts'),
   ...pageMocks,
   '@/lib/business-catalog': { publicCatalog: async id => { catalogId = id; return { products: [] }; } },
   '@/lib/restaurant-pilot': { pilotRestaurant: async id => { pilotId = id; return { is_live: true }; } },

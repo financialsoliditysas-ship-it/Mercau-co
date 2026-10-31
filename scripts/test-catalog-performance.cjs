@@ -37,7 +37,7 @@ async function main(){
  let evictedReloaded=false;await image.catalogImage('bounded-0',async()=>{evictedReloaded=true;return {bytes:bad,type:'image/jpeg'};},null,false);assert(evictedReloaded);
  const proxy=`/api/negocios/${businessId}/catalogo/${productId}/foto?v=7`;
  assert(urls.catalogImageSources(proxy).srcSet.includes('w=320 320w'));assert.equal(urls.catalogImageSources(proxy,true).src,proxy);assert.equal(urls.catalogImageSources('https://private.invalid/photo?token=example').srcSet,undefined);
- const catalogPage=fs.readFileSync('app/negocios/[id]/catalogo/page.tsx','utf8');assert(catalogPage.includes('Promise.allSettled([publicCatalog(business.id),pilotRestaurant(business.id)])'));
+ const catalogPage=fs.readFileSync('app/negocios/[id]/catalogo/page.tsx','utf8');assert(catalogPage.includes('Promise.allSettled([loadMenuCatalog(business.id),pilotRestaurant(business.id)])'));assert(catalogPage.includes('cache(publicCatalog)'));
  assert(fs.readFileSync('lib/airtable-directory.ts','utf8').includes("typeof cache==='function'?cache(readDirectoryBusinesses):readDirectoryBusinesses"));
  console.log(JSON.stringify({passed:true,originalBytes:original.length,thumbnailBytes:thumb.length,width:metadata.width,authorizationBefore304:true,noSharedCdnCache:true,versionReplacement:true,pendingDeduplicated:true,expiryAndEviction:true,originalPreserved:true,isolatedData:true}));
 }
