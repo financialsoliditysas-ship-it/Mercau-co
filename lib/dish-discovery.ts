@@ -42,24 +42,22 @@ export async function discoverDishes({ municipality, query = '', section = '', c
     if (!result.data || result.data.length < 1000) break;
   }
   if (page.offset >= eligible.length) throw new Error('Página inválida.');
-  // One dish per restaurant per round: a large menu cannot occupy the whole first page.
-  const batch = eligible.slice(page.offset, page.offset + 12);
-  const products = await Promise.all(batch.map(async (business): Promise<DiscoveredDish | null> => {
+  // Two products per restaurant, up to eight per page; interleave them to balance exposure.
+  const batch = eligible.slice(page.offset, page.offset + 4);
+  const products = await Promise.all(batch.map(async (business): Promise<DiscoveredDish[]> => {
     let request = db.from('business_catalog_products').select('id,name,section,price,image_path,version,option_groups', { count: 'exact' })
       .eq('business_id', business.id).eq('status', 'published').eq('available', true).gt('price', 0);
     if (section) request = section === 'Otros' ? request.in('section', ['Otros', '']) : request.eq('section', section);
     if (query && !normalize(business.name).includes(normalize(query))) request = request.ilike('name', `%${query.replace(/[\\%_]/g, '\\$&')}%`);
-    const result = await request.order('position').order('id').range(page.round, page.round);
+    const result = await request.order('position').order('id').range(page.round, page.round + 1);
     if (result.error) throw new Error('No se pudieron consultar los platos.');
-    if ((result.count || 0) > page.round + 1) page.more = true;
-    const row = result.data?.[0];
-    if (!row) return null;
-    return { id: row.id, name: row.name, section: row.section || 'Otros', ...dishStartingPrice(row.price, row.option_groups),
+    if ((result.count || 0) > page.round + 2) page.more = true;
+    return (result.data || []).map(row=>({ id: row.id, name: row.name, section: row.section || 'Otros', ...dishStartingPrice(row.price, row.option_groups),
       image: row.image_path ? `/api/negocios/${business.id}/catalogo/${row.id}/foto?v=${row.version}` : undefined,
-      restaurantId: business.id, restaurantName: business.name, menuPath: businessCatalogPath(business), businessPath: businessPath(business) } satisfies DiscoveredDish;
+      restaurantId: business.id, restaurantName: business.name, menuPath: businessCatalogPath(business), businessPath: businessPath(business) } satisfies DiscoveredDish));
   }));
   const offset = page.offset + batch.length;
-  const next = offset < eligible.length ? { ...page, offset } : page.more ? { ...page, offset: 0, round: page.round + 1, more: false } : null;
-  return { products: products.filter((product): product is DiscoveredDish => product !== null),
+  const next = offset < eligible.length ? { ...page, offset } : page.more ? { ...page, offset: 0, round: page.round + 2, more: false } : null;
+  return { products: [0,1].flatMap(index=>products.flatMap(items=>items[index]?[items[index]]:[])),
     categories: [...categories].sort((a, b) => a.localeCompare(b, 'es')), nextCursor: next ? Buffer.from(JSON.stringify(next)).toString('base64url') : null };
 }

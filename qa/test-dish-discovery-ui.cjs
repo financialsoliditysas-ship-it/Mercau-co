@@ -23,7 +23,7 @@ async function main(){
    await shot('01-platos');await shot('01-platos-completa',true);
    await page.getByRole('button',{name:'Restaurantes',exact:true}).click();await page.getByRole('heading',{name:'Elige un negocio'}).waitFor();
    await page.goBack();await page.locator('.dish-card').first().waitFor();assert(!new URL(page.url()).searchParams.has('vista'));
-   await page.goForward();await page.getByRole('heading',{name:'Elige un negocio'}).waitFor();await page.getByRole('button',{name:'Platos',exact:true}).click();await page.locator('.dish-card').first().waitFor();
+   await page.goForward();await page.getByRole('heading',{name:'Elige un negocio'}).waitFor();await page.getByRole('button',{name:'Productos',exact:true}).click();await page.locator('.dish-card').first().waitFor();
    await page.getByRole('button',{name:`Personalizar ${firstProduct.name} de ${first.name}`,exact:true}).click();
    const editor=page.getByRole('dialog',{name:firstProduct.name,exact:true});await editor.waitFor();
    assert.equal((await editor.locator('.dish-product-restaurant').innerText()).replace(/\s+/g,' '),`${first.name} · Ver menú`);
@@ -65,11 +65,20 @@ async function main(){
    await page.locator('.pilot-cart-line .pilot-quantity button').last().click();assert.equal(JSON.parse(await page.evaluate(id=>sessionStorage.getItem(`mercau:catalog-cart:${id}:v1`),second.id))[0].quantity,2);
    await page.locator('.pilot-cart-line .pilot-quantity button').first().click();await page.locator('.pilot-cart-line .pilot-quantity button').first().click();assert.equal(await page.evaluate(id=>sessionStorage.getItem(`mercau:catalog-cart:${id}:v1`),second.id),null);
    await page.getByRole('button',{name:'Volver a explorar',exact:true}).click();await page.locator('.dish-card').first().waitFor();
-   await page.getByRole('textbox',{name:'Busca un plato o restaurante'}).fill('imposible-no-existe');await page.getByRole('button',{name:'Buscar platos y restaurantes'}).click();await page.getByRole('heading',{name:'No encontramos platos disponibles'}).waitFor();
+   await page.getByRole('textbox',{name:'Busca un producto o restaurante'}).fill('imposible-no-existe');await page.getByRole('button',{name:'Buscar productos y restaurantes'}).click();await page.getByRole('heading',{name:'No encontramos productos disponibles'}).waitFor();
    await page.goBack();await page.locator('.dish-card').first().waitFor();
    const section=fixture.menus[first.id].menu[0].category;await page.getByRole('button',{name:section,exact:true}).click();await page.waitForTimeout(250);assert.equal(new URL(page.url()).searchParams.get('platosCategoria'),section);
    await page.reload();await page.waitForTimeout(250);assert.equal(new URL(page.url()).searchParams.get('platosCategoria'),section);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('mercau.buyer.destination.v1')).municipality),'Nechí');
-   await page.getByRole('button',{name:'Todos',exact:true}).click();await page.locator('.dish-card').first().waitFor();const initialCount=await page.locator('.dish-card').count();await page.getByRole('button',{name:'Ver más platos',exact:true}).click();await page.waitForFunction(n=>document.querySelectorAll('.dish-card').length>n,initialCount);
+   await page.getByRole('button',{name:'Todos',exact:true}).click();await page.locator('.dish-card').first().waitFor();await page.waitForFunction(()=>document.querySelectorAll('.dish-card').length>=8);const initialCount=await page.locator('.dish-card').count();
+   assert.equal(await page.getByRole('button',{name:/Ver más (platos|productos)/}).count(),0);
+   await page.locator('.dish-scroll-end').scrollIntoViewIfNeeded();await page.waitForFunction(n=>document.querySelectorAll('.dish-card').length>n,initialCount);
+   const expectedCount=Object.values(fixture.menus).reduce((sum,menu)=>sum+menu.menu.length,0);
+   for(let round=0;round<30&&await page.locator('.dish-scroll-end').count();round++){
+    const before=await page.locator('.dish-card').count();await page.locator('.dish-scroll-end').scrollIntoViewIfNeeded();
+    await page.waitForFunction(before=>document.querySelectorAll('.dish-card').length>before||!document.querySelector('.dish-scroll-end'),before);
+   }
+   assert.equal(await page.locator('.dish-card').count(),expectedCount,'All eligible products reachable by scrolling');
+   assert.equal(new Set(await page.locator('.dish-card-open').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('aria-label')))).size,expectedCount,'No duplicated products after automatic pagination');
    assert.equal(writes,0);assert.deepEqual(errors,[]);results.push({width,passed:true,realPublicSnapshot:true,isolatedAdapter:true,physicalDevice:false,operationalWrites:writes});await context.close();
   }
   const regression=await browser.newContext({viewport:{width:390,height:900},serviceWorkers:'block'}),regressionPage=await regression.newPage();let failOnce=true;

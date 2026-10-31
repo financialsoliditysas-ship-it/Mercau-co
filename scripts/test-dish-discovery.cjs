@@ -16,12 +16,13 @@ const db={from(table){const filters=[],sort=[];let start=0,end=Infinity,columns=
 const discover=load('lib/dish-discovery.ts',{'./airtable-directory':{loadDirectoryBusinesses:async()=>directory},'./supabase-admin':{getSupabaseAdminClient:()=>db},'./catalog-validation':validation,'./dish-pricing':pricing,'./business-public-url':{businessCatalogPath:b=>`/negocios/${b.id}/catalogo`,businessPath:b=>`/negocios/${b.id}`}});
 function storage(entries){const map=new Map(entries);return{get length(){return map.size;},key:i=>[...map.keys()][i]||null,getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};}
 (async()=>{
- let result=await discover.discoverDishes({municipality:'Nechí'});assert.equal(result.products.length,12);assert.equal(new Set(result.products.map(p=>p.restaurantId)).size,12);
+ let result=await discover.discoverDishes({municipality:'Nechí'});assert.equal(result.products.length,8);assert.equal(new Set(result.products.map(p=>p.restaurantId)).size,4);
+ assert.equal(new Set(result.products.slice(0,4).map(p=>p.restaurantId)).size,4,'Interleave first products before second products');
  assert.deepEqual(result.categories,['Asados','Sopas']);assert(result.nextCursor);assert(!JSON.stringify(result).includes('private/path'));assert(!JSON.stringify(result).includes('option_groups'));
  const all=[...result.products];while(result.nextCursor){result=await discover.discoverDishes({municipality:'Nechí',cursor:result.nextCursor});all.push(...result.products);}
  assert.equal(all.length,32);assert.equal(new Set(all.map(p=>p.id)).size,32);assert(!all.some(p=>[90,91,92,93].map(id).includes(p.restaurantId)));
- assert(calls.filter(c=>c.table==='business_catalog_products'&&c.columns!=='section').every(c=>c.end===c.start),'Read one product per restaurant, not full menus');
- const again=await discover.discoverDishes({municipality:'Nechí'});assert.deepEqual(again.products,all.slice(0,12));
+ assert(calls.filter(c=>c.table==='business_catalog_products'&&c.columns!=='section').every(c=>c.end===c.start+1),'Read two products per restaurant, not full menus');
+ const again=await discover.discoverDishes({municipality:'Nechí'});assert.deepEqual(again.products,all.slice(0,8));
  assert((await discover.discoverDishes({municipality:'Nechí',query:'Restaurante 1'})).products.some(p=>p.restaurantId===id(1)));
  assert((await discover.discoverDishes({municipality:'Nechí',query:'Sopa',section:'Sopas'})).products.every(p=>p.name==='Sopa'));
  assert.equal((await discover.discoverDishes({municipality:'Nechí',query:'inexistente'})).products.length,0);

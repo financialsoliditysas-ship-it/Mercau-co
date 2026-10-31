@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, CheckCircle2, Plus, Search, ShoppingCart, Store, X } from 'lucide-react';
@@ -28,6 +28,7 @@ export default function RestaurantDishes({ municipality, businesses, onQuery, ch
   const [switching, setSwitching] = useState<{ names: string; next: string } | null>(null), [cartMessage, setCartMessage] = useState('');
   const decision = useRef<((accepted: boolean) => void) | null>(null), switchDialog = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null), request = useRef(0), loadMoreBusy = useRef(false);
+  const endRef = useRef<HTMLDivElement>(null);
   const activeBusiness = businesses.find(b => b.id === restaurantId && !b.pilotRestaurant && isFoodBusiness(b.category));
   const base = '/comprar/restaurantes';
   function navigate(changes: Record<string, string | null>, replace = false) {
@@ -57,11 +58,11 @@ export default function RestaurantDishes({ municipality, businesses, onQuery, ch
     fetch(`/api/comprar/platos?${search}`, { cache: 'no-store', signal: controller.signal }).then(async response => {
       if (!response.ok) throw new Error(); return response.json();
     }).then(data => { if (current === request.current) setPage(data); })
-      .catch(error => { if (error.name !== 'AbortError' && current === request.current) setError('No pudimos cargar los platos. Intenta nuevamente.'); })
+      .catch(error => { if (error.name !== 'AbortError' && current === request.current) setError('No pudimos cargar los productos. Intenta nuevamente.'); })
       .finally(() => { if (current === request.current) setLoading(false); });
     return () => controller.abort();
   }, [municipality, query, category, mode, restaurantId, retry]);
-  async function more() {
+  const more = useCallback(async () => {
     if (!page.nextCursor || loadMoreBusy.current || !municipality) return;
     loadMoreBusy.current = true; const current = request.current; setLoading(true); setError('');
     try {
@@ -69,9 +70,26 @@ export default function RestaurantDishes({ municipality, businesses, onQuery, ch
       const response = await fetch(`/api/comprar/platos?${search}`, { cache: 'no-store' });
       if (!response.ok) throw new Error(); const data: Page = await response.json();
       if (current === request.current) setPage(previous => ({ ...data, products: [...previous.products, ...data.products.filter(item => !previous.products.some(p => p.id === item.id && p.restaurantId === item.restaurantId))] }));
-    } catch { if (current === request.current) setError('No pudimos cargar más platos. Intenta nuevamente.'); }
+    } catch { if (current === request.current) setError('No pudimos cargar más productos. Intenta nuevamente.'); }
     finally { loadMoreBusy.current = false; if (current === request.current) setLoading(false); }
-  }
+  }, [page.nextCursor, municipality, query, category]);
+  useEffect(() => {
+    const target=endRef.current;
+    if(!target || !page.nextCursor || loading || error || restaurantId || mode!=='platos')return;
+    const connection=(navigator as Navigator & {connection?:{saveData?:boolean;effectiveType?:string}}).connection;
+    const limited=connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || '');
+    let timer:ReturnType<typeof setTimeout>|undefined;
+    const schedule=()=>{if(timer===undefined&&document.visibilityState==='visible')timer=setTimeout(()=>{timer=undefined;void more();},limited?800:200);};
+    const margin=limited?0:160;
+    const check=()=>{if(target.getBoundingClientRect().top<=innerHeight+margin)schedule();};
+    if(typeof IntersectionObserver==='undefined') {
+      check();window.addEventListener('scroll',check,{passive:true});window.addEventListener('resize',check);
+      return()=>{clearTimeout(timer);window.removeEventListener('scroll',check);window.removeEventListener('resize',check);};
+    }
+    const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting))schedule();else{clearTimeout(timer);timer=undefined;}},{rootMargin:`${margin}px 0px`});
+    observer.observe(target);document.addEventListener('visibilitychange',check);
+    return()=>{observer.disconnect();clearTimeout(timer);document.removeEventListener('visibilitychange',check);};
+  },[page.nextCursor,loading,error,restaurantId,mode,more]);
   function respond(accepted: boolean) { decision.current?.(accepted); decision.current = null; setSwitching(null); }
   async function beforeAdd() {
     if (!activeBusiness) return false;
@@ -96,7 +114,7 @@ export default function RestaurantDishes({ municipality, businesses, onQuery, ch
     trackPublicMetric('directory_filter_used', { notes: `discovery=${value}` });
   }
   const returnToDiscovery = () => navigate({ restaurante: null, plato: null });
-  return <section className={`restaurant-discovery${restaurantId ? ' dish-menu-open' : ''}`} aria-label="Descubrir restaurantes y platos">
+  return <section className={`restaurant-discovery${restaurantId ? ' dish-menu-open' : ''}`} aria-label="Descubrir restaurantes y productos">
     {restaurantId ? <>
       <button className="dish-back" onClick={returnToDiscovery}><ArrowLeft size={20}/>Volver a explorar</button>
       {activeBusiness ? <>
@@ -110,23 +128,23 @@ export default function RestaurantDishes({ municipality, businesses, onQuery, ch
     </> : <>
       <div className="buyer-title"><Link href="/comprar" aria-label="Volver al inicio"><ArrowLeft size={23}/></Link><h1>¿Qué se te <span>antoja</span>?</h1></div>
       <form className="buyer-search dish-search" role="search" onSubmit={event => { event.preventDefault(); searchRef.current?.blur(); navigate({ q: input.trim() || null }); }}>
-        <Search size={20}/><input ref={searchRef} aria-label="Busca un plato o restaurante" placeholder="Busca un plato o restaurante" value={input} onChange={event => setInput(event.target.value)} enterKeyHint="search"/>
-        {input && <button type="button" aria-label="Borrar búsqueda" onClick={() => { setInput(''); navigate({ q: null }); }}><X size={19}/></button>}<button aria-label="Buscar platos y restaurantes"><ArrowRight size={22}/></button>
+        <Search size={20}/><input ref={searchRef} aria-label="Busca un producto o restaurante" placeholder="Busca un producto o restaurante" value={input} onChange={event => setInput(event.target.value)} enterKeyHint="search"/>
+        {input && <button type="button" aria-label="Borrar búsqueda" onClick={() => { setInput(''); navigate({ q: null }); }}><X size={19}/></button>}<button aria-label="Buscar productos y restaurantes"><ArrowRight size={22}/></button>
       </form>
-      <div className="dish-tabs" role="group" aria-label="Descubrir por"><button aria-pressed={mode === 'platos'} onClick={() => changeMode('platos')}>Platos</button><button aria-pressed={mode === 'restaurantes'} onClick={() => changeMode('restaurantes')}>Restaurantes</button></div>
+      <div className="dish-tabs" role="group" aria-label="Descubrir por"><button aria-pressed={mode === 'platos'} onClick={() => changeMode('platos')}>Productos</button><button aria-pressed={mode === 'restaurantes'} onClick={() => changeMode('restaurantes')}>Restaurantes</button></div>
       {mode === 'restaurantes' ? children : <>
-        <nav className="dish-filters" aria-label="Categorías de platos"><button aria-pressed={!category} onClick={() => navigate({ platosCategoria: null })}>Todos</button>{page.categories.map(name => <button key={name} aria-pressed={category === name} onClick={() => navigate({ platosCategoria: name })}>{name}</button>)}</nav>
-        {!municipality && <p className="dish-empty">Elige un municipio arriba para descubrir sus platos.</p>}
+        <nav className="dish-filters" aria-label="Categorías de productos"><button aria-pressed={!category} onClick={() => navigate({ platosCategoria: null })}>Todos</button>{page.categories.map(name => <button key={name} aria-pressed={category === name} onClick={() => navigate({ platosCategoria: name })}>{name}</button>)}</nav>
+        {!municipality && <p className="dish-empty">Elige un municipio arriba para descubrir sus productos.</p>}
         {error && <div className="dish-error" role="alert"><p>{error}</p><button onClick={() => page.products.length ? void more() : setRetry(value => value + 1)}>Intentar nuevamente</button></div>}
-        {!loading && !error && municipality && !page.products.length && <div className="dish-empty"><Store size={30}/><h2>No encontramos platos disponibles</h2><p>Prueba otra búsqueda o consulta los restaurantes.</p><button onClick={() => changeMode('restaurantes')}>Explorar restaurantes</button></div>}
+        {!loading && !error && municipality && !page.products.length && !page.nextCursor && <div className="dish-empty"><Store size={30}/><h2>No encontramos productos disponibles</h2><p>Prueba otra búsqueda o consulta los restaurantes.</p><button onClick={() => changeMode('restaurantes')}>Explorar restaurantes</button></div>}
         <div className="dish-grid">{page.products.map((dish, index) => <article className="dish-card" key={`${dish.restaurantId}:${dish.id}`}>
           <button className="dish-card-open" aria-label={`Personalizar ${dish.name} de ${dish.restaurantName}`} onClick={() => {
             navigate({ restaurante: dish.restaurantId, plato: dish.id });
             trackPublicMetric('Producto visto', { businessId: dish.restaurantId, businessName: dish.restaurantName, notes: `discovery=platos; product_id=${dish.id}` });
           }}><div className="dish-photo"><CatalogProductImage name={dish.name} imageUrl={dish.image} priority={index < 2} sizes="(max-width: 639px) 50vw, (max-width: 999px) 33vw, 240px"/></div><div className="dish-card-body"><h2>{dish.name}</h2><strong>{dish.from && <small>Desde </small>}{money(dish.price)}</strong><span><Store size={13}/>{dish.restaurantName}</span><i aria-hidden="true"><Plus size={21}/></i></div></button>
         </article>)}</div>
-        {loading && <p className="dish-loading" role="status">Buscando platos…</p>}
-        {page.nextCursor && <button className="dish-load-more" disabled={loading} onClick={() => void more()}>Ver más platos</button>}
+        {loading && <p className="dish-loading" role="status">Cargando productos…</p>}
+        {page.nextCursor && <div ref={endRef} className="dish-scroll-end" aria-hidden="true" style={{height:2}}/>}
       </>}
       {cart && <Link className="dish-resume-cart" href={base + '?' + new URLSearchParams({ restaurante: cart.restaurantId })}><ShoppingCart size={20}/>Ver pedido en {cart.restaurantName}<ArrowRight size={18}/></Link>}
     </>}

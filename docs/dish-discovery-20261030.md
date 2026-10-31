@@ -1,5 +1,20 @@
 # Descubrir platos antes del restaurante
 
+## Ajuste local posterior: Productos y desplazamiento continuo
+
+Pendiente de publicacion: etiquetas visibles `Productos`, busqueda y mensajes coherentes.
+Se conservan las URL, parametros y valores internos de analitica para no romper enlaces.
+Cada pagina trae hasta ocho productos de hasta cuatro restaurantes (dos por restaurante,
+intercalados). La siguiente se solicita automaticamente cerca del final visible, no toda
+la oferta al abrir. Miniaturas y carga diferida de imagenes conservadas.
+Si el navegador indica ahorro de datos o 2G, no se anticipa el bloque fuera del viewport
+y se aumenta la pausa entre bloques. No se ha medido ahorro monetario o de datos real.
+Sin boton repetitivo: solo aparece reintento si falla una carga. Se conserva fallback de
+scroll en navegadores sin IntersectionObserver y se serializan las consultas adicionales.
+Pruebas del ajuste: suite, lint, build, TypeScript y prueba aislada de recorrido por scroll;
+no se generan pedidos, notificaciones ni despachos. El cierre de publicacion inferior es
+historico y corresponde al corte anterior.
+
 Estado: publicado el 2026-10-30 con autorizacion expresa posterior a la aprobacion visual.
 La documentacion inferior conserva el alcance y las pruebas del candidato local.
 Rama: `feat/dish-discovery-20261030`, parte del corte publicado `f32f070`.
