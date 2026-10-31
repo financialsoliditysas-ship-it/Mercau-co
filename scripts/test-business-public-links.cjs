@@ -13,6 +13,17 @@ function load(file, mocks = {}) {
   }).outputText, file + '.cjs');
   return mod.exports;
 }
+const ShareActions = load('components/CatalogShareActions.tsx').default;
+for (const [noun, invitation] of [
+  ['Menú', '¿Qué se te antoja hoy? Mira el menú de Negocio prueba y haz tu pedido por Mercáu'],
+  ['Catálogo', 'Encuentra lo que necesitas en Negocio prueba. Explora su catálogo y haz tu pedido por Mercáu']
+]) {
+  const url = 'https://www.mercau.co/negocios/recGLMhJYXTRE46st/catalogo';
+  const html = renderToStaticMarkup(React.createElement(ShareActions, { businessName: 'Negocio prueba', catalogUrl: url, noun }));
+  const href = html.match(/href="(https:\/\/wa.me\/[^\"]+)"/)[1];
+  const message = new URL(href).searchParams.get('text');
+  assert.equal(message, `${invitation}\n\nDomicilios en la cabecera urbana de Nechí. Consulta disponibilidad y horario en el ${noun.toLocaleLowerCase('es-CO')}.\n${url}`);
+}
 const urls = load('lib/business-public-url.ts');
 const business = {
   id: 'recGLMhJYXTRE46st', name: 'Financial Solidity sas', publicSlug: 'financial-solidity-sas',

@@ -6,7 +6,10 @@ import { Check, Copy, Share2 } from "lucide-react";
 export default function CatalogShareActions({ businessName, catalogUrl, noun = "Menú" }: { businessName: string; catalogUrl: string; noun?: "Menú" | "Catálogo" }) {
   const [copied, setCopied] = useState(false);
   const lowerNoun = noun.toLocaleLowerCase("es-CO");
-  const text = `Conoce el ${lowerNoun} de ${businessName} en Mercáu${noun === "Menú" ? " y haz tu pedido" : ""}:`;
+  const invitation = noun === "Menú"
+    ? `¿Qué se te antoja hoy? Mira el menú de ${businessName} y haz tu pedido por Mercáu`
+    : `Encuentra lo que necesitas en ${businessName}. Explora su catálogo y haz tu pedido por Mercáu`;
+  const text = `${invitation}\n\nDomicilios en la cabecera urbana de Nechí. Consulta disponibilidad y horario en el ${lowerNoun}.`;
 
   async function copy() {
     await navigator.clipboard.writeText(catalogUrl);
