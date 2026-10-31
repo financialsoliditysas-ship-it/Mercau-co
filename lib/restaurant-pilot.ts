@@ -145,7 +145,7 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
   if (!restaurant.enabled) throw new PilotError('La prueba no esta recibiendo pedidos.', 503);
   const input = validatePilotOrder(body, restaurant.menu);
   const repeatOf = typeof body.repeatOf === 'string' ? body.repeatOf : '';
-  if(repeatOf && (!/^PRB-\d+$/.test(repeatOf) || body.repeatConfirmed!==true))throw new PilotError('Confirma explícitamente la compra adicional.');
+  if(repeatOf && (!/^(?:PRB-\d+|MCU-1-\d{6})$/.test(repeatOf) || body.repeatConfirmed!==true))throw new PilotError('Confirma explícitamente la compra adicional.');
   const { data, error } = await db.rpc('create_food_order_once_v3', {
     p_scope: `food:${userId}:${restaurantId}`, p_key: input.request_key,
     p_payload: { ...input, restaurant_id: restaurantId, customer_id: userId,
@@ -171,7 +171,7 @@ export async function listPilotOrders(userId: string, manager: boolean, restaura
     .eq('restaurant_id', restaurantId).order('created_at', { ascending: false }).limit(50);
   if (!manager) query = query.eq('customer_id', userId);
   if(publicId){
-    if(!/^PRB-\d+$/.test(publicId))throw new PilotError('Referencia de pedido inválida.');
+    if(!/^(?:PRB-\d+|MCU-1-\d{6})$/.test(publicId))throw new PilotError('Referencia de pedido inválida.');
     query=query.eq('public_id',publicId);
   }
   const { data, error } = await query;

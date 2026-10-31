@@ -5,7 +5,7 @@ import { sendCustomerChangePush } from './customer-push';
 
 export async function changeOrder(userId:string,body:Record<string,unknown>) {
   if(!orderChangesEnabled())throw new PilotError('Esta opción todavía no está habilitada.',404);
-  if(typeof body.publicId!=='string'||!/^PRB-\d+$/.test(body.publicId))throw new PilotError('Pedido inválido.');
+  if(typeof body.publicId!=='string'||!/^(?:PRB-\d+|MCU-1-\d{6})$/.test(body.publicId))throw new PilotError('Pedido inválido.');
   const db=getSupabaseAdminClient();
   const target=await db.from('pilot_food_orders').select('*').eq('public_id',body.publicId).maybeSingle();
   if(target.error)throw new PilotError('No se pudo consultar el pedido.',503);

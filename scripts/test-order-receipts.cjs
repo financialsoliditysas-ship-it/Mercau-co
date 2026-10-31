@@ -27,6 +27,10 @@ async function database(){
    delivery_latitude:null,delivery_longitude:null,delivery_location_accuracy_m:null,delivery_location_captured_at:null};
   const createFood=(k,p=food,scope='food:'+uid+':qa')=>pg.query('select create_food_order_once_v3($1,$2,$3::jsonb) as result',[scope,k,JSON.stringify(p)]);
   const first=(await createFood(key)).rows[0].result;assert.equal(first.outcome,'created');
+  assert.match(first.public_id,/^PRB-/);
+  const seriesSql=fs.readFileSync('supabase/order_reference_series.sql','utf8');
+  await pg.exec(seriesSql);await pg.exec(seriesSql);
+  assert.equal((await pg.query('select public_id from pilot_food_orders')).rows[0].public_id,first.public_id,'Existing references must remain unchanged');
   const replay=(await createFood(key,{...food,lines:[{...food.lines[0],lineId:'33333333-3333-4333-8333-333333333333'}]})).rows[0].result;
   assert.equal(replay.outcome,'existing');assert.equal(replay.public_id,first.public_id);
   const conflict=(await createFood(key,{...food,address:'Otra dirección'})).rows[0].result;assert.equal(conflict.outcome,'conflict');
@@ -58,6 +62,7 @@ async function database(){
   const duplicate=await foodResult(food);assert.equal(duplicate.outcome,'duplicate');assert.equal(duplicate.previous_public_id,first.public_id);
   const repeatKey=uuid(), repeat=await foodResult({...food,_repeat_of:first.public_id},repeatKey);
   assert.equal(repeat.outcome,'created');assert.notEqual(repeat.public_id,first.public_id);
+  assert.equal(repeat.public_id,'MCU-1-000001');
   assert.equal((await foodResult(food,repeatKey)).public_id,repeat.public_id,'Repeating the confirmed second request must return the second order');
   assert.equal((await foodResult({...food,_repeat_of:first.public_id})).outcome,'duplicate','A stale confirmation cannot create a third order');
   assert.equal((await pg.query('select repeat_of_public_id from order_creation_receipts where request_key=$1',[repeatKey])).rows[0].repeat_of_public_id,first.public_id);
@@ -161,6 +166,8 @@ async function foodService(){
  const before=queries;await assert.rejects(()=>api.createPilotOrder(uid,{...body,repeatOf:'PRB-000001'},business),error=>error.status===400);assert.equal(queries,before,'No confirmation must not reach the creation RPC');
  outcome='created';await api.createPilotOrder(uid,{...body,repeatOf:'PRB-000001',repeatConfirmed:true},business);assert.equal(captured.p_payload._repeat_of,'PRB-000001');assert.equal(pushes,2);
  await api.lookupPilotOrderIntent(uid,key,business);assert.equal(captured.p_scope,`food:${uid}:${business}`);assert.equal(pushes,2);
+ await assert.rejects(()=>api.createPilotOrder(uid,{...body,repeatOf:'MCU-1-000001'},business),error=>error.status===400);
+ await api.createPilotOrder(uid,{...body,repeatOf:'MCU-1-000001',repeatConfirmed:true},business);assert.equal(captured.p_payload._repeat_of,'MCU-1-000001');
  console.log('PASS actual food service: server prices/identity retained, exact duplicate message, explicit-repeat gate, one push per creation, none on replay/duplicate/uncertainty/lookup. Database and push simulated.');
 }
 (async()=>{await database();await matching();await foodService();})().catch(error=>{console.error(error);process.exitCode=1;});

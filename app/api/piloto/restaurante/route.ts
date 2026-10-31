@@ -48,7 +48,7 @@ export async function PATCH(request: Request) {
     const user = await userFor(request);
     const body = await request.json();
     if (body?.action === 'report_payment') {
-      if (typeof body.publicId !== 'string' || !/^PRB-\d{6}$/.test(body.publicId)) throw new PilotError('Pedido inválido.');
+      if (typeof body.publicId !== 'string' || !/^(?:PRB-\d{6}|MCU-1-\d{6})$/.test(body.publicId)) throw new PilotError('Pedido inválido.');
       return NextResponse.json(await reportPilotPayment(user.id, body.publicId, body.reference, restaurantId(request)));
     }
     if (!body || typeof body.id !== 'string' || !/^[a-f0-9-]{36}$/i.test(body.id) ||

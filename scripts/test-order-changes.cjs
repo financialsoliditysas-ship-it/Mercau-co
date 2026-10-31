@@ -92,9 +92,10 @@ async function push(){
  events.push({data:{json:()=>({orderId:'PRB-FAKE'})},waitUntil:p=>completed=p});await completed;assert.equal(messages[1].type,'MERCAU_NEW_ORDER_PUSH');assert.equal(notifications.length,2);
  console.log('PASS customer push: own user targeting, private payload, endpoint restrictions and separate worker event. No external push sent.');
 }
-async function service(){
+async function service(publicId='PRB-000001'){
  const product={id:'new',name:'Alternativa',price:15000,image:'',category:'QA',optionGroups:[{id:'44444444-4444-4444-8444-444444444444',name:'Adicion',required:true,type:'single',minSelections:1,maxSelections:1,choices:[{id:'55555555-5555-4555-8555-555555555555',name:'Extra',priceDelta:2000}]}]};
  const row={id:'fake',public_id:'PRB-000001',restaurant_id:'qa',customer_id:buyer,customer_name:'Privado',customer_phone:'3000000000',address:'Ficticia',neighborhood:'Ficticia',payment_method:'CASH',subtotal:20000,lines:[{lineId:'66666666-6666-4666-8666-666666666666',productId:'old',name:'Original',quantity:2,unitPrice:10000}]};
+ row.public_id=publicId;
  let rpc=0,notices=0,captured,replayed=false,enabled=true,proposalMatches=true;
  const db={from(name){return{select(){return this;},eq(k,v){if(k==='order_id')assert.equal(v,row.id);return this;},maybeSingle:async()=>({data:name==='pilot_food_orders'?row:proposalMatches?{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}:null,error:null})};},async rpc(name,args){rpc++;captured=args;return {data:name==='propose_food_change_v1'?{id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',replayed}:{ok:true,replayed:false},error:null};}};
  const validation=load('lib/catalog-validation.ts');
@@ -113,4 +114,4 @@ async function service(){
  assert.equal((await route.POST(new Request('http://localhost/api/pedidos/cambios',{method:'POST',body:'{}'}))).status,401);assert.equal(invoked,0);
  console.log('PASS change service: manager/owner isolation, server catalog prices/options, no repeated push, proposal ownership, disabled feature and unauthenticated route.');
 }
-database().then(push).then(service).catch(error=>{console.error(error);process.exitCode=1;});
+database().then(push).then(()=>service()).then(()=>service('MCU-1-000001')).catch(error=>{console.error(error);process.exitCode=1;});
