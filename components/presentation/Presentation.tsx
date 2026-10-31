@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check, ChevronRight, Compass, House, MapPin, Menu, MoreVertical, Plus, ReceiptText, Search, Smartphone, SquareArrowUp, UserRound, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronRight, Compass, Download, House, MapPin, Menu, MoreVertical, Plus, ReceiptText, Search, Smartphone, SquareArrowUp, UserRound, X } from 'lucide-react';
 import InstallMercau from '@/components/InstallMercau';
 import { businessCatalogPath, businessPath } from '@/lib/business-public-url';
 import { commercialLabel, type BuyerBusiness } from '@/lib/buyer-commercial';
@@ -65,7 +65,7 @@ export default function Presentation() {
     </header>
 
     <div id="presentacion-contenido">
-      <section className="p-hero" aria-labelledby="p-title"><div className="p-wrap p-hero-inner"><picture><source media="(max-width: 430px)" srcSet="/presentation/hero-mobile.webp" /><img className="p-hero-art" src="/presentation/hero.webp" alt="Hamburguesa y mercado de alimentos, imagen ilustrativa" width="1440" height="960" fetchPriority="high" /></picture><PhonePreview /><div className="p-hero-copy"><h1 id="p-title"><span>Pide comida y compra</span> en los negocios de tu municipio.</h1><p>Explora restaurantes, menús y catálogos.<br className="p-desktop-break" /> Encuentra lo que necesitas y consulta tu pedido.</p><div className="p-hero-actions"><Link className="p-button" href="/comprar">Ver qué puedo pedir <ArrowRight size={19} /></Link><Link className="p-install-link" href="#instalar">Instalar Mercáu</Link></div><small>Explora sin cuenta. Inicia sesión para pedir.</small></div></div></section>
+      <section className="p-hero" aria-labelledby="p-title"><div className="p-wrap p-hero-inner"><picture><source media="(max-width: 430px)" srcSet="/presentation/hero-mobile.webp" /><img className="p-hero-art" src="/presentation/hero.webp" alt="Hamburguesa y mercado de alimentos, imagen ilustrativa" width="1440" height="960" fetchPriority="high" /></picture><PhonePreview /><div className="p-hero-copy"><h1 id="p-title"><span>Pide comida y compra</span> en los negocios de tu municipio.</h1><p>Explora restaurantes, menús y catálogos.<br className="p-desktop-break" /> Encuentra lo que necesitas y consulta tu pedido.</p><div className="p-hero-actions"><Link className="p-button" href="/comprar">Ver qué puedo pedir <ArrowRight size={19} /></Link><Link className="p-install-link p-install-app" href="#instalar"><Download size={18} aria-hidden="true" />{platform === 'ios' ? 'Cómo instalar la app' : 'Instalar la app de Mercáu'}</Link></div><small>Explora sin cuenta. Inicia sesión para pedir.</small></div></div></section>
 
       <section className="p-wrap p-categories" aria-label="Restaurantes y comercios">{[
         { name: 'Restaurantes', text: 'Descubre menús de tus lugares favoritos.', action: 'Ver menús', href: '/comprar/restaurantes', kind: 'food' },
