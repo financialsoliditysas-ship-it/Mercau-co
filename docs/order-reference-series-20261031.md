@@ -5,8 +5,28 @@
 Nuevos pedidos: `MCU-1-000001`, `MCU-1-000002`, etc. Secuencia global de
 `pilot_food_orders`, incluidos pedidos del restaurante de demostracion.
 No modifica referencias existentes, UUID, importes, clientes, permisos de pedidos,
-idempotencia, propuestas de cambio ni transiciones. Los envios conservan su
-serie independiente `MCU-000001` y su vinculacion existente con Shipday.
+idempotencia, propuestas de cambio ni estados.
+
+## Referencia compartida con Shipday
+
+Tras `food_delivery_reference.sql`, el despacho de un pedido MCU-1 nuevo usa
+su misma referencia como `delivery_orders.public_id`. El proveedor existente
+envia ese valor en `orderNumber`; webhook y conciliacion siguen consultando
+esa misma columna. No se modifica el payload del proveedor ni se reenvia nada.
+Pedidos antiguos PRB y solicitudes de envio independientes conservan MCU-000001.
+Envios ya creados no se renumeran. El seguimiento admite ambos formatos y
+conserva la comprobacion de propiedad.
+
+Publicar primero el seguimiento compatible, despues aplicar la migracion.
+La migracion modifica solo dos fragmentos conocidos de la funcion vigente y
+se detiene si no encuentra el contrato esperado. No cambia sus permisos,
+reclamacion de despacho, bloqueo por fila ni validaciones operativas.
+Las pruebas aisladas verifican referencia compartida, repeticion de ready
+sin segundo envio, historial preservado y payload Shipday simulado.
+
+Reversion de referencia compartida: restaurar en la funcion solamente la lista
+de columnas sin `public_id` y su valor explicito, preservando pedidos y envios
+existentes; mantener el seguimiento compatible con MCU-1.
 
 La secuencia PostgreSQL puede tener saltos por transacciones abortadas; no es
 numeracion fiscal ni una promesa de consecutivos sin huecos.

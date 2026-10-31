@@ -100,6 +100,8 @@ class AccountError extends Error { constructor(message, status) { super(message)
     await new ShipdayProvider().createOrder(baseOrder);
     assert.equal(payload.pickupLatitude,8.1);assert.equal(payload.deliveryLatitude,8.09);
     assert.equal(payload.deliveryLongitude,-74.78);
+    await new ShipdayProvider().createOrder({...baseOrder,public_id:'MCU-1-000001'});
+    assert.equal(payload.orderNumber,'MCU-1-000001','Shipday receives the exact food order reference');
     await new ShipdayProvider().createOrder({...baseOrder,pickup_latitude:null,pickup_longitude:null,delivery_latitude:null,delivery_longitude:null});
     assert(!('deliveryLatitude' in payload));assert(!('pickupLatitude' in payload));
   } finally {global.fetch=realFetch;if(oldApiKey===undefined)delete process.env.SHIPDAY_API_KEY;else process.env.SHIPDAY_API_KEY=oldApiKey;}

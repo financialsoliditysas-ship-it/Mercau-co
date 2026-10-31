@@ -9,6 +9,7 @@ for(const [index,source] of ['supabase/drafts/logistics_controls_v2.sql','supaba
 }
 for(const [file,expected]of Object.entries(contract.sha256)){
  let bytes=fs.readFileSync(file);
+ if(file==='lib/delivery-tracking.ts')bytes=Buffer.from(bytes.toString('utf8').replace('/^(?:MCU-\\d{6,}|MCU-1-\\d{6})$/','/^MCU-\\d{6,}$/'));
  // Only the authorized reference-format alternatives differ from the operational hashes.
  if(['lib/restaurant-pilot.ts','lib/order-changes.ts','app/api/piloto/restaurante/route.ts'].includes(file)){
   let source=bytes.toString('utf8');
@@ -49,5 +50,6 @@ function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mo
  const db={from(name){let allowed=true;return{select(){return this;},eq(key,value){allowed=allowed&&row[key]===value;return this;},async maybeSingle(){return {data:name==='delivery_orders'&&allowed?row:null,error:null};}};}};
  const tracking=load('lib/delivery-tracking.ts',{'./account-server':{AccountError},'./supabase-admin':{getSupabaseAdminClient:()=>db},'./account-model':{deliveryLabels:{assigned:'Mensajero asignado'}}});
  const own=await tracking.authorizedDeliveryTracking('owner','MCU-000001');assert(!JSON.stringify(own).includes('PRIVATE'));await assert.rejects(()=>tracking.authorizedDeliveryTracking('other','MCU-000001'),error=>error.status===404);
+ row.public_id='MCU-1-000001';assert.equal((await tracking.authorizedDeliveryTracking('owner',row.public_id)).publicId,row.public_id);await assert.rejects(()=>tracking.authorizedDeliveryTracking('other',row.public_id),error=>error.status===404);
  console.log('PASS preserved payment QR, authentication, manifest and provider payload; explicit order-change projection/worker contract, logistics hashes, webhook and private tracking. Order changes remain local and REQUIRE approved migration/activation. No dispatches executed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

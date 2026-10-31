@@ -16,6 +16,7 @@ async function database(){
     insert into auth.users(id) values('${uid}');`);
   for(const file of ['delivery_orders','restaurant_pilot','business_admins','financial_ledger','breb_payments','pilot_operations_settlements',
    'business_order_configuration','business_order_pricing_correction','account_workspace','shipday_carriers']){
+   if(file==='business_order_configuration')await pg.exec(fs.readFileSync('supabase/restaurant_live_orders.sql','utf8').split('create or replace function')[0]+'commit;');
    try{await pg.exec(fs.readFileSync('supabase/'+file+'.sql','utf8'));}catch(e){throw new Error(file+': '+e.message);}
   }
   await pg.exec(fs.readFileSync('supabase/drafts/logistics_controls_v2.sql','utf8'));
@@ -112,6 +113,17 @@ async function database(){
   await pg.query("insert into pilot_restaurants(id,name,enabled) values('qa-other','Otro negocio ficticio',true)");
   assert.equal((await createFood(uuid(),{...food,restaurant_id:'qa-other'},'food:'+uid+':qa-other')).rows[0].result.outcome,'created');
   console.log('PASS five-minute guard: new request keys, explicit second order and its replay, stale confirmations, quantities, options, notes, expiry, rejected/cancelled exclusion, uncertain dispatch block, private lookups and buyer/business isolation.');
+  const deliveryReferenceSql=fs.readFileSync('supabase/food_delivery_reference.sql','utf8');
+  await pg.exec(deliveryReferenceSql);await pg.exec(deliveryReferenceSql);
+  await pg.query("update pilot_restaurants set pickup_address='Ficticia',pickup_phone='3000000000' where id='qa'");
+  await pg.query("insert into pilot_restaurant_members(restaurant_id,user_id,role) values('qa',$1,'manager')",[uid]);
+  const sameReference=await foodResult({...food,address:'Destino referencia compartida'});
+  const foodId=(await pg.query('select id from pilot_food_orders where public_id=$1',[sameReference.public_id])).rows[0].id;
+  await pg.query("select pilot_food_transition($1,$2,'accepted')",[foodId,uid]);
+  const ready=(await pg.query("select pilot_food_transition($1,$2,'ready') as result",[foodId,uid])).rows[0].result;
+  assert.equal((await pg.query('select public_id from delivery_orders where id=$1',[ready.delivery_id])).rows[0].public_id,sameReference.public_id);
+  assert.equal((await pg.query("select pilot_food_transition($1,$2,'ready') as result",[foodId,uid])).rows[0].result.dispatch,false,'Repeated ready must not duplicate delivery');
+  assert.equal((await pg.query('select public_id from delivery_orders where id=$1',[order.id])).rows[0].public_id,order.public_id,'Existing delivery reference remains unchanged');
   for(const role of ['anon','authenticated']){
    await pg.exec('set role '+role);
    await assert.rejects(()=>createFood(key),/permission denied/);

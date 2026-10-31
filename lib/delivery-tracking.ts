@@ -2,7 +2,7 @@ import { AccountError } from './account-server';
 import { getSupabaseAdminClient } from './supabase-admin';
 import { deliveryLabels } from './account-model';
 export async function authorizedDeliveryTracking(userId: string, publicId: string) {
-  if (!/^MCU-\d{6,}$/.test(publicId)) throw new AccountError('Seguimiento no disponible.', 404);
+  if (!/^(?:MCU-\d{6,}|MCU-1-\d{6})$/.test(publicId)) throw new AccountError('Seguimiento no disponible.', 404);
   const db = getSupabaseAdminClient();
   const result = await db.from('delivery_orders')
     .select('id,public_id,customer_user_id,status,created_at,updated_at')
