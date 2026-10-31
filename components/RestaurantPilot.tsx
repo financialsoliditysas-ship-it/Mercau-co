@@ -7,13 +7,14 @@ import CustomerPushOptIn from './CustomerPushOptIn';
 import { unresolvedChange, type OrderChange } from '@/lib/order-changes-model';
 import OrderReviewPresentation from './buyer/OrderReviewPresentation';
 import './buyer/order-visual.css';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, Store as StoreIcon } from 'lucide-react';
 import './buyer/menu-visual.css';
 import BackToAccount from './BackToAccount';
 import PilotPublicationControls from './PilotPublicationControls';
 import CatalogProductImage from './CatalogProductImage';
 import RestaurantOrderPayout from './RestaurantOrderPayout';
 import { catalogImageSources } from '@/lib/catalog-image-url';
+import { dishStartingPrice } from '@/lib/dish-pricing';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import type { PilotProduct } from '@/lib/restaurant-pilot';
@@ -83,15 +84,17 @@ function createOrderChimeUrl() {
   return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
 }
 
-export default function RestaurantPilot({ manager = false, restaurantId, businessName, embedded = false, returnPath = '', preview = false, visualMenu = false, coverImage = '', legacyPreview = false, previewDeliveryProfile }: {
+export default function RestaurantPilot({ manager = false, restaurantId, businessName, embedded = false, returnPath = '', preview = false, visualMenu = false, coverImage = '', legacyPreview = false, previewDeliveryProfile, discovery = false, discoveryProductId = '', beforeDiscoveryAdd, onDiscoveryAdded }: {
   manager?: boolean; restaurantId?: string; businessName?: string; embedded?: boolean; returnPath?: string; preview?: boolean; visualMenu?: boolean; coverImage?: string;
   legacyPreview?:boolean;previewDeliveryProfile?:{name:string;phone:string;address:string;neighborhood:string;instructions:string};
+  discovery?:boolean;discoveryProductId?:string;beforeDiscoveryAdd?:()=>Promise<boolean>;onDiscoveryAdded?:()=>void;
 }) {
   const live = Boolean(restaurantId);
   const title = businessName || 'Restaurante Mercado';
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [discoveryLogin,setDiscoveryLogin]=useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
@@ -109,6 +112,34 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [customSelections,setCustomSelections]=useState<Record<string,string[]>>({});
   const [customNote,setCustomNote]=useState('');
   const [customQuantity,setCustomQuantity]=useState(1);
+  const discoveryOpened = useRef('');
+  const discoveryAdding = useRef(false);
+  useEffect(()=>{
+    if(!discovery || !discoveryProductId || !menu.length || discoveryOpened.current===discoveryProductId)return;
+    discoveryOpened.current=discoveryProductId;
+    const product=menu.find(item=>item.id===discoveryProductId);
+    if(!enabled || !product){setNotice('Este producto no está disponible para pedir. Puedes consultar el menú.');return;}
+    openCustomization(product);
+    // Opening from discovery uses the same product editor and its existing defaults.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[discovery,discoveryProductId,menu,enabled]);
+  useEffect(()=>{
+    if(!discovery || !customizing)return;
+    const root=document.querySelector<HTMLElement>('.dish-menu-open .pilot-customizer');
+    const previous=document.activeElement as HTMLElement|null;
+    root?.querySelector<HTMLElement>('button,input,textarea')?.focus();
+    const original=document.body.style.overflow;document.body.style.overflow='hidden';
+    function keydown(event:KeyboardEvent){
+      if(event.key==='Escape'){setCustomizing(null);return;}
+      if(event.key!=='Tab' || !root)return;
+      const controls=Array.from(root.querySelectorAll<HTMLElement>('button:not(:disabled),input,textarea,a[href]'));
+      const first=controls[0],last=controls[controls.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+    }
+    document.addEventListener('keydown',keydown);
+    return()=>{document.body.style.overflow=original;document.removeEventListener('keydown',keydown);previous?.focus();};
+  },[discovery,customizing]);
   const [requestKey, setRequestKey] = useState('');
   const submitInFlight = useRef(false);
   const pendingIntent = useRef('');
@@ -511,18 +542,24 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       return {...current,[groupId]:next};
     });
   }
-  function addCustomizedProduct() {
+  async function addCustomizedProduct() {
     if(!customizing)return;
     const incomplete=customizing.optionGroups.find(group=>{
       const count=(customSelections[group.id] || []).length;
       return count<group.minSelections || count>group.maxSelections || (group.required && count===0);
     });
     if(incomplete){setNotice(`Completa “${incomplete.name}” antes de agregar el producto.`);return;}
+    if(discoveryAdding.current)return;
+    if(beforeDiscoveryAdd){
+      discoveryAdding.current=true;
+      try{if(!await beforeDiscoveryAdd())return;}finally{discoveryAdding.current=false;}
+    }
     setCart(current=>[...current,{lineId:crypto.randomUUID(),productId:customizing.id,quantity:customQuantity,
       selections:customizing.optionGroups.map(group=>({groupId:group.id,choiceIds:customSelections[group.id] || []})),note:customNote.trim()}]);
     if(!preview&&live&&restaurantId)trackCommerceEvent('Producto agregado','AddToCart',{businessId:restaurantId,businessName:title,productId:customizing.id,productName:customizing.name,value:(customizing.price+customizing.optionGroups.reduce((sum,group)=>sum+group.choices.filter(choice=>(customSelections[group.id] || []).includes(choice.id)).reduce((subtotal,choice)=>subtotal+choice.priceDelta,0),0))*customQuantity,quantity:customQuantity});
     setCustomizing(null);setRequestKey('');setNotice('Producto agregado a tu pedido.');
     if(visualMenu)setAddedNoticeId(value=>value+1);
+    onDiscoveryAdded?.();
   }
   function configuredUnitPrice(line:Line) {
     const product=menu.find(item=>item.id===line.productId);if(!product)return 0;
@@ -612,7 +649,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     } catch (e) { setNotice(e instanceof Error ? e.message : 'No se pudo actualizar.'); }
     finally { setBusy(false); }
   }
-  return <div className={`pilot${preview?' buyer-pilot-preview':''}${(preview||visualMenu)&&checkout?' checkout-open':''}${visualMenu&&!manager?' pilot-visual-menu':''}${visualMenu&&currentOrderId?' order-tracking-open':''}`}>
+  return <div className={`pilot${preview?' buyer-pilot-preview':''}${(preview||visualMenu)&&checkout?' checkout-open':''}${visualMenu&&!manager?' pilot-visual-menu':''}${visualMenu&&currentOrderId?' order-tracking-open':''}${discovery?' pilot-dish-discovery':''}${discoveryLogin?' discovery-login-open':''}`}>
     {!embedded && <header className="pilot-header"><a href="/" aria-label="Volver a Mercau"><img src="/logo-mercau.png" alt="Mercau" /></a><span>{manager ? 'Panel de mi negocio' : title}</span>
       {preview ? <a href="/comprar">Volver al Inicio</a> : <BackToAccount />}{session && !preview && <button onClick={signOut}>Cerrar sesion</button>}</header>}
     {preview && <p className="pilot-preview-banner">Vista de prueba · Datos ficticios. No se cobra dinero ni se despachan pedidos.</p>}
@@ -646,7 +683,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
           {live && <a className="pilot-create-account" href={`/mi-cuenta?mode=register&intent=buyer&returnTo=${encodeURIComponent(returnPath || '/')}`}><UserPlus size={18} aria-hidden="true" />Crear mi cuenta para pedir</a>}</div></form>
       {!live && <p>Acceso solo para cuentas invitadas a esta prueba.</p>}</section>}
     {!manager && !currentOrderId && <>
-      {visualMenu && !checkout && <section className="menu-visual-identity" aria-label="Información del restaurante">
+      {visualMenu && !checkout && !discovery && <section className="menu-visual-identity" aria-label="Información del restaurante">
         {coverImage && <div className="menu-visual-cover"><img {...catalogImageSources(coverImage)} sizes="(max-width: 639px) 100vw, 960px" fetchPriority="high" decoding="async" alt=""/></div>}
         <a className="menu-visual-back" href="/comprar" aria-label="Volver al Inicio"><ArrowLeft size={25}/></a>
         <div className="menu-visual-title"><h1>{title}</h1><p>Menú</p></div>
@@ -674,7 +711,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
         <div className="pilot-quantity"><button disabled={busy} aria-label={`Quitar ${product?.name}`} onClick={()=>quantity(l.lineId,-1)}>-</button><output>{l.quantity}</output><button disabled={busy || l.quantity>=10} aria-label={`Agregar ${product?.name}`} onClick={()=>quantity(l.lineId,1)}>+</button></div></div>;})}
         {cart.length>0&&<><p>Productos <strong>{money(subtotal)}</strong></p><p>Domicilio <strong>{money(fee)}</strong></p><p>Total <strong>{money(subtotal + fee)}</strong></p></>}
         <button className="pilot-primary" disabled={!cart.length || !enabled || busy} onClick={() => {
-          if (!session) { document.querySelector<HTMLElement>('.pilot-login')?.scrollIntoView({ behavior:'smooth', block:'start' }); return; }
+          if (!session) {
+            if(discovery){setDiscoveryLogin(true);requestAnimationFrame(()=>document.querySelector<HTMLElement>('.pilot-login')?.scrollIntoView({behavior:'smooth',block:'start'}));}
+            else document.querySelector<HTMLElement>('.pilot-login')?.scrollIntoView({ behavior:'smooth', block:'start' });
+            return;
+          }
           if(!preview&&live&&restaurantId)trackCommerceEvent('Carrito iniciado','InitiateCheckout',{businessId:restaurantId,businessName:title,value:subtotal+fee,quantity:cart.reduce((sum,line)=>sum+line.quantity,0)});
           reviewSavedData.current = visualMenu && Boolean(session?.user.user_metadata?.delivery_profile);
           setCheckout(true); setReview(false);
@@ -711,8 +752,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
           <button disabled={busy} onClick={() => setReview(false)}>Corregir datos</button></>}</section>)}
       </aside></div>
       {customizing && <div className="pilot-customizer-backdrop" role="presentation" onMouseDown={()=>setCustomizing(null)}><section className="pilot-customizer" role="dialog" aria-modal="true" aria-labelledby="customizer-title" onMouseDown={event=>event.stopPropagation()}>
-        <div className="pilot-customizer-heading"><div><p>Personaliza tu pedido</p><h2 id="customizer-title">{customizing.name}</h2><strong>Desde {money(customizing.price)}</strong></div><button type="button" onClick={()=>setCustomizing(null)} aria-label="Cerrar personalización">×</button></div>
+        {discovery&&customizing.image&&<div className="dish-detail-photo"><CatalogProductImage name={customizing.name} imageUrl={customizing.image} priority sizes="(max-width: 639px) 100vw, 560px"/></div>}
+        <div className="pilot-customizer-heading"><div><p>Personaliza tu pedido</p><h2 id="customizer-title">{customizing.name}</h2>{!discovery&&<strong>Desde {money(customizing.price)}</strong>}</div><button type="button" onClick={()=>setCustomizing(null)} aria-label="Cerrar personalización">×</button></div>
+        {discovery&&<><p className="dish-product-restaurant"><StoreIcon/>{title} · <a href={returnPath?.startsWith('/comprar/restaurantes')?`/negocios/${restaurantId}/catalogo`:returnPath}>Ver menú</a></p><strong className="dish-detail-price">{dishStartingPrice(customizing.price,customizing.optionGroups).from?'Desde ':''}{money(dishStartingPrice(customizing.price,customizing.optionGroups).price)}</strong></>}
         {visualMenu && customizing.description && <p className="menu-product-full-description">{customizing.description}</p>}
+        {discovery&&notice.startsWith('Completa “')&&<p role="alert">{notice}</p>}
         {customizing.optionGroups.map(group=><fieldset key={group.id}><legend>{group.name}{group.required?' *':''}</legend><p className="pilot-option-help">{group.type==='single'?'Elige una opción':`Puedes elegir hasta ${group.maxSelections}`}</p>
           {group.choices.map(choice=>{const checked=(customSelections[group.id] || []).includes(choice.id);return <label key={choice.id}><input type={group.type==='single'?'radio':'checkbox'} name={`choice-${group.id}`} checked={checked} onChange={()=>selectChoice(group.id,choice.id,group.type,group.maxSelections)}/><span>{choice.name}</span>{choice.priceDelta>0&&<strong>+ {money(choice.priceDelta)}</strong>}</label>;})}
         </fieldset>)}
@@ -720,7 +764,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
         <div className="pilot-customizer-footer"><div className="pilot-quantity"><button type="button" disabled={customQuantity<=1} onClick={()=>setCustomQuantity(value=>Math.max(1,value-1))}>-</button><output>{customQuantity}</output><button type="button" disabled={customQuantity>=10} onClick={()=>setCustomQuantity(value=>Math.min(10,value+1))}>+</button></div><button type="button" className="pilot-primary" onClick={addCustomizedProduct}>Agregar · {money((customizing.price+customizing.optionGroups.reduce((sum,group)=>sum+group.choices.filter(choice=>(customSelections[group.id] || []).includes(choice.id)).reduce((subtotal,choice)=>subtotal+choice.priceDelta,0),0))*customQuantity)}</button></div>
       </section></div>}
     </>}
-    {!manager && cart.length > 0 && !checkout && <a className="pilot-mobile-cart" href="#tu-pedido" aria-label={`Ver pedido, ${cart.reduce((sum,line)=>sum+line.quantity,0)} productos, total ${money(subtotal+fee)}`}><ShoppingCart size={21} aria-hidden="true" /><span>Ver pedido</span><span className="pilot-cart-count">{cart.reduce((sum,line)=>sum+line.quantity,0)}</span><strong>{money(subtotal + fee)}</strong></a>}
+    {!manager && cart.length > 0 && !checkout && <a className="pilot-mobile-cart" href="#tu-pedido" aria-label={`Ver pedido, ${cart.reduce((sum,line)=>sum+line.quantity,0)} productos, ${discovery?'subtotal de productos':'total'} ${money(discovery?subtotal:subtotal+fee)}`}><ShoppingCart size={21} aria-hidden="true" /><span>Ver pedido{discovery&&<small>Domicilio y total al revisar</small>}</span><span className="pilot-cart-count">{cart.reduce((sum,line)=>sum+line.quantity,0)}</span><strong>{money(discovery?subtotal:subtotal + fee)}</strong></a>}
     {session && manager && <section id="mis-pedidos" className="pilot-orders"><div className="pilot-orders-heading"><div><h1>Pedidos de mi negocio</h1><p>{pendingOrders ? `${pendingOrders} pendiente${pendingOrders === 1 ? '' : 's'} de confirmar` : 'No hay pedidos pendientes de confirmar'}</p></div><div className="pilot-alert-actions">
         <button type="button" className={pushEnabled ? 'pilot-alert-toggle active' : 'pilot-alert-toggle'} aria-pressed={pushEnabled} disabled={pushBusy || (!pushAvailable && !pushPublicKey)} onClick={toggleBackgroundPush}><BellRing size={18} />{pushBusy ? 'Configurando...' : pushEnabled ? 'Push y alarma activos' : 'Activar avisos de pedidos'}</button>
         <button type="button" className={alertsEnabled ? 'pilot-alert-toggle active' : 'pilot-alert-toggle'} aria-pressed={alertsEnabled} onClick={toggleAlerts}>{alertsEnabled ? <VolumeX size={18} /> : <BellRing size={18} />}{alertsEnabled ? 'Pausar sonido local' : 'Sonido en esta pantalla'}</button>
