@@ -50,6 +50,9 @@ export async function discoverDishes({ municipality, query = '', section = '', c
     if (section) request = section === 'Otros' ? request.in('section', ['Otros', '']) : request.eq('section', section);
     if (query && !normalize(business.name).includes(normalize(query))) request = request.ilike('name', `%${query.replace(/[\\%_]/g, '\\$&')}%`);
     const result = await request.order('position').order('id').range(page.round, page.round + 1);
+    // Exact-count ranges past this restaurant's last row are normal exhaustion.
+    // Keep other errors visible; never turn an authorization/network failure into an empty menu.
+    if(page.round>0 && result.status===416 && result.error?.code==='PGRST103')return [];
     if (result.error) throw new Error('No se pudieron consultar los platos.');
     if ((result.count || 0) > page.round + 2) page.more = true;
     return (result.data || []).map(row=>({ id: row.id, name: row.name, section: row.section || 'Otros', ...dishStartingPrice(row.price, row.option_groups),
