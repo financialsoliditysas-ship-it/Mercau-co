@@ -255,7 +255,7 @@ export default function BusinessWorkspace({
         {id && allowed && (
           <a className="ma-button primary" href={`/mi-negocio/${id}/catalogo`}>
             <Plus size={17} />
-            Agregar primer producto o plato
+            Agregar o editar productos
           </a>
         )}
       </div>
