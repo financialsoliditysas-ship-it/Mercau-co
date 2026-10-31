@@ -1,7 +1,27 @@
 # Descubrir platos antes del restaurante
 
-Estado: propuesta local, sin push, despliegue, migraciones ni pedidos reales.
+Estado: publicado el 2026-10-30 con autorizacion expresa posterior a la aprobacion visual.
+La documentacion inferior conserva el alcance y las pruebas del candidato local.
 Rama: `feat/dish-discovery-20261030`, parte del corte publicado `f32f070`.
+
+## Publicacion autorizada
+
+- Commit publicado: `9e1eafd17babe5702cfd2195e8140a3e7df9abad`.
+- Despliegue: `dpl_5Jf1w1N1gZSSsgUyUCEFPtKTZFff`, READY, dominios `www.mercau.co` y `mercau.co`.
+- Entrada: `https://www.mercau.co/comprar/restaurantes`.
+- Reversion disponible: `dpl_bPNM9B1m2ufzK1Q35fNxL6TZg1P9`, commit `f32f070`.
+- Antes de publicar: SQL de solo lectura confirmo columnas, permisos SELECT del servidor,
+  cuatro restaurantes elegibles y 63 productos disponibles. No se aplicaron migraciones.
+- Despues de publicar: GET reales aprobaron primera/segunda pagina, filtros, busqueda por
+  restaurante, resultado vacio y exclusion de cobertura no habilitada. Se compararon los platos
+  con el menu real correspondiente, sus minimos de precio y la respuesta de las miniaturas.
+- Home, Restaurantes, Comercios y las dos rutas de demostracion respondieron 200.
+  El listado publico sigue sin el restaurante de prueba.
+- Chrome emulado en 390 px sobre produccion: cuadricula, detalle, pestaña Restaurantes,
+  Atrás y ausencia de desbordamiento o errores JavaScript aprobados. Todas las peticiones
+  no GET estuvieron bloqueadas por Playwright. No se generaron pedidos, cobros, push ni despachos.
+- Se conserva pendiente la comprobacion fisica desde Android/iPhone; no se afirma que se realizo.
+- No se modificaron configuracion productiva, secretos, planes, permisos, reglas de pedidos ni PWA.
 
 ## Alcance
 
@@ -94,5 +114,5 @@ Nuevos: `lib/dish-discovery.ts`, `lib/dish-pricing.ts`, `lib/dish-cart.ts`,
 Modificados: `components/buyer/BuyerExperience.tsx`, `components/RestaurantPilot.tsx`,
 `scripts/test-account-suite.cjs`.
 
-Pendiente: aprobación visual y verificación autorizada de la consulta agregada con configuración
-real antes de publicar; no hacen falta migraciones para esta propuesta.
+El candidato local recibio aprobacion visual y autorizacion de publicacion; la verificacion de
+consulta real quedo completada en el cierre superior. No fueron necesarias migraciones.
