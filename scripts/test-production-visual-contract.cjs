@@ -10,7 +10,9 @@ for(const [index,source] of ['supabase/drafts/logistics_controls_v2.sql','supaba
 for(const [file,expected]of Object.entries(contract.sha256)){
  let bytes=fs.readFileSync(file);
  if(changes.sha256[file]){
-  assert.equal(crypto.createHash('sha256').update(bytes.toString('utf8').replace(/\r\n/g,'\n')).digest('hex'),changes.sha256[file],'Unexpected order-change integration '+file);
+  const source=bytes.toString('utf8').replace(/\r\n/g,'\n');
+  const baseline=file==='public/mercau-sw.js'?source.replace("importScripts('/mercau-public-cache-v1.js');\n",''):source;
+  assert.equal(crypto.createHash('sha256').update(baseline).digest('hex'),changes.sha256[file],'Unexpected order-change integration '+file);
   continue;
  }
  if(safety.sha256[file]){

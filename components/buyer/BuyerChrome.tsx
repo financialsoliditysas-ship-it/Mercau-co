@@ -3,6 +3,7 @@ import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Home, ReceiptText, Search, UserRound, ArrowLeft } from 'lucide-react';
 import './buyer.css';
+import ConnectionNotice from '@/components/ConnectionNotice';
 
 export function BuyerHeader(){
   const [installed,setInstalled]=useState<boolean|null>(null);
@@ -11,7 +12,7 @@ export function BuyerHeader(){
     const update=()=>setInstalled(media.matches||Boolean((navigator as Navigator & {standalone?:boolean}).standalone));
     update();media.addEventListener('change',update);return()=>media.removeEventListener('change',update);
   },[]);
-  return <header className="buyer-header"><Link href="/comprar" aria-label="Mercáu Inicio"><img src="/logo-mercau.png" alt="" width="42" height="42"/><strong>Mercáu</strong></Link><div className="buyer-header-actions">{installed===false&&<Link className="buyer-public-home" href="/"><ArrowLeft size={16} aria-hidden="true"/><span>Portada</span></Link>}<Link href="/comprar/cuenta" aria-label="Mi cuenta"><UserRound size={24}/></Link></div></header>;
+  return <><header className="buyer-header"><Link href="/comprar" aria-label="Mercáu Inicio"><img src="/logo-mercau.png" alt="" width="42" height="42"/><strong>Mercáu</strong></Link><div className="buyer-header-actions">{installed===false&&<Link className="buyer-public-home" href="/"><ArrowLeft size={16} aria-hidden="true"/><span>Portada</span></Link>}<Link href="/comprar/cuenta" aria-label="Mi cuenta"><UserRound size={24}/></Link></div></header><ConnectionNotice/></>;
 }
 export const BuyerNavigation=forwardRef<HTMLElement,{section:string}>(function BuyerNavigation({section},ref){
   const links=[

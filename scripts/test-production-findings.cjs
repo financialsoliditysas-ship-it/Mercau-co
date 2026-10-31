@@ -7,10 +7,12 @@ function load(file,mocks={}){const mod=new Module(file);mod.require=id=>id in mo
  const originalFetch=global.fetch,originalNow=Date.now;let calls=0,release;let now=1000;
  try{
   Date.now=()=>now;global.fetch=()=>{calls++;return new Promise(resolve=>{release=()=>resolve({ok:true,json:async()=>({businesses:rows,preview:false})});});};
-  const client=load('lib/buyer-directory-client.ts');assert.equal(client.recentBuyerDirectory(),null);
+  const browsing=load('lib/public-browse-client.ts');
+  const client=load('lib/buyer-directory-client.ts',{'./public-browse-client':browsing});assert.equal(client.recentBuyerDirectory(),null);
   const one=client.refreshBuyerDirectory(),two=client.refreshBuyerDirectory();assert.strictEqual(one,two);assert.equal(calls,1);release();await one;
-  assert.equal(client.recentBuyerDirectory().businesses.length,5);now+=30001;assert.equal(client.recentBuyerDirectory(),null);
-  global.fetch=async()=>{throw Error('offline');};await assert.rejects(()=>client.refreshBuyerDirectory());assert.equal(client.recentBuyerDirectory(),null);
+  assert.equal(client.recentBuyerDirectory().businesses.length,5);now+=30001;assert.equal(client.recentBuyerDirectory().stale,true);
+  global.fetch=async()=>{throw Error('offline');};assert.equal((await client.refreshBuyerDirectory()).stale,true);
+  now+=15*60*1000+1;assert.equal(client.recentBuyerDirectory(),null);await assert.rejects(()=>client.refreshBuyerDirectory());
  }finally{global.fetch=originalFetch;Date.now=originalNow;}
  const code=fs.readFileSync('app/api/negocios/route.ts','utf8');assert(code.includes('Promise.all'));assert(code.includes('catalogBusinessAvailability(directory.map'));
  assert(fs.readFileSync('app/piloto/restaurante-mercado/page.tsx','utf8').includes('<RestaurantPilot visualMenu />'));

@@ -18,6 +18,7 @@ assert.equal(commercial.commercialLabel({...fixtures[3],hasCatalog:false}),null)
 assert.equal(commercial.commercialLabel({...fixtures[3],commercialKind:undefined}),'Ver catálogo');
 for(const [key,name] of Object.entries(commercial.quickCategoryNames))assert(fixtures.some(b=>commercial.matchesQuickCategory(b,key)),`Missing ${name} fixture`);
 const route=load('app/api/comprador/negocios/route.ts',{
+  '@/lib/public-read-cache':load('lib/public-read-cache.ts'),
   '@/app/api/negocios/route':{GET:async()=>new Response(JSON.stringify({businesses:[],realDirectory:true}))},
   '@/data/buyer-preview':{buyerPreviewBusinesses:fixtures},
 });

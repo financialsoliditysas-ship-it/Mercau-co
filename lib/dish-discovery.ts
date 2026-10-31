@@ -3,6 +3,9 @@ import { getSupabaseAdminClient } from './supabase-admin';
 import { isFoodBusiness } from './catalog-validation';
 import { dishStartingPrice } from './dish-pricing';
 import { businessCatalogPath, businessPath } from './business-public-url';
+import { publicReadCache } from './public-read-cache';
+const publicDirectory=publicReadCache<Awaited<ReturnType<typeof loadDirectoryBusinesses>>>(10000,1);
+const publicSections=publicReadCache<string[]>(10000,8);
 
 export type DiscoveredDish = {
   id: string; name: string; section: string; price: number; from: boolean; image?: string;
@@ -22,7 +25,7 @@ export async function discoverDishes({ municipality, query = '', section = '', c
     if (page.scope !== scope || !Number.isInteger(page.round) || page.round < 0 || page.round > 10000 ||
       !Number.isInteger(page.offset) || page.offset < 0 || typeof page.more !== 'boolean') throw new Error('Página inválida.');
   }
-  const directory = (await loadDirectoryBusinesses()).filter(business =>
+  const directory = (await publicDirectory('directory',loadDirectoryBusinesses)).filter(business =>
     !business.pilotRestaurant && isFoodBusiness(business.category) && business.municipality === municipality);
   if (!directory.length) return { products: [], categories: [], nextCursor: null };
   const db = getSupabaseAdminClient();
@@ -32,15 +35,19 @@ export async function discoverDishes({ municipality, query = '', section = '', c
   const eligible = directory.filter(business => (restaurants.data || []).some(row => row.id === business.id && row.directory_business_id === business.id))
     .sort((a, b) => a.id.localeCompare(b.id));
   if (!eligible.length) return { products: [], categories: [], nextCursor: null };
-  const categories = new Set<string>();
+  const categories = await publicSections(JSON.stringify(eligible.map(b=>b.id)),async()=>{
+  const found = new Set<string>();
   // Only section metadata, never complete menus. Bound this metadata read and paginate it.
   for (let start = 0; ; start += 1000) {
     const result = await db.from('business_catalog_products').select('section').in('business_id', eligible.map(b => b.id))
       .eq('status', 'published').eq('available', true).gt('price', 0).order('id').range(start, start + 999);
+    if(start>0&&result.status===416&&result.error?.code==='PGRST103')break;
     if (result.error) throw new Error('No se pudieron consultar las categorías.');
-    for (const row of result.data || []) categories.add(row.section || 'Otros');
+    for (const row of result.data || []) found.add(row.section || 'Otros');
     if (!result.data || result.data.length < 1000) break;
   }
+  return [...found].sort((a,b)=>a.localeCompare(b,'es'));
+  });
   if (page.offset >= eligible.length) throw new Error('Página inválida.');
   // Two products per restaurant, up to eight per page; interleave them to balance exposure.
   const batch = eligible.slice(page.offset, page.offset + 4);
@@ -62,5 +69,5 @@ export async function discoverDishes({ municipality, query = '', section = '', c
   const offset = page.offset + batch.length;
   const next = offset < eligible.length ? { ...page, offset } : page.more ? { ...page, offset: 0, round: page.round + 2, more: false } : null;
   return { products: [0,1].flatMap(index=>products.flatMap(items=>items[index]?[items[index]]:[])),
-    categories: [...categories].sort((a, b) => a.localeCompare(b, 'es')), nextCursor: next ? Buffer.from(JSON.stringify(next)).toString('base64url') : null };
+    categories, nextCursor: next ? Buffer.from(JSON.stringify(next)).toString('base64url') : null };
 }

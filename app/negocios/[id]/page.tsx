@@ -107,9 +107,10 @@ export default async function BusinessPage({
 
   if (!business) notFound();
   if (business.publicSlug && params.id !== business.publicSlug) permanentRedirect(businessPath(business));
-  const hasCatalog=(await catalogBusinessIds([business.id])).has(business.id);
-  const settings=await publicBusinessSettings(business);
-  const gallery=await businessGallery(business.id).catch(()=>[]);
+  const [catalogIds,settings,gallery]=await Promise.all([
+    catalogBusinessIds([business.id]),publicBusinessSettings(business),businessGallery(business.id).catch(()=>[])
+  ]);
+  const hasCatalog=catalogIds.has(business.id);
   const cover=gallery.find(p=>p.kind==='cover');
 
   const callPhone = phoneForCall(settings?.phone || business.whatsapp);

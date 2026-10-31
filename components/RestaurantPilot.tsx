@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import CustomerOrderCard from './CustomerOrderCard';
 import OrderChangePanel from './OrderChangePanel';
 import CustomerPushOptIn from './CustomerPushOptIn';
+import ConnectionNotice from './ConnectionNotice';
 import { unresolvedChange, type OrderChange } from '@/lib/order-changes-model';
 import OrderReviewPresentation from './buyer/OrderReviewPresentation';
 import './buyer/order-visual.css';
@@ -22,6 +23,7 @@ import { BellRing, ExternalLink, LocateFixed, MapPin, RotateCcw, ShoppingCart, U
 import './restaurant-pilot.css';
 import { trackCommerceEvent } from '@/lib/commerce-tracking';
 import { trackMetaEvent } from '@/lib/meta-pixel';
+import { publicBrowse } from '@/lib/public-browse-client';
 import { pendingOrderIntent, clearOrderIntent, orderIntentStore, readOrderIntent } from '@/lib/order-intent';
 
 type LineSelection = { groupId:string;choiceIds:string[] };
@@ -318,6 +320,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
     const query = new URLSearchParams(path.replace(/^\?/, ''));
     if (restaurantId) query.set('restaurant', restaurantId);
+    if(!preview&&!manager&&live&&query.get('mode')==='menu'&&(!options.method||options.method==='GET')){
+      const result=await publicBrowse('/api/piloto/restaurante?'+query.toString(),5000);
+      if(result.stale)setNotice('Mostrando el menú guardado. Reconecta para actualizar precios y disponibilidad antes de pedir.');
+      return result.data;
+    }
     if (preview && !previewSession.current) {
       try { previewSession.current = sessionStorage.getItem('mercau.preview.session') || crypto.randomUUID(); sessionStorage.setItem('mercau.preview.session',previewSession.current); }
       catch { previewSession.current = crypto.randomUUID(); }
@@ -329,7 +336,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       previousPublicId:result.previousPublicId,canRepeat:result.canRepeat===true
     });
     return result;
-  }, [session, restaurantId, preview]);
+  }, [session, restaurantId, preview,manager,live]);
   const pushApi = useCallback(async (options: RequestInit = {}) => {
     const business = restaurantId || 'restaurante-mercado';
     const response = await fetch(`/api/push/subscription?business=${encodeURIComponent(business)}`, { ...options, cache: 'no-store',
@@ -604,6 +611,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const currentOrder = orders.find(order => order.public_id === currentOrderId);
   const showPaymentInstructions = currentOrder?.status !== 'rejected' && currentOrder?.delivery?.status !== 'cancelled';
   async function submit(repeatOf = '') {
+    if(navigator.onLine===false){setNotice('Sin conexión. Tu selección se conserva; reconecta y revisa el pedido antes de confirmarlo.');return;}
     if (submitInFlight.current) return;
     submitInFlight.current = true;
     setBusy(true); setNotice('');setPreviousOrderReference('');setCanRepeatOrder(false);
@@ -650,6 +658,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     finally { setBusy(false); }
   }
   return <div className={`pilot${preview?' buyer-pilot-preview':''}${(preview||visualMenu)&&checkout?' checkout-open':''}${visualMenu&&!manager?' pilot-visual-menu':''}${visualMenu&&currentOrderId?' order-tracking-open':''}${discovery?' pilot-dish-discovery':''}${discoveryLogin?' discovery-login-open':''}`}>
+    {!discovery&&!manager&&<ConnectionNotice/>}
     {!embedded && <header className="pilot-header"><a href="/" aria-label="Volver a Mercau"><img src="/logo-mercau.png" alt="Mercau" /></a><span>{manager ? 'Panel de mi negocio' : title}</span>
       {preview ? <a href="/comprar">Volver al Inicio</a> : <BackToAccount />}{session && !preview && <button onClick={signOut}>Cerrar sesion</button>}</header>}
     {preview && <p className="pilot-preview-banner">Vista de prueba · Datos ficticios. No se cobra dinero ni se despachan pedidos.</p>}

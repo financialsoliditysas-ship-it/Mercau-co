@@ -87,7 +87,7 @@ async function push(){
  assert.equal(api.validCustomerSubscription({...fake,keys:{...fake.keys,auth:'short'}}),null);
  await api.sendCustomerChangePush(buyer,'PRB-000001','fake');assert.equal(sent,1);assert(filters.some(([k,v])=>k==='user_id'&&v===buyer));assert.equal(disabled,0);
  const events={},notifications=[],messages=[];
- require('node:vm').runInNewContext(fs.readFileSync('public/mercau-sw.js','utf8'),{self:{addEventListener:(type,fn)=>events[type]=fn,registration:{showNotification:async(...args)=>notifications.push(args)},location:{origin:'https://qa.invalid'}},clients:{matchAll:async()=>[{postMessage:data=>messages.push(data)}]},URL,Promise,Date});
+ require('node:vm').runInNewContext(fs.readFileSync('public/mercau-sw.js','utf8'),{importScripts:()=>{},self:{addEventListener:(type,fn)=>events[type]=fn,registration:{showNotification:async(...args)=>notifications.push(args)},location:{origin:'https://qa.invalid'}},clients:{matchAll:async()=>[{postMessage:data=>messages.push(data)}]},URL,Promise,Date});
  let completed;events.push({data:{json:()=>({kind:'CUSTOMER_ORDER_CHANGE',title:'Cambio',url:'/comprar/pedidos'})},waitUntil:p=>completed=p});await completed;assert.equal(messages[0].type,'MERCAU_CUSTOMER_ORDER_CHANGE');
  events.push({data:{json:()=>({orderId:'PRB-FAKE'})},waitUntil:p=>completed=p});await completed;assert.equal(messages[1].type,'MERCAU_NEW_ORDER_PUSH');assert.equal(notifications.length,2);
  console.log('PASS customer push: own user targeting, private payload, endpoint restrictions and separate worker event. No external push sent.');
