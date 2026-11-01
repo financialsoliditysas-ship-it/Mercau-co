@@ -32,6 +32,11 @@ assert.match(read('lib/business-push.ts'), /payload\.businessId === "restaurante
 assert.match(read('lib/business-push.ts'), /\/piloto\/restaurante\?pedido=/);
 assert.match(ui, /pushManager\.subscribe/);
 assert.match(ui, /Activar avisos de pedidos/);
+assert.match(ui, /Avisos push activos/);
+assert.match(ui, /Reactivar sonido local/);
+assert.match(ui, /mercau:order-sound:/);
+assert.doesNotMatch(ui, /Push y alarma activos/);
+assert.doesNotMatch(ui, /setAlertsEnabled\(false\)/, 'A rejected audio attempt must not silently disable operator preference');
 assert.match(ui, /addEventListener\('message', receivePush\)/);
 assert.match(ui, /void refresh\(\)/);
 assert.match(ui, /addEventListener\('visibilitychange', refreshWhenVisible\)/);

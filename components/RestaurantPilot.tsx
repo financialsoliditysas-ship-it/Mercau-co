@@ -164,6 +164,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const alertsEnabledRef = useRef(false);
   const highlightTimers = useRef<number[]>([]);
   const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [soundBlocked,setSoundBlocked]=useState(false);
+  const pendingAlarm=useRef(false);
   const [pushAvailable, setPushAvailable] = useState(false);
   const [pushChecked, setPushChecked] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -265,8 +267,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       if (currentUser.current !== (next?.user.id || null)) {
         pendingIntent.current='';setRequestKey('');setPreviousOrderReference('');setCanRepeatOrder(false);
         ordersRequest.current++; setOrders([]); setCurrentOrderId(null); setOrdersError(''); setCheckout(false); setReview(false);
-        knownManagerOrders.current.clear(); managerOrdersLoaded.current = false; setNewOrderIds([]); setAlertsEnabled(false);
-        alertsEnabledRef.current = false; setAlertActivity('');
+        knownManagerOrders.current.clear(); managerOrdersLoaded.current = false; setNewOrderIds([]);
+        let wanted=false;
+        try{wanted=Boolean(manager&&next?.user.id&&localStorage.getItem(`mercau:order-sound:${next.user.id}:${restaurantId||'restaurante-mercado'}`)==='on');}catch{}
+        setAlertsEnabled(wanted);setSoundBlocked(wanted);pendingAlarm.current=false;
+        alertsEnabledRef.current = wanted; setAlertActivity(wanted?'Toca Reactivar sonido local para comprobar el audio en esta pantalla.':'');
         setPushAvailable(false); setPushChecked(false); setPushEnabled(false); setPushPublicKey('');
         setCustomer(EMPTY_CUSTOMER);
         setLocationStatus('');
@@ -277,7 +282,12 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     supabase.auth.getSession().then(({ data }) => updateSession(data.session)).catch(() => updateSession(null));
     const { data } = supabase.auth.onAuthStateChange((_event, next) => updateSession(next));
     return () => { active = false; currentUser.current = null; data.subscription.unsubscribe(); };
-  }, [supabase, preview, previewDeliveryProfile]);
+  }, [supabase, preview, previewDeliveryProfile,manager,restaurantId]);
+  function rememberAlarm(enabled:boolean){
+    setAlertsEnabled(enabled);alertsEnabledRef.current=enabled;
+    if(!enabled){pendingAlarm.current=false;setSoundBlocked(false);}
+    try{if(session?.user.id)localStorage.setItem(`mercau:order-sound:${session.user.id}:${restaurantId||'restaurante-mercado'}`,enabled?'on':'off');}catch{}
+  }
   useEffect(() => () => {
     highlightTimers.current.forEach(timer => window.clearTimeout(timer));
     orderAlertAudio.current?.pause();
@@ -288,6 +298,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     if (!audio) throw new Error('Las alertas todavía no están activadas.');
     audio.currentTime = 0;
     await audio.play();
+    setSoundBlocked(false);pendingAlarm.current=false;
   }, []);
   const prepareOrderAlert = useCallback(() => {
     if (orderAlertAudio.current) return;
@@ -302,9 +313,9 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     if (!fresh.length || !alertsEnabledRef.current) return;
     setAlertActivity(`Pedido nuevo detectado: ${fresh.map(order => order.public_id).join(', ')}`);
     void playOrderAlert().catch(() => {
-      alertsEnabledRef.current = false;
-      setAlertsEnabled(false);
-      setNotice("El navegador bloqueó el sonido. Pulsa Activar alertas nuevamente.");
+      if(!alertsEnabledRef.current)return;
+      pendingAlarm.current=true;setSoundBlocked(true);
+      setNotice('El navegador suspendió el sonido local. Conservamos tu elección. Al volver, toca Reactivar sonido local si se solicita.');
     });
     if ('vibrate' in navigator) navigator.vibrate([350, 150, 350, 150, 350, 150, 350]);
     const ids = fresh.map(order => order.public_id);
@@ -312,10 +323,12 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     const timer = window.setTimeout(() => setNewOrderIds(current => current.filter(id => !ids.includes(id))), 30000);
     highlightTimers.current.push(timer);
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(fresh.length === 1 ? 'Nuevo pedido en Mercáu' : `${fresh.length} pedidos nuevos en Mercáu`, {
-        body: fresh.length === 1 ? `Pedido ${fresh[0].public_id} pendiente de confirmar.` : 'Abre el panel para revisarlos.',
-        icon: '/logo-mercau.png',
-      });
+      try {
+        new Notification(fresh.length === 1 ? 'Nuevo pedido en Mercáu' : `${fresh.length} pedidos nuevos en Mercáu`, {
+          body: fresh.length === 1 ? `Pedido ${fresh[0].public_id} pendiente de confirmar.` : 'Abre el panel para revisarlos.',
+          icon: '/logo-mercau.png',
+        });
+      } catch { /* Mobile push is handled by the service worker; keep rendering the order. */ }
     }
   }, [playOrderAlert]);
   const api = useCallback(async (path: string, options: RequestInit = {}) => {
@@ -400,6 +413,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
           setAlertActivity(current => current.startsWith('Pedido nuevo detectado:') ? current : `Última revisión: ${new Date().toLocaleTimeString('es-CO')}`);
         }
         setOrders(nextOrders); setOrdersError('');
+        return nextOrders;
       }
     } catch {
       if (currentUser.current === userId && ordersRequest.current === requestId) setOrdersError('No se pudo actualizar el seguimiento. Conservamos la última información recibida.');
@@ -425,6 +439,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       if (!alertsEnabledRef.current) return;
       setAlertActivity(`Push recibido${event.data.orderId ? `: ${event.data.orderId}` : ''}. Actualizando pedidos y reproduciendo alarma.`);
       void playOrderAlert().catch(() => {
+        if(!alertsEnabledRef.current)return;
+        pendingAlarm.current=true;setSoundBlocked(true);
         setNotice('El pedido se actualizó, pero el navegador bloqueó el sonido interno. Revisa el volumen y los permisos de notificación.');
       });
       if ('vibrate' in navigator) navigator.vibrate([700, 180, 700, 180, 900, 180, 900]);
@@ -435,7 +451,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   useEffect(() => {
     if (!manager || !session) return;
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void refresh();
+      if (document.visibilityState === 'visible') void refresh().then(next=>{
+        if(!pendingAlarm.current||!alertsEnabledRef.current||!next?.some(order=>order.status==='pending'))return;
+        pendingAlarm.current=false;
+        void playOrderAlert().catch(()=>{if(alertsEnabledRef.current){pendingAlarm.current=true;setSoundBlocked(true);}});
+      });
     };
     window.addEventListener('focus', refreshWhenVisible);
     document.addEventListener('visibilitychange', refreshWhenVisible);
@@ -443,7 +463,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       window.removeEventListener('focus', refreshWhenVisible);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
-  }, [manager, session, refresh]);
+  }, [manager, session, refresh,playOrderAlert]);
   useEffect(() => {
     if (currentOrderId) document.getElementById('mis-pedidos')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [currentOrderId]);
@@ -461,9 +481,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     return () => { document.title = 'Mercáu'; };
   }, [manager, pendingOrders]);
   async function toggleAlerts() {
-    if (alertsEnabled) {
-      setAlertsEnabled(false);
-      alertsEnabledRef.current = false;
+    if (alertsEnabled && !soundBlocked) {
+      rememberAlarm(false);
       orderAlertAudio.current?.pause();
       setNotice('Alertas sonoras pausadas.');
       return;
@@ -471,19 +490,19 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     try {
       prepareOrderAlert();
       await playOrderAlert();
-      setAlertsEnabled(true);
-      alertsEnabledRef.current = true;
+      rememberAlarm(true);
       if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
       setNotice('Alertas activadas. Escucharás una segunda prueba automática en 4 segundos.');
       window.setTimeout(() => {
         if (!alertsEnabledRef.current) return;
         void playOrderAlert().then(() => setNotice('Prueba automática completada. Las alertas siguen activas.')).catch(() => {
-          alertsEnabledRef.current = false;
-          setAlertsEnabled(false);
-          setNotice('El navegador bloqueó la prueba automática. Mantén esta página visible y activa nuevamente las alertas.');
+          if(!alertsEnabledRef.current)return;
+          pendingAlarm.current=true;setSoundBlocked(true);
+          setNotice('El navegador suspendió la prueba de sonido. Tu elección sigue guardada; toca Reactivar sonido local al volver al panel.');
         });
       }, 4000);
     } catch {
+      setSoundBlocked(true);
       setNotice('El navegador no permitió activar el sonido. Revisa el volumen y los permisos del sitio.');
     }
   }
@@ -505,8 +524,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       if (permission !== 'granted') throw new Error('No autorizaste las notificaciones. Puedes habilitarlas desde los permisos del sitio.');
       prepareOrderAlert();
       await playOrderAlert();
-      alertsEnabledRef.current = true;
-      setAlertsEnabled(true);
+      rememberAlarm(true);
       const status = pushPublicKey ? { publicKey: pushPublicKey } : await pushApi();
       if (!status.publicKey) throw new Error('Las notificaciones todavía no están disponibles.');
       const existing = await registration.pushManager.getSubscription();
@@ -518,7 +536,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       await registration.showNotification('Notificaciones de Mercáu activadas', {
         body: 'Este dispositivo recibirá los pedidos nuevos del negocio.', icon: '/logo-mercau.png', tag: 'mercau-push-ready',
       });
-      setNotice('Notificaciones y alarma reforzada activadas. Mantén el volumen del teléfono alto.');
+      setNotice('Avisos push activados y sonido local probado. En segundo plano, el teléfono controla el aviso y su sonido.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo activar la notificación.');
     } finally { setPushBusy(false); }
@@ -789,10 +807,11 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     </>}
     {!manager && cart.length > 0 && !checkout && <a className="pilot-mobile-cart" href="#tu-pedido" aria-label={`Ver pedido, ${cart.reduce((sum,line)=>sum+line.quantity,0)} productos, ${discovery?'subtotal de productos':'total'} ${money(discovery?subtotal:subtotal+fee)}`}><ShoppingCart size={21} aria-hidden="true" /><span>Ver pedido{discovery&&<small>Domicilio y total al revisar</small>}</span><span className="pilot-cart-count">{cart.reduce((sum,line)=>sum+line.quantity,0)}</span><strong>{money(discovery?subtotal:subtotal + fee)}</strong></a>}
     {session && manager && <section id="mis-pedidos" className="pilot-orders"><div className="pilot-orders-heading"><div><h1>Pedidos de mi negocio</h1><p>{pendingOrders ? `${pendingOrders} pendiente${pendingOrders === 1 ? '' : 's'} de confirmar` : 'No hay pedidos pendientes de confirmar'}</p></div><div className="pilot-alert-actions">
-        <button type="button" className={pushEnabled ? 'pilot-alert-toggle active' : 'pilot-alert-toggle'} aria-pressed={pushEnabled} disabled={pushBusy || (!pushAvailable && !pushPublicKey)} onClick={toggleBackgroundPush}><BellRing size={18} />{pushBusy ? 'Configurando...' : pushEnabled ? 'Push y alarma activos' : 'Activar avisos de pedidos'}</button>
-        <button type="button" className={alertsEnabled ? 'pilot-alert-toggle active' : 'pilot-alert-toggle'} aria-pressed={alertsEnabled} onClick={toggleAlerts}>{alertsEnabled ? <VolumeX size={18} /> : <BellRing size={18} />}{alertsEnabled ? 'Pausar sonido local' : 'Sonido en esta pantalla'}</button>
+        <button type="button" className={pushEnabled ? 'pilot-alert-toggle active' : 'pilot-alert-toggle'} aria-pressed={pushEnabled} disabled={pushBusy || (!pushAvailable && !pushPublicKey)} onClick={toggleBackgroundPush}><BellRing size={18} />{pushBusy ? 'Configurando...' : pushEnabled ? 'Avisos push activos' : 'Activar avisos de pedidos'}</button>
+        <button type="button" className={alertsEnabled&&!soundBlocked ? 'pilot-alert-toggle active' : 'pilot-alert-toggle'} aria-pressed={alertsEnabled} onClick={toggleAlerts}>{alertsEnabled&&!soundBlocked ? <VolumeX size={18} /> : <BellRing size={18} />}{soundBlocked?'Reactivar sonido local':alertsEnabled ? 'Pausar sonido local' : 'Sonido en esta pantalla'}</button>
+        {alertsEnabled&&soundBlocked&&<button type="button" className="pilot-alert-toggle" onClick={()=>{rememberAlarm(false);orderAlertAudio.current?.pause();setNotice('Alertas sonoras pausadas.');}}><VolumeX size={18}/>Pausar sonido local</button>}
         <button onClick={refresh} disabled={busy}>Actualizar</button>
-      </div></div>{pushChecked && !pushAvailable && <p className="pilot-alert-activity">Las notificaciones en segundo plano no están disponibles en este navegador. En iPhone, agrega Mercáu a la pantalla de inicio y ábrelo desde su icono.</p>}{pushEnabled && <p role="status" className="pilot-alert-activity"><BellRing size={16} /> Aviso persistente activo. El teléfono controla el volumen del push; para una alarma larga y más fuerte, deja este panel abierto en el dispositivo del negocio.</p>}{alertsEnabled && <p role="status" className="pilot-alert-activity"><BellRing size={16} /> {alertActivity || 'Alarma local activa. Esperando pedidos nuevos.'}</p>}{!orders.length && <p>No hay pedidos para mostrar.</p>}
+      </div></div>{pushChecked && !pushAvailable && <p className="pilot-alert-activity">Las notificaciones en segundo plano no están disponibles en este navegador. En iPhone, agrega Mercáu a la pantalla de inicio y ábrelo desde su icono.</p>}{pushEnabled && <p role="status" className="pilot-alert-activity"><BellRing size={16} /> Avisos push activados. El teléfono controla su sonido. iPhone puede suspender la alarma local al dejar Mercáu en segundo plano; mantén el panel visible para usarla durante la atención.</p>}{alertsEnabled && <p role="status" className="pilot-alert-activity"><BellRing size={16} /> {soundBlocked?'Sonido local pendiente de reactivación. Tu elección sigue guardada; toca Reactivar sonido local.':alertActivity || 'Alarma local activa en esta pantalla. Esperando pedidos nuevos.'}</p>}{!orders.length && <p>No hay pedidos para mostrar.</p>}
       {orders.map(o => <article id={`pedido-${o.public_id}`} key={o.public_id} className={newOrderIds.includes(o.public_id) ? 'pilot-order-new' : undefined}>{newOrderIds.includes(o.public_id) && <p className="pilot-new-order-label"><BellRing size={17} /> Nuevo pedido</p>}<h2>{o.public_id}</h2><p>{new Date(o.created_at).toLocaleString('es-CO')}</p>
         <strong className="pilot-order-status">{statuses[o.delivery?.status || o.status] || 'Pedido en revision'}</strong><p className={o.finance?.payment_status === 'CONFIRMED' ? 'pilot-payment-confirmed' : ''}>Pago contra entrega: {o.payment_method === 'BREB_QR' ? 'transferencia Bre-B' : 'efectivo'}{o.finance?.payment_status === 'CONFIRMED' ? ' · Confirmado' : ''}</p>
         <ul>{o.lines.map((l,i) => <li key={i}><strong>{l.quantity} x {l.name} · {money(l.unitPrice * l.quantity)}</strong>{l.selections?.map(selection=>selection.choices.map(choice=><span key={`${selection.groupName}-${choice.name}`} className="pilot-order-option">{selection.groupName}: {choice.name}{choice.priceDelta>0&&<> <strong>+{money(choice.priceDelta)} c/u</strong></>}</span>))}{l.note&&<span className="pilot-order-option">Observación: {l.note}</span>}</li>)}</ul>
