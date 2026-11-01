@@ -1,13 +1,13 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight, RefreshCw, X } from 'lucide-react';
 import CustomerOrderCard from '@/components/CustomerOrderCard';
 import { customerOrderProgress, type CustomerOrder } from '@/lib/customer-order-status';
 import { latestChange } from '@/lib/order-changes-model';
 import CustomerPushOptIn from '@/components/CustomerPushOptIn';
 
 const money=(value:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(value);
-export default function BuyerOrderList({orders}:{orders:CustomerOrder[]}){
+export default function BuyerOrderList({orders,error='',updatedAt='',onRefresh}:{orders:CustomerOrder[];error?:string;updatedAt?:string;onRefresh?:()=>void}){
   const [selectedId,setSelectedId]=useState('');
   const dialog=useRef<HTMLDialogElement>(null),trigger=useRef<HTMLButtonElement|null>(null);
   const openedFromLink=useRef('');
@@ -35,6 +35,11 @@ export default function BuyerOrderList({orders}:{orders:CustomerOrder[]}){
     })}</div>
     <dialog ref={dialog} className="buyer-order-dialog" aria-labelledby="buyer-order-detail-title" onCancel={event=>{event.preventDefault();close();}} onClose={()=>{setSelectedId('');requestAnimationFrame(()=>trigger.current?.focus());}}>
       <div className="buyer-order-dialog-heading"><h2 id="buyer-order-detail-title">Detalle del pedido</h2><button type="button" onClick={close} aria-label="Cerrar detalle del pedido"><X size={23}/></button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+        {updatedAt&&<p role="status">Última actualización: {new Date(updatedAt).toLocaleTimeString('es-CO',{timeZone:'America/Bogota'})}</p>}
+        {onRefresh&&<button type="button" onClick={onRefresh} className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 font-bold"><RefreshCw size={17} aria-hidden="true"/>Actualizar estado</button>}
+        {error&&<p role="alert" className="w-full text-[#B91C1C]">{error}</p>}
+      </div>
       {selected&&<CustomerOrderCard order={selected} visual/>}
     </dialog>
   </>;

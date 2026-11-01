@@ -15,6 +15,7 @@ import CategoryIcon from './CategoryIcon';
 import { recentBuyerDirectory, refreshBuyerDirectory } from '@/lib/buyer-directory-client';
 import { compareDirectoryPresentation } from '@/lib/buyer-commercial';
 import type { CustomerOrder } from '@/lib/customer-order-status';
+import { startCustomerOrderPolling } from '@/lib/customer-order-polling';
 import { commercialLabel, matchesQuickCategory, quickCategoryNames, type BuyerBusiness, type QuickCategory } from '@/lib/buyer-commercial';
 
 const quickAccesses = [
@@ -34,6 +35,9 @@ export default function BuyerExperience({section,quickFilter=''}:{section:string
   const bottomRef=useRef<HTMLElement>(null);
   const activeQuick=Object.hasOwn(quickCategoryNames,quickFilter)?quickFilter as QuickCategory:'';
   const [orders,setOrders]=useState<CustomerOrder[]>([]),[orderError,setOrderError]=useState(''),[ordersLoading,setOrdersLoading]=useState(false);
+  const [ordersUpdatedAt,setOrdersUpdatedAt]=useState('');
+  const refreshOrders=useRef<()=>void>(()=>{});
+  const orderUserId=account.session?.user.id;
   useEffect(()=>{try{setDestination(parseBuyerDestination(localStorage.getItem(buyerDestinationKey)));}catch{}},[]);
   useEffect(()=>{
     setQuery('');
@@ -60,23 +64,17 @@ export default function BuyerExperience({section,quickFilter=''}:{section:string
     if(locationOpen)dialogRef.current?.showModal();else dialogRef.current?.close();
   },[locationOpen]);
   useEffect(()=>{
-    setOrders([]);setOrderError('');
-    if(section!=='pedidos'||!account.session)return;
-    let active=true;const controller=new AbortController();setOrdersLoading(true);
-    let loading=false;
-    async function load(){
-      if(loading||!active)return;loading=true;
-      try { const data=await account.request('/api/mi-cuenta/pedidos',{signal:controller.signal});if(active){setOrders(data.orders||[]);setOrderError('');} }
-      catch {if(active)setOrderError('No pudimos consultar tus pedidos. Intenta nuevamente.');}
-      finally{loading=false;if(active)setOrdersLoading(false);}
-    }
-    function refresh(){if(document.visibilityState==='visible')void load();}
-    function push(event:MessageEvent){if(event.data?.type==='MERCAU_CUSTOMER_ORDER_CHANGE')refresh();}
-    void load();const timer=setInterval(refresh,15000);
-    window.addEventListener('mercau:order-updated',refresh);window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
-    navigator.serviceWorker?.addEventListener('message',push);
-    return()=>{active=false;controller.abort();clearInterval(timer);window.removeEventListener('mercau:order-updated',refresh);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);navigator.serviceWorker?.removeEventListener('message',push);};
-  },[section,account.session,account.request]);
+    setOrders([]);setOrderError('');setOrdersUpdatedAt('');
+    if(section!=='pedidos'||!orderUserId){setOrdersLoading(false);return;}
+    setOrdersLoading(true);
+    const polling=startCustomerOrderPolling<{orders:CustomerOrder[]}>({
+      request:signal=>account.request('/api/mi-cuenta/pedidos',{signal}),
+      onData:data=>{setOrders(data.orders||[]);setOrderError('');setOrdersLoading(false);setOrdersUpdatedAt(new Date().toISOString());},
+      onError:()=>{setOrderError('No pudimos actualizar el estado. La información mostrada puede estar desactualizada.');setOrdersLoading(false);}
+    });
+    refreshOrders.current=polling.refresh;
+    return()=>{refreshOrders.current=()=>{};polling.stop();};
+  },[section,orderUserId,account.request]);
   function closeLocation(){setLocationOpen(false);requestAnimationFrame(()=>locationTrigger.current?.focus());}
   function chooseMunicipality(municipality:BuyerDestination['municipality']){
     const selected:BuyerDestination={municipality,source:'manual'};setDestination(selected);
@@ -128,7 +126,7 @@ export default function BuyerExperience({section,quickFilter=''}:{section:string
           {favorites.notice&&<p role="status">{favorites.notice}</p>}
         </section></RestaurantSection>
       </>}
-      {section==='pedidos'&&<section className="buyer-orders"><div className="buyer-page-heading"><ReceiptText size={25}/><h1>Mis pedidos</h1></div>{!account.ready?<p role="status">Cargando tu cuenta...</p>:!account.session?<div className="buyer-empty buyer-activity-empty"><ReceiptText size={36}/><h2>Tus pedidos, en un solo lugar</h2><p>Entra con tu cuenta para consultar su estado.</p><Link href="/mi-cuenta" className="buyer-primary-link">Entrar a mi cuenta<ArrowRight size={18}/></Link></div>:<>{ordersLoading&&<p role="status">Consultando pedidos...</p>}{orderError&&<p role="alert">{orderError}</p>}{!ordersLoading&&!orderError&&!orders.length&&<div className="buyer-empty buyer-activity-empty"><ShoppingBag size={36}/><h2>Aún no tienes pedidos</h2><Link href="/comprar/restaurantes" className="buyer-primary-link">Explorar restaurantes<ArrowRight size={18}/></Link></div>}<BuyerOrderList orders={orders}/></>}</section>}
+      {section==='pedidos'&&<section className="buyer-orders"><div className="buyer-page-heading"><ReceiptText size={25}/><h1>Mis pedidos</h1></div>{!account.ready?<p role="status">Cargando tu cuenta...</p>:!account.session?<div className="buyer-empty buyer-activity-empty"><ReceiptText size={36}/><h2>Tus pedidos, en un solo lugar</h2><p>Entra con tu cuenta para consultar su estado.</p><Link href="/mi-cuenta" className="buyer-primary-link">Entrar a mi cuenta<ArrowRight size={18}/></Link></div>:<>{ordersLoading&&<p role="status">Consultando pedidos...</p>}{orderError&&<p role="alert">{orderError}</p>}{!ordersLoading&&!orderError&&!orders.length&&<div className="buyer-empty buyer-activity-empty"><ShoppingBag size={36}/><h2>Aún no tienes pedidos</h2><Link href="/comprar/restaurantes" className="buyer-primary-link">Explorar restaurantes<ArrowRight size={18}/></Link></div>}<BuyerOrderList orders={orders} error={orderError} updatedAt={ordersUpdatedAt} onRefresh={()=>refreshOrders.current()}/></>}</section>}
       {section==='cuenta'&&<section className="buyer-account"><h1>Mi cuenta</h1><div className="buyer-account-identity"><span><UserRound size={32}/></span><h2>{account.data?.profile.name || 'Tu espacio en Mercáu'}</h2></div><p>{account.session?'Gestiona tu perfil y consulta tu actividad.':'Puedes explorar sin cuenta. Entra o regístrate cuando quieras hacer un pedido.'}</p><Link href={account.session?'/mi-cuenta/perfil':'/mi-cuenta'} className="buyer-primary-link">{account.session?'Ver mi perfil':'Entrar o crear mi cuenta'}<ArrowRight size={18}/></Link><Link href="/comprar/favoritos"><span><Heart size={21}/>Mis favoritos</span><ArrowRight size={18}/></Link><Link href="/comprar/pedidos"><span><ReceiptText size={21}/>Mis pedidos</span><ArrowRight size={18}/></Link>{account.data?.businesses.length? <Link href="/mi-cuenta/negocio"><span><Store size={21}/>Administrar mi negocio</span><ArrowRight size={18}/></Link>:null}<Link href="/contacto"><span><UserRound size={21}/>Ayuda y contacto</span><ArrowRight size={18}/></Link></section>}
     </div>
     <BuyerNavigation ref={bottomRef} section={section}/>
