@@ -2,7 +2,7 @@
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, CheckCircle2, Plus, Search, ShoppingCart, Store, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Plus, Search, ShoppingCart, Store, X } from 'lucide-react';
 import RestaurantPilot from '@/components/RestaurantPilot';
 import CatalogProductImage from '@/components/CatalogProductImage';
 import { businessCatalogPath } from '@/lib/business-public-url';
@@ -158,5 +158,7 @@ export default function RestaurantDishes({ municipality, businesses, onQuery, ch
 }
 
 const DishCard=memo(function DishCard({dish,priority,onSelect}:{dish:DiscoveredDish;priority:boolean;onSelect:(dish:DiscoveredDish)=>void}){
-  return <article className="dish-card"><button className="dish-card-open" aria-label={`Personalizar ${dish.name} de ${dish.restaurantName}`} onClick={()=>onSelect(dish)}><div className="dish-photo"><CatalogProductImage name={dish.name} imageUrl={dish.image} priority={priority} sizes="(max-width: 639px) 50vw, (max-width: 999px) 33vw, 240px"/></div><div className="dish-card-body"><h2>{dish.name}</h2><strong>{dish.from&&<small>Desde </small>}{money(dish.price)}</strong><span><Store size={13}/>{dish.restaurantName}</span><i aria-hidden="true"><Plus size={21}/></i></div></button></article>;
+  const closed=dish.acceptingOrders===false;
+  const opening=dish.nextOpeningAt?new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(dish.nextOpeningAt)):'';
+  return <article className={`dish-card${closed?' dish-card-closed':''}`}><button className="dish-card-open" aria-label={`${closed?'Ver producto, negocio cerrado:':'Personalizar'} ${dish.name} de ${dish.restaurantName}`} onClick={()=>onSelect(dish)}><div className="dish-photo"><CatalogProductImage name={dish.name} imageUrl={dish.image} priority={priority} sizes="(max-width: 639px) 50vw, (max-width: 999px) 33vw, 240px"/>{closed&&<span className="dish-closed-badge">Cerrado</span>}</div><div className="dish-card-body"><h2>{dish.name}</h2><strong>{dish.from&&<small>Desde </small>}{money(dish.price)}</strong><span><Store size={13}/>{dish.restaurantName}</span>{closed&&<p className="dish-availability">{opening?`Abre ${opening}`:'Consulta el horario'}</p>}<i aria-hidden="true">{closed?<Eye size={20}/>:<Plus size={21}/>}</i></div></button></article>;
 });

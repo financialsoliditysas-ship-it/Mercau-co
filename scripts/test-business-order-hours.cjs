@@ -12,6 +12,11 @@ async function main(){
  assert.equal(businessOrderHours({...data,specialHours:[{date:'2026-10-30',closed:true,periods:[]}]},at('2026-10-30','09:00')).open,false);
  assert.equal(businessOrderHours({...data,specialHours:[{date:'2026-11-02',closed:false,periods:[{start:'09:00',end:'10:00'}]}]},at('2026-11-02','09:30')).open,true);
  assert.equal(businessOrderHours(null).open,true,'Do not invent hours for businesses without a structured schedule');assert.equal(businessOrderHours({schedule:[]}).open,false);
+ assert.equal(businessOrderHours(data,at('2026-10-30','12:00')).nextOpeningAt,'2026-10-30T20:00:00.000Z');
+ assert.equal(businessOrderHours(data,at('2026-10-31','20:00')).nextOpeningAt,'2026-11-01T13:08:00.000Z');
+ assert.equal(businessOrderHours(data,at('2026-11-02','09:00')).nextOpeningAt,'2026-11-03T13:00:00.000Z');
+ assert.equal(businessOrderHours({...data,temporaryClosed:true}).nextOpeningAt,undefined);
+ assert.equal(businessOrderHours({...data,specialHours:[{date:'2026-11-01',closed:true,periods:[]}]},at('2026-10-31','20:00')).nextOpeningAt,'2026-11-03T13:00:00.000Z');
  const route=load('app/api/piloto/restaurante/route.ts',{'@/lib/restaurant-pilot':{pilotId:'demo',pilotRestaurant:async()=>({name:'QA',menu:[],enabled:true,schedule_open:false,availability_message:'Cerrado',is_live:true})}});
  for(const mode of ['menu','availability']){const response=await route.GET(new Request(`https://example.invalid?mode=${mode}`));assert.equal(response.status,200);const body=await response.json();assert.equal(body.enabled,false);assert.equal(body.availabilityMessage,'Cerrado');assert.equal(response.headers.get('cache-control'),'no-store');}
  console.log('PASS saved split hours, Colombia timezone, exact closing boundaries, Sunday 08:08 preserved, Monday, special/temporary closure, unknown schedules and closed menu/availability API. No services contacted.');

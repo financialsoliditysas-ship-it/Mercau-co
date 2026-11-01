@@ -41,7 +41,21 @@ function storage(entries){const map=new Map(entries);return{get length(){return 
  }
  rangeFailure=null;
  rows.push({business_id:id(0),data:{temporaryClosed:true}});
- assert(!(await discover.discoverDishes({municipality:'Nechí'})).products.some(product=>product.restaurantId===id(0)),'Closed restaurants must not appear as orderable dishes');rows.pop();
+ let closedPage=await discover.discoverDishes({municipality:'Nechí'}),visible=[...closedPage.products];
+ assert(!closedPage.products.some(product=>product.restaurantId===id(0)),'Open businesses must appear first');
+ while(closedPage.nextCursor){closedPage=await discover.discoverDishes({municipality:'Nechí',cursor:closedPage.nextCursor});visible.push(...closedPage.products);}
+ assert.equal(visible.length,32,'Closed products remain discoverable');assert.equal(new Set(visible.map(product=>product.id)).size,32);
+ assert.equal(visible.findIndex(product=>product.restaurantId===id(0)),28,'All open products precede closed products');
+ assert(visible.slice(28).every(product=>product.acceptingOrders===false&&product.availabilityMessage.includes('Cerrado')));
+ let searchClosed=await discover.discoverDishes({municipality:'Nechí',query:'Restaurante 0'}),foundClosed=[...searchClosed.products];
+ while(searchClosed.nextCursor){searchClosed=await discover.discoverDishes({municipality:'Nechí',query:'Restaurante 0',cursor:searchClosed.nextCursor});foundClosed.push(...searchClosed.products);}
+ assert.equal(foundClosed.length,4);assert(foundClosed.every(product=>!product.acceptingOrders));rows.pop();
+ const allClosed=directory.map(business=>({business_id:business.id,data:{temporaryClosed:true}}));rows.push(...allClosed);
+ const closedOnly=await discover.discoverDishes({municipality:'Nechí'});assert.equal(closedOnly.products.length,8);assert(closedOnly.products.every(product=>product.acceptingOrders===false));rows.splice(rows.length-allClosed.length);
+ const RealDate=global.Date;let instant=Date.parse('2026-10-31T19:59:00-05:00');
+ global.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[instant]));}static now(){return instant;}};
+ rows.push({business_id:id(0),data:{schedule:Array.from({length:7},()=>({closed:false,periods:[{start:'08:00',end:'20:00'}]}))}});
+ try{let crossing=await discover.discoverDishes({municipality:'Nechí'}),crossingProducts=[...crossing.products];instant=RealDate.parse('2026-10-31T20:01:00-05:00');while(crossing.nextCursor){crossing=await discover.discoverDishes({municipality:'Nechí',cursor:crossing.nextCursor});crossingProducts.push(...crossing.products);}assert.equal(crossingProducts.length,32);assert.equal(new Set(crossingProducts.map(p=>p.id)).size,32,'Closing during pagination must not duplicate or lose products');assert(crossingProducts.some(p=>p.restaurantId===id(0)&&p.acceptingOrders===false));}finally{global.Date=RealDate;rows.pop();}
  const group={id:'11111111-1111-4111-8111-111111111111',name:'Tamaño',type:'single',required:true,minSelections:1,maxSelections:1,choices:[{id:'22222222-2222-4222-8222-222222222222',name:'Mediano',priceDelta:2000,defaultSelected:false},{id:'33333333-3333-4333-8333-333333333333',name:'Grande',priceDelta:4000,defaultSelected:false}]};
  assert.deepEqual(pricing.dishStartingPrice(10000,[group]),{price:12000,from:true});assert.deepEqual(pricing.dishStartingPrice(10000,[]),{price:10000,from:false});
  const carts=load('lib/dish-cart.ts'),store=storage([[`mercau:catalog-cart:${id(0)}:v1`,'[{"quantity":1}]'],[`mercau:catalog-cart:${id(1)}:v1`,'[]'],['other','unchanged']]);

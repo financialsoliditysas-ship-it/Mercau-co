@@ -121,7 +121,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     if(!discovery || !discoveryProductId || !menu.length || discoveryOpened.current===discoveryProductId)return;
     discoveryOpened.current=discoveryProductId;
     const product=menu.find(item=>item.id===discoveryProductId);
-    if(!enabled || !product){setNotice('Este producto no está disponible para pedir. Puedes consultar el menú.');return;}
+    if(!product){setNotice('Este producto no está disponible para consultar. Puedes ver el menú.');return;}
     openCustomization(product);
     // Opening from discovery uses the same product editor and its existing defaults.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -582,7 +582,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     });
   }
   async function addCustomizedProduct() {
-    if(!customizing)return;
+    if(!customizing||!enabled||busy)return;
     const incomplete=customizing.optionGroups.find(group=>{
       const count=(customSelections[group.id] || []).length;
       return count<group.minSelections || count>group.maxSelections || (group.required && count===0);
@@ -740,7 +740,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map((p,index) => {
         const count = cart.filter(l => l.productId === p.id).reduce((sum,line)=>sum+line.quantity,0);
         return <article key={p.id} data-menu-category={p.category}>
-          {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={!enabled || busy}/>}
+          {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={busy}/>}
           <div className="pilot-product-image aspect-[4/3] w-full overflow-hidden bg-gray-100"><CatalogProductImage name={p.name} imageUrl={p.image} priority={index<2} sizes={visualMenu?'(max-width: 639px) 112px, 160px':undefined} /></div><div className="pilot-product-body"><h2>{p.name}</h2>{p.description && <p className="text-sm menu-product-description">{p.description}</p>}<p className="pilot-product-price">{money(p.price)}</p>
           {p.optionGroups.length>0 && <p className="pilot-customizable">Personalizable</p>}
           {count>0 && <p className="text-center text-sm font-bold text-[#D82016]">{count} en tu pedido</p>}
@@ -794,15 +794,16 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       </aside></div>
       {customizing && <div className="pilot-customizer-backdrop" role="presentation" onMouseDown={()=>setCustomizing(null)}><section className="pilot-customizer" role="dialog" aria-modal="true" aria-labelledby="customizer-title" onMouseDown={event=>event.stopPropagation()}>
         {discovery&&customizing.image&&<div className="dish-detail-photo"><CatalogProductImage name={customizing.name} imageUrl={customizing.image} priority sizes="(max-width: 639px) 100vw, 560px"/></div>}
-        <div className="pilot-customizer-heading"><div><p>Personaliza tu pedido</p><h2 id="customizer-title">{customizing.name}</h2>{!discovery&&<strong>Desde {money(customizing.price)}</strong>}</div><button type="button" onClick={()=>setCustomizing(null)} aria-label="Cerrar personalización">×</button></div>
+        <div className="pilot-customizer-heading"><div><p>{enabled?'Personaliza tu pedido':'Detalle del producto'}</p><h2 id="customizer-title">{customizing.name}</h2>{!discovery&&<strong>Desde {money(customizing.price)}</strong>}</div><button type="button" onClick={()=>setCustomizing(null)} aria-label="Cerrar personalización">×</button></div>
         {discovery&&<><p className="dish-product-restaurant"><StoreIcon/>{title} · <a href={returnPath?.startsWith('/comprar/restaurantes')?`/negocios/${restaurantId}/catalogo`:returnPath}>Ver menú</a></p><strong className="dish-detail-price">{dishStartingPrice(customizing.price,customizing.optionGroups).from?'Desde ':''}{money(dishStartingPrice(customizing.price,customizing.optionGroups).price)}</strong></>}
         {visualMenu && customizing.description && <p className="menu-product-full-description">{customizing.description}</p>}
+        {!enabled&&<p role="status" className="menu-product-full-description">{availabilityMessage || 'El negocio no recibe pedidos en este momento.'} Puedes consultar el producto, pero no agregarlo al pedido.</p>}
         {discovery&&notice.startsWith('Completa “')&&<p role="alert">{notice}</p>}
-        {customizing.optionGroups.map(group=><fieldset key={group.id}><legend>{group.name}{group.required?' *':''}</legend><p className="pilot-option-help">{group.type==='single'?'Elige una opción':`Puedes elegir hasta ${group.maxSelections}`}</p>
+        {customizing.optionGroups.map(group=><fieldset key={group.id} disabled={!enabled}><legend>{group.name}{group.required?' *':''}</legend><p className="pilot-option-help">{group.type==='single'?'Elige una opción':`Puedes elegir hasta ${group.maxSelections}`}</p>
           {group.choices.map(choice=>{const checked=(customSelections[group.id] || []).includes(choice.id);return <label key={choice.id}><input type={group.type==='single'?'radio':'checkbox'} name={`choice-${group.id}`} checked={checked} onChange={()=>selectChoice(group.id,choice.id,group.type,group.maxSelections)}/><span>{choice.name}</span>{choice.priceDelta>0&&<strong>+ {money(choice.priceDelta)}</strong>}</label>;})}
         </fieldset>)}
-        <label className="pilot-item-note">Observación para este producto<textarea maxLength={240} rows={3} value={customNote} onChange={e=>setCustomNote(e.target.value)} placeholder="Ej: carne bien asada y salsas aparte"/><small>{customNote.length}/240</small></label>
-        <div className="pilot-customizer-footer"><div className="pilot-quantity"><button type="button" disabled={customQuantity<=1} onClick={()=>setCustomQuantity(value=>Math.max(1,value-1))}>-</button><output>{customQuantity}</output><button type="button" disabled={customQuantity>=10} onClick={()=>setCustomQuantity(value=>Math.min(10,value+1))}>+</button></div><button type="button" className="pilot-primary" onClick={addCustomizedProduct}>Agregar · {money((customizing.price+customizing.optionGroups.reduce((sum,group)=>sum+group.choices.filter(choice=>(customSelections[group.id] || []).includes(choice.id)).reduce((subtotal,choice)=>subtotal+choice.priceDelta,0),0))*customQuantity)}</button></div>
+        {enabled&&<label className="pilot-item-note">Observación para este producto<textarea maxLength={240} rows={3} value={customNote} onChange={e=>setCustomNote(e.target.value)} placeholder="Ej: carne bien asada y salsas aparte"/><small>{customNote.length}/240</small></label>}
+        <div className="pilot-customizer-footer"><div className="pilot-quantity"><button type="button" disabled={customQuantity<=1} onClick={()=>setCustomQuantity(value=>Math.max(1,value-1))}>-</button><output>{customQuantity}</output><button type="button" disabled={customQuantity>=10} onClick={()=>setCustomQuantity(value=>Math.min(10,value+1))}>+</button></div><button type="button" className="pilot-primary" disabled={!enabled||busy} onClick={addCustomizedProduct}>{enabled?<>Agregar · {money((customizing.price+customizing.optionGroups.reduce((sum,group)=>sum+group.choices.filter(choice=>(customSelections[group.id] || []).includes(choice.id)).reduce((subtotal,choice)=>subtotal+choice.priceDelta,0),0))*customQuantity)}</>:'Negocio cerrado'}</button></div>
       </section></div>}
     </>}
     {!manager && cart.length > 0 && !checkout && <a className="pilot-mobile-cart" href="#tu-pedido" aria-label={`Ver pedido, ${cart.reduce((sum,line)=>sum+line.quantity,0)} productos, ${discovery?'subtotal de productos':'total'} ${money(discovery?subtotal:subtotal+fee)}`}><ShoppingCart size={21} aria-hidden="true" /><span>Ver pedido{discovery&&<small>Domicilio y total al revisar</small>}</span><span className="pilot-cart-count">{cart.reduce((sum,line)=>sum+line.quantity,0)}</span><strong>{money(discovery?subtotal:subtotal + fee)}</strong></a>}
