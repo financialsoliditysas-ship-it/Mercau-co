@@ -8,21 +8,26 @@ function colombiaDay(value = new Date()) {
 
 export async function getOperationsDashboard() {
   const db = getSupabaseAdminClient();
-  const [deliveriesResult, foodResult, financeResult, settledResult] = await Promise.all([
+  const dayStart = new Date(`${colombiaDay()}T00:00:00-05:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const [deliveriesResult, foodResult, financeResult, settledResult, todayFoodResult] = await Promise.all([
     db.from('delivery_orders').select('id,public_id,customer_name,pickup_name,delivery_address,status,shipday_status,shipday_order_id,shipday_last_error,shipday_carrier_id,courier_name,courier_phone,delivery_fee,created_at,updated_at,assigned_at,picked_up_at,delivered_at').order('created_at', { ascending: false }).limit(200),
     db.from('pilot_food_orders').select('id,public_id,restaurant_id,customer_name,status,subtotal,delivery_fee,delivery_order_id,created_at').order('created_at', { ascending: false }).limit(200),
     db.from('order_financial_snapshots').select('id,restaurant_id,delivery_order_id,merchant_net,merchant_delivery_share,courier_share,vega_share,payment_status,settlement_status,created_at').eq('payment_status', 'CONFIRMED').neq('settlement_status', 'SETTLED').limit(500),
-    db.from('financial_settlement_items').select('snapshot_id,component,settlement:financial_settlements!inner(status)').eq('settlement.status', 'CONFIRMED')
+    db.from('financial_settlement_items').select('snapshot_id,component,settlement:financial_settlements!inner(status)').eq('settlement.status', 'CONFIRMED'),
+    db.from('pilot_food_orders').select('id', { count: 'exact', head: true }).gte('created_at', dayStart.toISOString()).lt('created_at', dayEnd.toISOString())
   ]);
-  if (deliveriesResult.error || foodResult.error || financeResult.error || settledResult.error) throw new Error('No se pudo consolidar la operación diaria.');
+  if (deliveriesResult.error || foodResult.error || financeResult.error || settledResult.error || todayFoodResult.error) throw new Error('No se pudo consolidar la operación diaria.');
 
   const deliveries = deliveriesResult.data || [];
   const foodOrders = foodResult.data || [];
   const snapshots = financeResult.data || [];
   const settled = new Set((settledResult.data || []).map(row => `${row.snapshot_id}:${row.component}`));
   const restaurantIds = [...new Set([...foodOrders.map(order => order.restaurant_id), ...snapshots.map(row => row.restaurant_id)].filter(Boolean))];
-  const restaurantsResult = restaurantIds.length ? await db.from('pilot_restaurants').select('id,name').in('id', restaurantIds) : { data: [], error: null };
+  const restaurantsResult = restaurantIds.length ? await db.from('pilot_restaurants').select('id,name,is_live').in('id', restaurantIds) : { data: [], error: null };
+  if (restaurantsResult.error) throw new Error('No se pudieron identificar los negocios de los pedidos.');
   const restaurantNames = new Map((restaurantsResult.data || []).map(row => [row.id, row.name]));
+  const liveRestaurants = new Set((restaurantsResult.data || []).filter(row => row.is_live).map(row => row.id));
   const deliveriesById = new Map(deliveries.map(order => [order.id, order]));
   const now = Date.now();
 
@@ -43,7 +48,6 @@ export async function getOperationsDashboard() {
   ];
 
   const today = colombiaDay();
-  const todayDeliveries = deliveries.filter(order => colombiaDay(new Date(order.created_at)) === today);
   const active = deliveries.filter(order => ACTIVE_DELIVERY_STATES.includes(order.status));
   const completedToday = deliveries.filter(order => order.delivered_at && colombiaDay(new Date(order.delivered_at)) === today);
   const pendingRestaurant = foodOrders.filter(order => order.status === 'pending');
@@ -68,7 +72,12 @@ export async function getOperationsDashboard() {
 
   return {
     generatedAt: new Date().toISOString(),
-    summary: { ordersToday: todayDeliveries.length, pendingRestaurant: pendingRestaurant.length, activeDeliveries: active.length, completedToday: completedToday.length, issues: issues.length },
+    summary: { ordersToday: todayFoodResult.count || 0, pendingRestaurant: pendingRestaurant.length, activeDeliveries: active.length, completedToday: completedToday.length, issues: issues.length },
+    orders: foodOrders.map(order => ({ public_id: order.public_id, customer_name: order.customer_name,
+      business_name: restaurantNames.get(order.restaurant_id) || 'Negocio sin identificar',
+      is_test: !liveRestaurants.has(order.restaurant_id), status: order.status,
+      delivery_status: order.delivery_order_id ? deliveriesById.get(order.delivery_order_id)?.status || null : null,
+      subtotal: order.subtotal, delivery_fee: order.delivery_fee, created_at: order.created_at })),
     issues: issues.slice(0, 50),
     active: active.slice(0, 50),
     balances: { merchants: [...merchantBalances.values()].sort((a, b) => b.amount - a.amount), couriers: [...courierBalances.values()].sort((a, b) => b.amount - a.amount), vega: { reference: 'VEGA_EXPRESS', name: 'Vega Express', amount: vegaBalance, orders: vegaItems.length, items: vegaItems } }
