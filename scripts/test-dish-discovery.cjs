@@ -19,7 +19,7 @@ function queryResult(data,start,end) {
  return {error:null,status:200,count:data.length,data:data.slice(start,end+1)};
 }
 const db={from(table){const filters=[],sort=[];let start=0,end=Infinity,columns='';const q={select(value){columns=value;return q;},eq(k,v){filters.push(r=>r[k]===v);return q;},in(k,v){filters.push(r=>v.includes(r[k]));return q;},gt(k,v){filters.push(r=>r[k]>v);return q;},or(){return q;},ilike(k,v){const word=v.slice(1,-1).replace(/\\([\\%_])/g,'$1').toLowerCase();filters.push(r=>r[k].toLowerCase().includes(word));return q;},order(k){sort.push(k);return q;},range(a,b){start=a;end=b;return q;},then(resolve,reject){calls.push({table,columns,start,end});let data=(table==='pilot_restaurants'?restaurants:rows).filter(r=>filters.every(f=>f(r)));data.sort((a,b)=>{for(const key of sort){const c=typeof a[key]==='number'?a[key]-b[key]:String(a[key]).localeCompare(String(b[key]));if(c)return c;}return 0;});return Promise.resolve(queryResult(data,start,end)).then(resolve,reject);}};return q;}};
-const discover=load('lib/dish-discovery.ts',{'./public-read-cache':load('lib/public-read-cache.ts'),'./airtable-directory':{loadDirectoryBusinesses:async()=>directory},'./supabase-admin':{getSupabaseAdminClient:()=>db},'./catalog-validation':validation,'./dish-pricing':pricing,'./business-public-url':{businessCatalogPath:b=>`/negocios/${b.id}/catalogo`,businessPath:b=>`/negocios/${b.id}`}});
+const discover=load('lib/dish-discovery.ts',{'./business-order-hours':load('lib/business-order-hours.ts'),'./public-read-cache':load('lib/public-read-cache.ts'),'./airtable-directory':{loadDirectoryBusinesses:async()=>directory},'./supabase-admin':{getSupabaseAdminClient:()=>db},'./catalog-validation':validation,'./dish-pricing':pricing,'./business-public-url':{businessCatalogPath:b=>`/negocios/${b.id}/catalogo`,businessPath:b=>`/negocios/${b.id}`}});
 function storage(entries){const map=new Map(entries);return{get length(){return map.size;},key:i=>[...map.keys()][i]||null,getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};}
 (async()=>{
  let result=await discover.discoverDishes({municipality:'Nechí'});assert.equal(result.products.length,8);assert.equal(new Set(result.products.map(p=>p.restaurantId)).size,4);
@@ -40,6 +40,8 @@ function storage(entries){const map=new Map(entries);return{get length(){return 
   rangeFailure=failure;await assert.rejects(()=>discover.discoverDishes({municipality:'Nechí',cursor:laterCursor}));
  }
  rangeFailure=null;
+ rows.push({business_id:id(0),data:{temporaryClosed:true}});
+ assert(!(await discover.discoverDishes({municipality:'Nechí'})).products.some(product=>product.restaurantId===id(0)),'Closed restaurants must not appear as orderable dishes');rows.pop();
  const group={id:'11111111-1111-4111-8111-111111111111',name:'Tamaño',type:'single',required:true,minSelections:1,maxSelections:1,choices:[{id:'22222222-2222-4222-8222-222222222222',name:'Mediano',priceDelta:2000,defaultSelected:false},{id:'33333333-3333-4333-8333-333333333333',name:'Grande',priceDelta:4000,defaultSelected:false}]};
  assert.deepEqual(pricing.dishStartingPrice(10000,[group]),{price:12000,from:true});assert.deepEqual(pricing.dishStartingPrice(10000,[]),{price:10000,from:false});
  const carts=load('lib/dish-cart.ts'),store=storage([[`mercau:catalog-cart:${id(0)}:v1`,'[{"quantity":1}]'],[`mercau:catalog-cart:${id(1)}:v1`,'[]'],['other','unchanged']]);

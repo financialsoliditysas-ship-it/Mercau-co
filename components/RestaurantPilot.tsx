@@ -105,6 +105,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [menu, setMenu] = useState<PilotProduct[]>([]);
   const [fee, setFee] = useState(0);
   const [enabled, setEnabled] = useState(false);
+  const [availabilityMessage,setAvailabilityMessage]=useState('');
   const [deliveryMode, setDeliveryMode] = useState<'MERCAU'|'OWN'>('MERCAU');
   const [category, setCategory] = useState('Todo');
   const [visibleCategory,setVisibleCategory]=useState('Todo');
@@ -357,9 +358,22 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   }, [manager, session, pushApi]);
   useEffect(() => {
     if (manager) return;
-    api('?mode=menu').then(r => { setMenu(r.menu); setFee(r.fee); setEnabled(r.enabled); setDeliveryMode(r.deliveryMode || 'MERCAU'); })
+    api('?mode=menu').then(r => { setMenu(r.menu); setFee(r.fee); setEnabled(r.enabled); setAvailabilityMessage(r.availabilityMessage || ''); setDeliveryMode(r.deliveryMode || 'MERCAU'); })
       .catch(e => setNotice(e.message));
   }, [api, manager]);
+  useEffect(()=>{
+    if(manager||preview||!live)return;
+    let active=true,loading=false;
+    async function update(){
+      if(loading||document.visibilityState!=='visible')return;loading=true;
+      try{const value=await api('?mode=availability',{signal:AbortSignal.timeout(10000)});if(active){setEnabled(value.enabled);setAvailabilityMessage(value.availabilityMessage || '');}}
+      catch{if(active){setEnabled(false);setAvailabilityMessage('No se pudo comprobar si el negocio está abierto. Reconecta e intenta nuevamente.');}}
+      finally{loading=false;}
+    }
+    const refresh=()=>{void update();},timer=setInterval(refresh,30000);
+    refresh();window.addEventListener('focus',refresh);window.addEventListener('online',refresh);document.addEventListener('visibilitychange',refresh);
+    return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',refresh);window.removeEventListener('online',refresh);document.removeEventListener('visibilitychange',refresh);};
+  },[api,manager,preview,live]);
   const orderChangesActive=manager&&orders.some(order=>order.changes!==undefined);
   useEffect(()=>{
     if(!orderChangesActive)return;
@@ -698,10 +712,10 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
         <div className="menu-visual-title"><h1>{title}</h1><p>Menú</p></div>
       </section>}
       {!embedded && <section className="pilot-intro"><h1>{title}</h1>{!live && <><p>Hamburguesas, parrilla y malteadas · Nechi</p><p>Horario de referencia: 5:00 p. m. a 10:00 p. m.</p></>}
-        {!enabled && <p>Pedidos pausados.</p>}</section>}
+        {!enabled && <p role="status">{availabilityMessage || 'Pedidos pausados.'}</p>}</section>}
       {live && <p className="pilot-coverage">Solo casco urbano de Nechí. Puedes pagar en efectivo contra entrega o mediante Bre-B. El negocio debe confirmar tu pedido.</p>}
       {live && deliveryMode==='OWN' && <p className="pilot-delivery-owner"><strong>Entrega realizada por el negocio.</strong> El pedido será llevado por el equipo de {title}, no por un domiciliario de Mercáu.</p>}
-      {embedded && !enabled && <p role="status">Pedidos pausados.</p>}
+      {embedded && !enabled && <p role="status">{availabilityMessage || 'Pedidos pausados.'}</p>}
       {!menu.length && <p>No hay productos disponibles para pedir.</p>}
       <nav ref={categoriesRef} className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
         <button key={c} data-category={c} aria-pressed={c === (visualMenu&&category==='Todo'?visibleCategory:category)} onClick={() => {setCategory(c);setVisibleCategory(c);if(visualMenu)requestAnimationFrame(()=>categoriesRef.current?.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));}}>{c}</button>)}</nav>

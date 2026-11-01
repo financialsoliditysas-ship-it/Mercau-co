@@ -20,9 +20,10 @@ function failure(error: unknown) {
 export async function GET(request: Request) {
   try {
     const mode = new URL(request.url).searchParams.get('mode');
-    if (mode === 'menu') {
-      const r = await pilotRestaurant(restaurantId(request));
-      return NextResponse.json({ name: r.name, menu: r.menu, fee: r.delivery_fee, enabled: r.enabled, live: r.is_live === true,
+    if (mode === 'menu' || mode === 'availability') {
+      const r = await pilotRestaurant(restaurantId(request),mode==='menu');
+      if(mode==='availability')return NextResponse.json({enabled:r.enabled&&r.schedule_open!==false,availabilityMessage:r.availability_message || ''},{headers:{'Cache-Control':'no-store'}});
+      return NextResponse.json({ name: r.name, menu: r.menu, fee: r.delivery_fee, enabled: r.enabled&&r.schedule_open!==false, availabilityMessage:r.availability_message || '', live: r.is_live === true,
         deliveryMode: r.delivery_mode || 'MERCAU' },
         { headers: { 'Cache-Control': 'no-store' } });
     }

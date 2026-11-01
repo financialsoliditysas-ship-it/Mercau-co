@@ -3,11 +3,14 @@ const contract=JSON.parse(fs.readFileSync('data/production-backend-contract.json
 // Retain the published baseline. Only these explicitly versioned safety changes supersede it.
 const safety=JSON.parse(fs.readFileSync('data/logistics-controls-contract.json'));
 const changes=JSON.parse(fs.readFileSync('data/order-changes-contract.json'));
+const hours=JSON.parse(fs.readFileSync('data/business-hours-contract.json'));
+for(const [file,expected]of Object.entries(hours))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file,'utf8').replace(/\r\n/g,'\n')).digest('hex'),expected,'Unexpected saved-hours change '+file);
 assert.equal(safety.status,'release-requires-sql-v2-v3');
 for(const [index,source] of ['supabase/drafts/logistics_controls_v2.sql','supabase/drafts/order_receipts_v3.sql'].entries()){
  assert.equal(fs.readFileSync(source,'utf8').replace(/\r\n/g,'\n'),fs.readFileSync(safety.releaseMigrations[index],'utf8').replace(/\r\n/g,'\n'),'Release migration differs from tested SQL');
 }
 for(const [file,expected]of Object.entries(contract.sha256)){
+ if(hours[file])continue;
  let bytes=fs.readFileSync(file);
  if(file==='lib/delivery-tracking.ts')bytes=Buffer.from(bytes.toString('utf8').replace('/^(?:MCU-\\d{6,}|MCU-1-\\d{6})$/','/^MCU-\\d{6,}$/'));
  // Only the authorized reference-format alternatives differ from the operational hashes.

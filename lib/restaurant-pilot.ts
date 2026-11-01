@@ -5,6 +5,7 @@ import { catalogOptionGroups, type CatalogOptionGroup } from './catalog-validati
 import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finance';
 import { orderChangesEnabled } from './order-changes-config';
 import { changeSelection, type OrderChange } from './order-changes-model';
+import { businessOrderHours } from './business-order-hours';
 
 export const pilotId = 'restaurante-mercado';
 export class PilotError extends Error {
@@ -21,7 +22,7 @@ export async function pilotUser(request: Request) {
 }
 export async function pilotMember(userId: string, manager = false, restaurantId = pilotId) {
   if (restaurantId !== pilotId) {
-    const restaurant = await pilotRestaurant(restaurantId);
+    const restaurant = await pilotRestaurant(restaurantId,false,false);
     if (!manager) return;
     const { data, error } = await getSupabaseAdminClient().from('business_admins').select('business_id')
       .eq('business_id', restaurant.directory_business_id).eq('user_id', userId).eq('status', 'Activo').maybeSingle();
@@ -35,12 +36,19 @@ export async function pilotMember(userId: string, manager = false, restaurantId 
   if (!data || (manager && data.role !== 'manager'))
     throw new PilotError('Esta cuenta no tiene acceso a esta prueba privada.', 403);
 }
-export async function pilotRestaurant(restaurantId = pilotId) {
+export async function pilotRestaurant(restaurantId = pilotId, includeMenu = true, checkHours = true) {
   if (restaurantId !== pilotId && !/^rec[a-zA-Z0-9]{14}$/.test(restaurantId)) throw new PilotError('Negocio no disponible.', 404);
   const { data, error } = await getSupabaseAdminClient().from('pilot_restaurants').select('*').eq('id', restaurantId).single();
   if (error || !data) throw new PilotError('La prueba todavia no esta configurada.', 503);
   if (restaurantId !== pilotId && (!data.is_live || !data.directory_initialized || data.directory_business_id !== restaurantId))
     throw new PilotError('Este negocio no tiene pedidos habilitados.', 404);
+  if(checkHours && data.is_live && data.directory_business_id){
+    const settings=await getSupabaseAdminClient().from('business_account_settings').select('data').eq('business_id',data.directory_business_id).maybeSingle();
+    if(settings.error)throw new PilotError('No se pudo comprobar el horario del negocio. Intenta nuevamente.',503);
+    const hours=businessOrderHours(settings.data?.data);
+    data.schedule_open=hours.open;data.availability_message=hours.message;
+  }
+  if(!includeMenu)return data;
   if(data.directory_initialized && data.directory_business_id) {
     const menu=await getSupabaseAdminClient().from('business_catalog_products').select('id,name,description,section,price,image_path,version,option_groups')
       .eq('business_id',data.directory_business_id).eq('status','published').eq('available',true).order('position').order('created_at');
@@ -146,6 +154,11 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
   const input = validatePilotOrder(body, restaurant.menu);
   const repeatOf = typeof body.repeatOf === 'string' ? body.repeatOf : '';
   if(repeatOf && (!/^(?:PRB-\d+|MCU-1-\d{6})$/.test(repeatOf) || body.repeatConfirmed!==true))throw new PilotError('Confirma explícitamente la compra adicional.');
+  if(restaurant.schedule_open===false){
+    const receipt=await lookupPilotOrderIntent(userId,input.request_key,restaurantId);
+    if(receipt.outcome!=='existing')throw new PilotError(restaurant.availability_message || 'El negocio está cerrado.',409);
+    // Let the existing creation RPC verify the fingerprint of a previously saved request.
+  }
   const { data, error } = await db.rpc('create_food_order_once_v3', {
     p_scope: `food:${userId}:${restaurantId}`, p_key: input.request_key,
     p_payload: { ...input, restaurant_id: restaurantId, customer_id: userId,

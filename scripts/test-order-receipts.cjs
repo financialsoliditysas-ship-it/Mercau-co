@@ -160,13 +160,13 @@ async function matching(){
 }
 async function foodService(){
  const business='rec'+'Q'.repeat(14),product='33333333-3333-4333-8333-333333333333';
- let outcome='created',pushes=0,captured,queries=0;
+ let outcome='created',pushes=0,captured,queries=0,businessSettings=null,lookupOutcome='existing';
  const db={from(table){const value=table==='pilot_restaurants'?{id:business,name:'Ficticio',enabled:true,is_live:true,directory_initialized:true,directory_business_id:business,delivery_fee:5000,delivery_mode:'MERCAU',commission_rate_bps:1500,customer_markup_bps:0}:
   [{id:product,name:'Ficticio',section:'Comida',price:1000,option_groups:[],version:1}];
-  return {select(){return this;},eq(){return this;},order(){return this;},async single(){return {data:value,error:null};},then(resolve,reject){return Promise.resolve({data:value,error:null}).then(resolve,reject);}};
- },async rpc(name,args){queries++;captured=args;if(name==='lookup_order_receipt_v3')return {data:{outcome:'existing',public_id:'PRB-000001'},error:null};
+  return {select(){return this;},eq(){return this;},order(){return this;},async maybeSingle(){return {data:{data:businessSettings},error:null};},async single(){return {data:value,error:null};},then(resolve,reject){return Promise.resolve({data:value,error:null}).then(resolve,reject);}};
+ },async rpc(name,args){queries++;captured=args;if(name==='lookup_order_receipt_v3')return {data:{outcome:lookupOutcome,public_id:lookupOutcome==='existing'?'PRB-000001':undefined},error:null};
   assert.equal(name,'create_food_order_once_v3');return {data:{outcome,public_id:outcome==='created'||outcome==='existing'?'PRB-000001':undefined,previous_public_id:'PRB-000001'},error:null};}};
- const api=load('lib/restaurant-pilot.ts',{'./supabase-admin':{getSupabaseAdminClient:()=>db},'./deliveries':{},'./business-push':{sendNewOrderPush:async()=>{pushes++;}},
+ const api=load('lib/restaurant-pilot.ts',{'./business-order-hours':load('lib/business-order-hours.ts'),'./supabase-admin':{getSupabaseAdminClient:()=>db},'./deliveries':{},'./business-push':{sendNewOrderPush:async()=>{pushes++;}},
   './catalog-validation':{catalogOptionGroups:()=>[]},'./pilot-order-finance':load('lib/pilot-order-finance.ts'),
   './order-changes-config':{orderChangesEnabled:()=>false},'./order-changes-model':{changeSelection:''}});
  const body={confirmed:true,requestKey:key,name:'QA',phone:'3000000000',address:'Ficticia',neighborhood:'QA',paymentMethod:'CASH',
@@ -180,6 +180,9 @@ async function foodService(){
  await api.lookupPilotOrderIntent(uid,key,business);assert.equal(captured.p_scope,`food:${uid}:${business}`);assert.equal(pushes,2);
  await assert.rejects(()=>api.createPilotOrder(uid,{...body,repeatOf:'MCU-1-000001'},business),error=>error.status===400);
  await api.createPilotOrder(uid,{...body,repeatOf:'MCU-1-000001',repeatConfirmed:true},business);assert.equal(captured.p_payload._repeat_of,'MCU-1-000001');
+ businessSettings={temporaryClosed:true};lookupOutcome='not_found';const beforeClosedPush=pushes;
+ await assert.rejects(()=>api.createPilotOrder(uid,body,business),error=>error.status===409&&error.message.includes('Cerrado'));assert.equal(pushes,beforeClosedPush);assert.equal(captured.p_scope,`food:${uid}:${business}`);
+ lookupOutcome='existing';outcome='existing';assert.equal((await api.createPilotOrder(uid,body,business)).replayed,true);assert.equal(pushes,beforeClosedPush,'Closed businesses must still allow lookup/replay of a saved order without new push');
  console.log('PASS actual food service: server prices/identity retained, exact duplicate message, explicit-repeat gate, one push per creation, none on replay/duplicate/uncertainty/lookup. Database and push simulated.');
 }
 (async()=>{await database();await matching();await foodService();})().catch(error=>{console.error(error);process.exitCode=1;});

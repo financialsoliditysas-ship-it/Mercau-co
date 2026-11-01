@@ -4,6 +4,7 @@ import { isFoodBusiness } from './catalog-validation';
 import { dishStartingPrice } from './dish-pricing';
 import { businessCatalogPath, businessPath } from './business-public-url';
 import { publicReadCache } from './public-read-cache';
+import { businessOrderHours } from './business-order-hours';
 const publicDirectory=publicReadCache<Awaited<ReturnType<typeof loadDirectoryBusinesses>>>(10000,1);
 const publicSections=publicReadCache<string[]>(10000,8);
 
@@ -32,7 +33,10 @@ export async function discoverDishes({ municipality, query = '', section = '', c
   const restaurants = await db.from('pilot_restaurants').select('id,directory_business_id')
     .in('id', directory.map(b => b.id)).eq('enabled', true).eq('is_live', true).eq('directory_initialized', true);
   if (restaurants.error) throw new Error('No se pudo consultar la oferta.');
-  const eligible = directory.filter(business => (restaurants.data || []).some(row => row.id === business.id && row.directory_business_id === business.id))
+  const hoursResult=await db.from('business_account_settings').select('business_id,data').in('business_id',(restaurants.data||[]).map(row=>row.id));
+  if(hoursResult.error)throw new Error('No se pudieron comprobar los horarios.');
+  const hoursByBusiness=new Map((hoursResult.data||[]).map(row=>[row.business_id,row.data]));
+  const eligible = directory.filter(business => (restaurants.data || []).some(row => row.id === business.id && row.directory_business_id === business.id) && businessOrderHours(hoursByBusiness.get(business.id)).open)
     .sort((a, b) => a.id.localeCompare(b.id));
   if (!eligible.length) return { products: [], categories: [], nextCursor: null };
   const categories = await publicSections(JSON.stringify(eligible.map(b=>b.id)),async()=>{
