@@ -25,6 +25,17 @@ Las tablas no conceden acceso directo a visitantes ni usuarios. La lectura y esc
 5. Mover formularios, actualizaciones e inscripciones a Supabase.
 6. Retirar Airtable despues de una ventana de observacion y una copia final.
 
+## Carga de medios
+
+Las fotos preservadas se cargan con:
+
+```bash
+node scripts/upload-directory-media.mjs migration-assets/business-photos
+node scripts/upload-directory-media.mjs migration-assets/business-photos --apply
+```
+
+El segundo comando requiere `NEXT_PUBLIC_SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en un entorno servidor autorizado. La clave no debe guardarse en el repositorio ni exponerse al navegador.
+
 ## Bloqueo conocido
 
 La API de Airtable esta limitada por cuota en el entorno actual. No se debe ejecutar una importacion automatica hasta recuperar acceso o recibir una exportacion autorizada. No se copian datos personales ni credenciales.
