@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import fallbackBusinesses from '../data/directory-fallback.json';
 import { photoDetails, photoFieldId } from './business-photo';
 import { isPilotBusinessNote } from './pilot-directory-data';
+import { loadSupabaseDirectoryBusinesses } from './supabase-directory';
 
 const DIRECTORY_REVALIDATE_SECONDS = 6 * 60 * 60;
 const continuityDirectory = fallbackBusinesses as DirectoryBusiness[];
@@ -159,6 +160,9 @@ async function loadAppliedUpdates(config: {
 }
 
 async function readDirectoryBusinesses() {
+  const supabaseBusinesses = await loadSupabaseDirectoryBusinesses();
+  if (supabaseBusinesses) return supabaseBusinesses;
+
   const token = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
   const tableId = process.env.AIRTABLE_NEGOCIOS_TABLE_ID;

@@ -7,4 +7,6 @@ node_modules
 *.log
 *.tsbuildinfo
 outputs/
+.tools/
+migration-assets/
 supabase/.temp/
