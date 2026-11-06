@@ -1,7 +1,15 @@
 import { DirectoryBusiness, toDirectoryCategory } from "@/data/directory";
-import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
+import fallbackBusinesses from '@/data/directory-fallback.json';
 import { photoDetails, photoFieldId } from './business-photo';
 import { isPilotBusinessNote } from './pilot-directory-data';
+
+const DIRECTORY_REVALIDATE_SECONDS = 6 * 60 * 60;
+const continuityDirectory = fallbackBusinesses as DirectoryBusiness[];
+
+function loadContinuityDirectory() {
+  return continuityDirectory.map(business => ({ ...business }));
+}
 
 const FIELD_IDS = {
   businessName: "fldZAuId3Z7tmNg1y",
@@ -158,7 +166,8 @@ async function readDirectoryBusinesses() {
     process.env.AIRTABLE_ACTUALIZACIONES_TABLE_ID || UPDATE_TABLE_ID;
 
   if (!token || !baseId || !tableId) {
-    throw new Error("Airtable no esta configurado en este entorno.");
+    console.error('[directory] Airtable configuration unavailable; serving continuity copy.');
+    return loadContinuityDirectory();
   }
 
   const params = new URLSearchParams({
@@ -168,24 +177,34 @@ async function readDirectoryBusinesses() {
       "OR({Estado} = 'Verificado', {Estado} = 'Destacado', {Estado} = 'Publicado')"
   });
 
-  const [response,appliedUpdates] = await Promise.all([fetch(
-    `https://api.airtable.com/v0/${baseId}/${tableId}?${params.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`
-      },
-      cache: "no-store"
-    }
-  ),loadAppliedUpdates({ token, baseId, updateTableId })]);
+  let response: Response;
+  let result: { records?: Array<{ id: string; fields?: Record<string, unknown> }> };
+  let appliedUpdates: Map<string, Record<string, unknown>>;
 
-  const result = await response.json();
-
-  if (!response.ok) {
-    const detail = result?.error?.message || result?.error || "Error desconocido";
-    throw new Error(`No se pudo cargar el directorio desde Airtable. ${detail}`);
+  try {
+    [response, appliedUpdates] = await Promise.all([
+      fetch(`https://api.airtable.com/v0/${baseId}/${tableId}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store"
+      }),
+      loadAppliedUpdates({ token, baseId, updateTableId })
+    ]);
+    result = await response.json();
+  } catch (error) {
+    console.error('[directory] Airtable request failed; serving continuity copy.', {
+      error: error instanceof Error ? error.name : 'UnknownError'
+    });
+    return loadContinuityDirectory();
   }
 
-  return ((result.records || []) as Array<{ id: string; fields?: Record<string, unknown> }>)
+  if (!response.ok) {
+    console.error('[directory] Airtable rejected the directory request; serving continuity copy.', {
+      status: response.status
+    });
+    return loadContinuityDirectory();
+  }
+
+  return (result.records || [])
     .map((record): DirectoryBusiness | null => {
       const fields = record.fields || {};
       const appliedUpdate = appliedUpdates.get(record.id) || {};
@@ -265,8 +284,11 @@ async function readDirectoryBusinesses() {
     .filter((business): business is DirectoryBusiness => Boolean(business));
 }
 
-// RSC supports request-local cache; standalone React/route tests retain the original reader.
-export const loadDirectoryBusinesses=typeof cache==='function'?cache(readDirectoryBusinesses):readDirectoryBusinesses;
+export const loadDirectoryBusinesses = unstable_cache(
+  readDirectoryBusinesses,
+  ['mercau-directory-v1'],
+  { revalidate: DIRECTORY_REVALIDATE_SECONDS }
+);
 
 export async function loadDirectoryBusiness(id: string) {
   const businesses = await loadDirectoryBusinesses();
