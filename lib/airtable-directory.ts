@@ -4,12 +4,21 @@ import fallbackBusinesses from '../data/directory-fallback.json';
 import { photoDetails, photoFieldId } from './business-photo';
 import { isPilotBusinessNote } from './pilot-directory-data';
 import { loadSupabaseDirectoryBusinesses } from './supabase-directory';
+import { directoryLogoAsset } from './directory-logo-assets';
 
 const DIRECTORY_REVALIDATE_SECONDS = 6 * 60 * 60;
 const continuityDirectory = fallbackBusinesses as DirectoryBusiness[];
 
+function withRecoveredLogo(business: DirectoryBusiness): DirectoryBusiness {
+  if (business.photoUrl) return business;
+  const asset = directoryLogoAsset(business.id);
+  return asset
+    ? { ...business, photoUrl: asset.url, photoKind: asset.kind, photoVersion: 'recovered-static-v1' }
+    : business;
+}
+
 function loadContinuityDirectory() {
-  return continuityDirectory.map(business => ({ ...business }));
+  return continuityDirectory.map(business => withRecoveredLogo({ ...business }));
 }
 
 const FIELD_IDS = {
@@ -285,7 +294,8 @@ async function readDirectoryBusinesses() {
         source: selectName(fields[FIELD_IDS.source]) || "Airtable"
       } satisfies DirectoryBusiness;
     })
-    .filter((business): business is DirectoryBusiness => Boolean(business));
+    .filter((business): business is DirectoryBusiness => Boolean(business))
+    .map(withRecoveredLogo);
 }
 
 export const loadDirectoryBusinesses = unstable_cache(
