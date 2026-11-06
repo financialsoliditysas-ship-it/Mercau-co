@@ -11,10 +11,12 @@ export async function GET(_request:NextRequest,{params}:{params:{businessId:stri
       if (business.error || !business.data || !['Destacado','Verificado','Publicado'].includes(business.data.status)) return new NextResponse(null,{status:404});
       const media = await db.from('directory_business_media').select('storage_path').eq('business_id', params.businessId).eq('kind', 'logo').order('position').order('created_at').limit(1).maybeSingle();
       if (media.error || !media.data?.storage_path) return new NextResponse(null,{status:404});
-      const downloaded = await db.storage.from('business-catalog').download(media.data.storage_path);
-      if (downloaded.error || !downloaded.data) return new NextResponse(null,{status:404});
-      const contentType = downloaded.data.type || 'application/octet-stream';
-      return new NextResponse(await downloaded.data.arrayBuffer(), { headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=3600' } });
+      const signed = await db.storage.from('business-catalog').createSignedUrl(media.data.storage_path, 3600);
+      if (signed.error || !signed.data?.signedUrl) return new NextResponse(null,{status:404});
+      const downloaded = await fetch(signed.data.signedUrl, { cache: 'no-store' });
+      if (!downloaded.ok) return new NextResponse(null,{status:404});
+      const contentType = downloaded.headers.get('content-type') || 'application/octet-stream';
+      return new NextResponse(await downloaded.arrayBuffer(), { headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=3600' } });
     }
 
     const key=process.env.AIRTABLE_API_KEY,base=process.env.AIRTABLE_BASE_ID,table=process.env.AIRTABLE_NEGOCIOS_TABLE_ID;
