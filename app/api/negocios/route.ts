@@ -12,7 +12,7 @@ export async function GET() {
       withPublicBusinessLinks(directory),
       catalogBusinessAvailability(directory.map(business=>business.id))
     ]);
-    return NextResponse.json({ businesses:businesses.map(business=>{const catalog=catalogs.get(business.id);return {...business,hasCatalog:Boolean(catalog?.count),catalogItemCount:catalog?.count || 0,commercialSearchTerms:catalog?.searchTerms || []};}) });
+    return NextResponse.json({ businesses:businesses.map(business=>{const catalog=catalogs.get(business.id);return {...business,photoUrl:business.photoUrl || catalog?.coverImageUrl,photoKind:business.photoUrl?business.photoKind:(catalog?.coverImageUrl?'photo':undefined),hasCatalog:Boolean(catalog?.count),catalogItemCount:catalog?.count || 0,commercialSearchTerms:catalog?.searchTerms || []};}) });
   } catch (error) {
     return NextResponse.json(
       {

@@ -60,7 +60,7 @@ global.fetch=async(_url,options)=>{
     failWrite=true;
     assert.equal((await route.PATCH(req({...body,version:edit.businessEditVersion(current),changes:{...changes,hours:'nuevo'}}),context)).status,503);
     assert.equal(current.hours,'');
-    const directory=load('lib/airtable-directory.ts',{'./pilot-directory-data':load('lib/pilot-directory-data.ts'),'./business-photo':load('lib/business-photo.ts'),'@/data/directory':{toDirectoryCategory:()=> 'Profesionales y servicios'}});
+    const directory=load('lib/airtable-directory.ts',{'./pilot-directory-data':load('lib/pilot-directory-data.ts'),'./business-photo':load('lib/business-photo.ts'),'@/data/directory':{toDirectoryCategory:()=> 'Profesionales y servicios'},'next/cache':{unstable_cache:fn=>fn}});
     global.fetch=async url=>String(url).includes('tblZFp7SvVV7MuBWD') ? Response.json({records:[{createdTime:'2026-10-13',fields:{fldRn5vmrSMFc4xAb:[original.id],fldvfa8cy8ZV4xquD:changes.description,fld1jU61ntd250csD:changes.neighborhood,fld5XhR6GjiKu6fF3:JSON.stringify(note)}}]}) : Response.json({records:[{id:original.id,fields:{fldZAuId3Z7tmNg1y:'Prueba',fldyyLYvoyMdiK13C:'Destacado',fldGg2RLescrYR2Z6:'old',fldkT6oBXKONCkak6:'https://old.invalid'}}]});
     process.env.AIRTABLE_NEGOCIOS_TABLE_ID='tblTestOnly000000';
     const published=(await directory.loadDirectoryBusinesses())[0];

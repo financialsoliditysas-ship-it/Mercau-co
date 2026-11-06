@@ -1,6 +1,6 @@
 import { DirectoryBusiness, toDirectoryCategory } from "@/data/directory";
 import { unstable_cache } from 'next/cache';
-import fallbackBusinesses from '@/data/directory-fallback.json';
+import fallbackBusinesses from '../data/directory-fallback.json';
 import { photoDetails, photoFieldId } from './business-photo';
 import { isPilotBusinessNote } from './pilot-directory-data';
 
