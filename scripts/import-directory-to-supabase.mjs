@@ -14,12 +14,20 @@ const source = JSON.parse(fs.readFileSync(file, 'utf8'));
 if (!Array.isArray(source)) throw new Error('La exportacion debe ser un arreglo JSON.');
 
 const required = ['id', 'name', 'category', 'municipality', 'status'];
-const allowedStatuses = new Set(['Borrador', 'Verificado', 'Destacado', 'Publicado', 'Archivado']);
+const statusMap = new Map([
+  ['Borrador', 'Borrador'],
+  ['Verificado', 'Verificado'],
+  ['Destacado', 'Destacado'],
+  ['Publicado', 'Publicado'],
+  ['Archivado', 'Archivado'],
+  ['Inactivo', 'Archivado']
+]);
 const businesses = source.map((record, index) => {
   for (const field of required) {
     if (!String(record?.[field] ?? '').trim()) throw new Error(`Registro ${index + 1}: falta ${field}.`);
   }
-  if (!allowedStatuses.has(record.status)) throw new Error(`Registro ${index + 1}: estado no permitido ${record.status}.`);
+  const status = statusMap.get(String(record.status || '').trim());
+  if (!status) throw new Error(`Registro ${index + 1}: estado no permitido ${record.status}.`);
   return {
     id: String(record.id).trim(),
     airtable_record_id: String(record.id).trim(),
@@ -33,7 +41,7 @@ const businesses = source.map((record, index) => {
     facebook: String(record.facebook || '').trim(),
     maps_url: String(record.mapsUrl || '').trim(),
     delivery_notes: String(record.deliveries || '').trim(),
-    status: record.status,
+    status,
     source: 'airtable-import'
   };
 });
