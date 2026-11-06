@@ -1,5 +1,7 @@
 import { toDirectoryCategory, type DirectoryBusiness } from '@/data/directory';
 import { getSupabaseAdminClient } from './supabase-admin';
+import { pilotBusinessName } from './pilot-directory-data';
+import { directoryLogoAsset } from './directory-logo-assets';
 
 type DirectoryRow = {
   id: string;
@@ -39,6 +41,8 @@ export async function loadSupabaseDirectoryBusinesses(): Promise<DirectoryBusine
 
     return (businesses.data as DirectoryRow[]).map(row => {
       const mediaRow = mediaByBusiness.get(row.id);
+      const logoAsset = directoryLogoAsset(row.id);
+      const pilotRestaurant = row.name.trim() === pilotBusinessName ? 'restaurante-mercado' as const : undefined;
       return {
         id: row.id,
         name: row.name,
@@ -54,8 +58,9 @@ export async function loadSupabaseDirectoryBusinesses(): Promise<DirectoryBusine
         mapsUrl: row.maps_url,
         status: row.status as DirectoryBusiness['status'],
         source: row.source || 'Supabase',
-        photoUrl: mediaRow ? `/api/negocios/${row.id}/foto?source=supabase` : undefined,
-        photoKind: mediaRow ? 'logo' : undefined
+        pilotRestaurant,
+        photoUrl: mediaRow ? `/api/negocios/${row.id}/foto?source=supabase` : logoAsset?.url,
+        photoKind: mediaRow ? 'logo' : logoAsset?.kind
       } satisfies DirectoryBusiness;
     });
   } catch {
