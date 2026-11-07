@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-account-suite.cjs",
     "test:account-ui": "node scripts/test-account-workspace-ui.cjs",
-    "test:finance": "node scripts/test-finance.cjs"
+    "test:finance": "node scripts/test-finance.cjs",
+    "test:meta-whatsapp-webhook": "node scripts/test-meta-whatsapp-webhook.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
