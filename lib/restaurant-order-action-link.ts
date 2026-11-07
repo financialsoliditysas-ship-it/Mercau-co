@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { sendCustomerChangePush } from '@/lib/customer-push';
 
 export class RestaurantActionError extends Error {
   constructor(message: string, public status = 400) { super(message); }
@@ -101,13 +102,56 @@ async function findActionOrder(token: string): Promise<RestaurantActionOrder> {
 export async function getRestaurantActionOrder(token: string) {
   const result = await findActionOrder(token);
   const lines = Array.isArray(result.order.lines) ? result.order.lines.map((line: any) => ({
+    lineId: typeof line?.lineId === 'string' ? line.lineId : '',
     name: typeof line?.name === 'string' ? line.name : 'Producto',
     quantity: Number(line?.quantity || 0),
     unitPrice: Number(line?.unitPrice || 0),
     note: typeof line?.note === 'string' ? line.note : '',
     selections: Array.isArray(line?.selections) ? line.selections : []
   })) : [];
-  return { ...result.order, lines };
+  const { pilotRestaurant } = await import('@/lib/restaurant-pilot');
+  const restaurant = await pilotRestaurant(result.link.restaurant_id);
+  return {
+    ...result.order,
+    lines,
+    menu: restaurant.menu.map((product: any) => ({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      optionGroups: product.optionGroups
+    }))
+  };
+}
+
+export async function proposeRestaurantOrderChangeByActionLink(token: string, body: Record<string, unknown>) {
+  const result = await findActionOrder(token);
+  const db = getSupabaseAdminClient();
+  const target = await db.from('pilot_food_orders').select('*')
+    .eq('id', result.link.order_id).eq('restaurant_id', result.link.restaurant_id).maybeSingle();
+  if (target.error) throw new RestaurantActionError('No se pudo comprobar el pedido.', 503);
+  if (!target.data) throw new RestaurantActionError('Pedido no disponible.', 404);
+
+  const { prepareFoodChangeProposal } = await import('@/lib/order-changes');
+  const proposal = await prepareFoodChangeProposal(target.data, body);
+  const response = await db.rpc('propose_food_change_v2', {
+    p_order: target.data.id,
+    p_actor: null,
+    p_link: result.link.id,
+    p_key: proposal.requestKey,
+    p_payload: {
+      old_lines: target.data.lines,
+      old_subtotal: target.data.subtotal,
+      new_lines: proposal.lines,
+      new_subtotal: proposal.subtotal
+    }
+  });
+  if (response.error || !response.data?.id) {
+    throw new RestaurantActionError('El pedido cambió, tiene una propuesta pendiente o ya no admite cambios. Actualiza para revisarlo.', 409);
+  }
+  if (!response.data.replayed) {
+    await sendCustomerChangePush(target.data.customer_id, target.data.public_id, response.data.id).catch(() => undefined);
+  }
+  return { ok: true, replayed: response.data.replayed === true, message: 'Propuesta enviada al comprador para su aprobación.' };
 }
 
 export async function transitionRestaurantOrderByActionLink(token: string, action: string) {

@@ -24,6 +24,7 @@ async function main() {
     }
     await execFile('supabase/drafts/logistics_controls_v2.sql');
     await execFile('supabase/migrations/20261030133030_order_creation_receipts.sql');
+    await execFile('supabase/migrations/20261030174526_order_change_proposals.sql');
     await execFile('supabase/migrations/20261106193000_restaurant_auto_dispatch.sql');
     await db.exec('grant all on all tables in schema public to service_role; grant usage, select on all sequences in schema public to service_role;');
     await db.exec(`insert into pilot_restaurants(id,name,pickup_address,pickup_phone,enabled,is_live,delivery_mode,preparation_minutes,dispatch_lead_minutes)
@@ -65,7 +66,20 @@ async function main() {
     assert.equal(rejected.status, 'rejected');
     assert.equal((await db.query('select delivery_order_id from pilot_food_orders where id=$1', [rejectedOrder.id])).rows[0].delivery_order_id, null);
 
-    console.log('PASS SQL restaurant auto-dispatch: aceptación programa minuto 12, crea un despacho, Pedido listo adelanta, repetición no duplica y rechazo previo no crea despacho. PGlite con esquema del repositorio; sin Shipday ni mensajes externos.');
+    const changeOrder = await create();
+    const link = (await db.query(`insert into restaurant_order_action_links(restaurant_id,order_id,token_hash,expires_at)
+      values('qa-auto',$1,'qa-link-hash',now()+interval '1 day') returning id`, [changeOrder.id])).rows[0];
+    const replacement = [{ lineId: '33333333-3333-4333-8333-333333333333', productId: 'p2', name: 'Alternativa ficticia', basePrice: 21000, unitPrice: 21000, quantity: 1, selections: [], note: '' }];
+    const proposal = (await db.query(`select propose_food_change_v2($1,null,$2,gen_random_uuid(),$3::jsonb) as result`, [
+      changeOrder.id, link.id, JSON.stringify({ old_lines: changeOrder.lines, old_subtotal: changeOrder.subtotal, new_lines: replacement, new_subtotal: 21000 })
+    ])).rows[0].result;
+    assert.ok(proposal.id, 'El enlace protegido debe poder crear una propuesta.');
+    const recorded = (await db.query('select proposed_by,proposed_by_link,proposed_via from food_order_change_proposals where id=$1', [proposal.id])).rows[0];
+    assert.equal(recorded.proposed_by, null);
+    assert.equal(recorded.proposed_by_link, link.id);
+    assert.equal(recorded.proposed_via, 'whatsapp_link');
+
+    console.log('PASS SQL restaurant auto-dispatch: programación, reclamación única y propuesta de cambio registrada desde enlace protegido. PGlite con esquema del repositorio; sin Shipday ni mensajes externos.');
   } finally {
     await db.close();
   }

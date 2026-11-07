@@ -248,4 +248,73 @@ $$;
 revoke all on function public.pilot_food_transition_v4(uuid, uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.pilot_food_transition_v4(uuid, uuid, text, text, text) to service_role;
 
+-- A protected restaurant link can propose, but never accept, a change. The link
+-- itself is recorded as the actor when no authenticated business account exists.
+alter table public.food_order_change_proposals
+  alter column proposed_by drop not null,
+  add column if not exists proposed_by_link uuid references public.restaurant_order_action_links(id),
+  add column if not exists proposed_via text not null default 'business_panel'
+    check (proposed_via in ('business_panel', 'whatsapp_link'));
+
+create or replace function public.propose_food_change_v2(
+  p_order uuid, p_actor uuid, p_link uuid, p_key uuid, p_payload jsonb
+)
+returns jsonb language plpgsql security invoker set search_path = public as $$
+declare
+  o public.pilot_food_orders;
+  r public.pilot_restaurants;
+  s public.order_financial_snapshots;
+  c public.food_order_change_proposals;
+  l public.restaurant_order_action_links;
+  amount bigint;
+begin
+  if (p_actor is null and p_link is null) or (p_actor is not null and p_link is not null) then
+    raise exception 'Acceso denegado';
+  end if;
+  select * into o from public.pilot_food_orders where id = p_order for update;
+  if not found then raise exception 'Pedido no disponible'; end if;
+  select * into r from public.pilot_restaurants where id = o.restaurant_id;
+  if p_link is not null then
+    select * into l from public.restaurant_order_action_links
+      where id = p_link and order_id = o.id and restaurant_id = o.restaurant_id
+        and revoked_at is null and expires_at > now()
+      for update;
+    if not found then raise exception 'Enlace no disponible'; end if;
+  elsif (r.is_live and not exists(select 1 from public.business_admins where business_id=r.directory_business_id and user_id=p_actor and status='Activo'))
+    or (not r.is_live and not exists(select 1 from public.pilot_restaurant_members where restaurant_id=o.restaurant_id and user_id=p_actor and role='manager')) then
+    raise exception 'Acceso denegado';
+  end if;
+  select * into c from public.food_order_change_proposals where order_id=o.id and request_key=p_key;
+  if found then
+    if c.new_lines is distinct from p_payload->'new_lines' then raise exception 'Referencia utilizada con otra propuesta'; end if;
+    return jsonb_build_object('id',c.id,'replayed',true);
+  end if;
+  if o.status not in ('pending','accepted') or o.delivery_order_id is not null then raise exception 'El pedido ya no admite cambios'; end if;
+  select * into s from public.order_financial_snapshots where food_order_id=o.id for update;
+  if not found or s.payment_status<>'PENDING' or s.settlement_status<>'PENDING'
+    or exists(select 1 from public.financial_events where snapshot_id=s.id) then raise exception 'El pedido tiene movimientos financieros y requiere soporte'; end if;
+  if o.lines is distinct from p_payload->'old_lines' or o.subtotal is distinct from (p_payload->>'old_subtotal')::integer
+    then raise exception 'El pedido cambió. Actualiza antes de proponer'; end if;
+  if jsonb_typeof(p_payload->'new_lines') is distinct from 'array'
+    or jsonb_array_length(p_payload->'new_lines') not between 1 and 20
+    or o.lines=p_payload->'new_lines' then raise exception 'Propuesta inválida'; end if;
+  if exists(select 1 from jsonb_array_elements(p_payload->'new_lines') item
+    where (item->>'quantity')::integer not between 1 and 10 or (item->>'unitPrice')::bigint<0) then raise exception 'Importe inválido'; end if;
+  select sum((item->>'unitPrice')::bigint*(item->>'quantity')::bigint) into amount from jsonb_array_elements(p_payload->'new_lines') item;
+  if amount is null or amount<=0 or amount>2147483647 or amount is distinct from (p_payload->>'new_subtotal')::bigint then raise exception 'Total inválido'; end if;
+  if exists(select 1 from public.food_order_change_proposals where order_id=o.id and status='pending') then raise exception 'Ya hay una propuesta pendiente'; end if;
+  if (select count(*) from public.food_order_change_proposals where order_id=o.id)>=10 then raise exception 'Este pedido requiere soporte'; end if;
+  update public.food_order_change_proposals set status='withdrawn' where order_id=o.id and status='declined';
+  insert into public.food_order_change_proposals(order_id,request_key,old_lines,new_lines,old_subtotal,new_subtotal,finance_before,proposed_by,proposed_by_link,proposed_via)
+    values(o.id,p_key,o.lines,p_payload->'new_lines',o.subtotal,amount,to_jsonb(s),p_actor,p_link,case when p_link is null then 'business_panel' else 'whatsapp_link' end)
+    returning * into c;
+  insert into public.pilot_food_history(order_id,status,actor_id,actor_type,actor_reference,metadata)
+    values(o.id,'change_proposed',p_actor,case when p_link is null then 'business' else 'whatsapp_link' end,coalesce(p_actor::text,p_link::text),jsonb_build_object('proposal_id',c.id));
+  return jsonb_build_object('id',c.id,'replayed',false);
+end;
+$$;
+
+revoke all on function public.propose_food_change_v2(uuid, uuid, uuid, uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.propose_food_change_v2(uuid, uuid, uuid, uuid, jsonb) to service_role;
+
 commit;
