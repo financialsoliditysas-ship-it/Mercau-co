@@ -72,3 +72,17 @@ export function whatsappDeliveryEvents(payload: unknown): WhatsAppDeliveryEvent[
   }
   return events;
 }
+
+export type MetaMessageStatus = {
+  id: string;
+  status: WhatsAppDeliveryEvent['status'];
+  error: string | null;
+};
+
+export function messageStatuses(payload: unknown): MetaMessageStatus[] {
+  return whatsappDeliveryEvents(payload).map((event) => ({
+    id: event.message_id,
+    status: event.status,
+    error: event.error_title
+  }));
+}

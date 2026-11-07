@@ -6,6 +6,8 @@ import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finan
 import { orderChangesEnabled } from './order-changes-config';
 import { changeSelection, type OrderChange } from './order-changes-model';
 import { businessOrderHours } from './business-order-hours';
+import { ensureRestaurantOrderActionLink } from './restaurant-order-action-link';
+import { processRestaurantOrderMessages } from './restaurant-order-messages';
 
 export const pilotId = 'restaurante-mercado';
 export class PilotError extends Error {
@@ -172,6 +174,17 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
   if(data?.outcome==='uncertain')throw new PilotError('El pedido anterior está registrado, pero su despacho necesita revisión. Revisa su estado o contacta a Mercáu antes de repetirlo.',409,data.previous_public_id);
   if (!data?.public_id) throw new PilotError('No se pudo comprobar el pedido. Revisa Mis pedidos antes de reintentar.',503);
   if (data.outcome === 'existing') return { public_id: data.public_id, replayed: true };
+  const createdOrder = await db.from('pilot_food_orders').select('id,public_id')
+    .eq('restaurant_id', restaurantId).eq('customer_id', userId).eq('public_id', data.public_id).maybeSingle();
+  if (createdOrder.data) {
+      await ensureRestaurantOrderActionLink({
+      orderId: createdOrder.data.id,
+      orderPublicId: createdOrder.data.public_id,
+      restaurantId,
+      restaurantName: restaurant.name,
+      restaurantPhone: restaurant.pickup_phone
+      }).then(() => processRestaurantOrderMessages(1)).catch(() => undefined);
+  }
   await sendNewOrderPush({ businessId: restaurantId, orderId: data.public_id,
     customerName: input.customer_name, total: input.subtotal + Number(restaurant.delivery_fee || 0) }).catch(() => undefined);
   return { public_id: data.public_id, replayed: false };
@@ -207,8 +220,8 @@ export async function transitionPilotOrder(userId: string, id: string, action: s
     .eq('id', id).eq('restaurant_id', restaurantId).maybeSingle();
   if (target.error) throw new PilotError('No se pudo comprobar el pedido.', 503);
   if (!target.data) throw new PilotError('Pedido no encontrado en este negocio.', 404);
-  const { data, error } = await db.rpc('pilot_food_transition', {
-    p_order: id, p_actor: userId, p_action: action
+  const { data, error } = await db.rpc('pilot_food_transition_v4', {
+    p_order: id, p_actor: userId, p_action: action, p_actor_type: 'business', p_actor_reference: userId
   });
   if (error) throw new PilotError('El pedido cambio o esta accion no esta disponible. Actualiza la lista.', 409);
   if (data?.dispatch && data.delivery_id) {
@@ -229,5 +242,7 @@ export async function transitionPilotOrder(userId: string, id: string, action: s
       : action === 'out_for_delivery' ? 'El pedido quedó marcado en camino.'
       : action === 'delivered' ? 'Pedido marcado como entregado.' : 'Pedido actualizado.' };
   }
+  if (action === 'accepted') return { ok: true, message: 'Pedido aceptado y preparación iniciada.' };
+  if (action === 'ready') return { ok: true, message: 'Pedido listo. Mercáu coordina la recogida.' };
   return { ok: true, message: 'Pedido actualizado.' };
 }

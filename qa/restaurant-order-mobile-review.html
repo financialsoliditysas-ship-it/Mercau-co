@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mercáu · revisión móvil de pedido</title>
+  <style>
+    :root { color-scheme: light; font-family: Arial, sans-serif; background: #fff7f7; color: #151a2b; }
+    body { margin: 0; padding: 20px 16px; }
+    main { max-width: 420px; margin: 0 auto; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 28px #8e171720; }
+    header { background: #e21412; color: white; padding: 20px; }
+    header p { margin: 0 0 7px; font-size: 13px; font-weight: 700; opacity: .9; }
+    header h1 { margin: 0; font-size: 24px; }
+    header strong { display: block; margin-top: 10px; }
+    section { padding: 20px; }
+    .state { background: #fff0f0; padding: 14px; border-radius: 12px; font-weight: 800; }
+    .state small { display: block; color: #b42320; margin-bottom: 5px; }
+    h2 { font-size: 18px; margin: 20px 0 10px; }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid #edf0f4; padding: 11px 0; font-weight: 700; }
+    .note, .obs { background: #f7f8fa; border-radius: 12px; padding: 12px; color: #485062; }
+    .amount { display: flex; justify-content: space-between; border-top: 1px solid #dfe3ea; margin-top: 20px; padding-top: 15px; font-weight: 800; }
+    .amount strong { color: #e21412; font-size: 20px; }
+    button { width: 100%; min-height: 48px; border: 0; border-radius: 12px; margin-top: 16px; padding: 12px; font-size: 16px; font-weight: 800; cursor: pointer; }
+    #accept, #ready { background: #e21412; color: #fff; }
+    #reject { background: #fff; color: #151a2b; border: 1px solid #cfd5df; }
+    [hidden] { display: none; }
+    footer { color: #667085; font-size: 12px; padding: 0 20px 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header><p>Mercáu · vista local con datos ficticios</p><h1>Asados Tic Tac</h1><strong>MCU-1-000001</strong></header>
+    <section>
+      <div class="state"><small>Estado</small><span id="status">Pedido pendiente</span></div>
+      <h2>Productos</h2>
+      <ul><li><span>2 x Punta de anca</span><span>$74.000</span></li><li><span>1 x Gaseosa personal</span><span>$4.000</span></li></ul>
+      <h2>Observaciones</h2><p class="obs">La carne en término 3/4. Sin cebolla.</p>
+      <div class="amount"><span>Valor para el negocio</span><strong>$66.300</strong></div>
+      <button id="accept">Aceptar y preparar</button>
+      <button id="reject">Rechazar pedido</button>
+      <button id="ready" hidden>Pedido listo</button>
+    </section>
+    <footer>Simulación local. No envía WhatsApp, no llama Shipday y no genera un pedido real.</footer>
+  </main>
+  <script>
+    const status = document.querySelector('#status'), accept = document.querySelector('#accept'), reject = document.querySelector('#reject'), ready = document.querySelector('#ready');
+    accept.onclick = () => { status.textContent = 'Pedido aceptado'; accept.hidden = true; reject.hidden = true; ready.hidden = false; };
+    ready.onclick = () => { status.textContent = 'Pedido listo. Mercáu coordina la recogida.'; ready.hidden = true; };
+    reject.onclick = () => { status.textContent = 'Pedido rechazado'; accept.hidden = true; reject.hidden = true; };
+  </script>
+</body>
+</html>

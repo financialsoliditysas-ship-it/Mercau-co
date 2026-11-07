@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { validMetaSignature, validMetaVerificationToken, whatsappDeliveryEvents } from '@/lib/whatsapp-webhook';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
+import { messageStatuses, validMetaSignature, validMetaVerificationToken, whatsappDeliveryEvents } from '@/lib/whatsapp-webhook';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,16 +30,38 @@ export async function POST(request: Request) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
+  let payload: unknown;
   try {
-    const events = whatsappDeliveryEvents(JSON.parse(rawBody));
-    if (events.length) {
-      const { error } = await getSupabaseAdminClient()
-        .from('whatsapp_message_delivery_events')
-        .upsert(events, { onConflict: 'message_id,status,occurred_at', ignoreDuplicates: true });
-      if (error) return new NextResponse('Storage unavailable', { status: 503 });
-    }
+    payload = JSON.parse(rawBody);
   } catch {
     return new NextResponse('Bad request', { status: 400 });
+  }
+
+  const db = getSupabaseAdminClient();
+  const deliveryEvents = whatsappDeliveryEvents(payload);
+  if (deliveryEvents.length) {
+    const { error } = await db
+      .from('whatsapp_message_delivery_events')
+      .upsert(deliveryEvents, { onConflict: 'message_id,status,occurred_at', ignoreDuplicates: true });
+    if (error) return new NextResponse('Storage unavailable', { status: 503 });
+  }
+
+  const events = messageStatuses(payload);
+  if (events.length > 0) {
+    for (const event of events) {
+      const update = event.status === 'failed'
+        ? { status: 'failed', last_error: event.error || 'Meta informó que el mensaje falló.' }
+        : ['sent', 'delivered', 'read'].includes(event.status)
+          ? { status: 'sent', last_error: null }
+          : null;
+      if (!update) continue;
+      const result = await db.from('restaurant_order_messages')
+        .update(update)
+        .eq('provider_message_id', event.id);
+      if (result.error) {
+        return new NextResponse('Webhook persistence failed', { status: 503 });
+      }
+    }
   }
 
   return NextResponse.json(

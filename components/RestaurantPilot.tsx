@@ -43,7 +43,7 @@ type Order = { id?: string; public_id: string; customer_name?: string; customer_
   delivery_mode?: 'MERCAU' | 'OWN';
   finance?: { payment_method: string; payment_status: string } | null;
   delivery: { public_id?: string; status: string; shipday_order_id?: string } | null;
-  history?: { status: string; created_at: string }[] };
+  history?: { status: string; created_at: string; actor_type?: string; metadata?: Record<string, unknown> }[] };
 const money = (n: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
 function applicationServerKey(value: string) {
   const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -54,7 +54,21 @@ const statuses: Record<string, string> = { pending: 'Esperando confirmacion', ac
   change_proposed:'Cambio propuesto al comprador',change_accepted:'Cambio aceptado por el comprador',change_declined:'Cambio no aceptado por el comprador',change_withdrawn:'Propuesta retirada',
   ready: 'Listo para recoger', out_for_delivery: 'En camino', created: 'Solicitud de mensajero recibida', sent_to_shipday: 'Buscando mensajero',
   assigned: 'Mensajero asignado', picked_up: 'Recogido', in_transit: 'En camino', delivered: 'Entregado',
-  cancelled: 'Cancelado', failed: 'Entrega no completada', integration_error: 'Despacho en revision' };
+  cancelled: 'Cancelado', failed: 'Entrega no completada', integration_error: 'Despacho en revision',
+  dispatch_search_started: 'Búsqueda automática iniciada', dispatch_search_error: 'Incidencia en la búsqueda' };
+function historyDescription(history: { status: string; actor_type?: string; metadata?: Record<string, unknown> }) {
+  const source = history.actor_type === 'whatsapp_link' ? 'desde el enlace del negocio'
+    : history.actor_type === 'system_scheduler' ? 'por Mercáu automáticamente' : '';
+  if (history.status === 'dispatch_search_started') return `Búsqueda de mensajero iniciada ${source}`.trim();
+  if (history.status === 'dispatch_search_error') {
+    const outcome = typeof history.metadata?.outcome === 'string' ? ` · ${history.metadata.outcome}` : '';
+    return `Incidencia en la búsqueda${outcome}`;
+  }
+  if (history.status === 'accepted' && typeof history.metadata?.dispatch_due_at === 'string') {
+    return `Pedido aceptado · búsqueda programada para ${new Date(history.metadata.dispatch_due_at).toLocaleTimeString('es-CO')}`;
+  }
+  return `${statuses[history.status] || history.status}${source ? ` ${source}` : ''}`;
+}
 
 function createOrderChimeUrl() {
   const sampleRate = 22050;
@@ -829,7 +843,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
           {o.delivery_mode==='OWN' && o.status==='ready' && <button disabled={busy} className="pilot-primary" onClick={()=>action(o,'out_for_delivery')}>Marcar pedido en camino</button>}
           {o.delivery_mode==='OWN' && o.status==='out_for_delivery' && <button disabled={busy} className="pilot-primary" onClick={()=>action(o,'delivered')}>Marcar pedido entregado</button>}
           {o.delivery?.public_id && <p>Envio {o.delivery.public_id} · Shipday {o.delivery.shipday_order_id || 'pendiente'}</p>}
-          <details><summary>Historial del negocio</summary>{o.history?.map((h,i) => <p key={i}>{statuses[h.status] || h.status} · {new Date(h.created_at).toLocaleString('es-CO')}</p>)}</details></>}
+          <details><summary>Historial del negocio</summary>{o.history?.map((h,i) => <p key={i}>{historyDescription(h)} · {new Date(h.created_at).toLocaleString('es-CO')}</p>)}</details></>}
       </article>)}
     </section>}
   </div>;

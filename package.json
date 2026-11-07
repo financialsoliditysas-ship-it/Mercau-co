@@ -11,7 +11,10 @@
     "test": "node scripts/test-account-suite.cjs",
     "test:account-ui": "node scripts/test-account-workspace-ui.cjs",
     "test:finance": "node scripts/test-finance.cjs",
-    "test:meta-whatsapp-webhook": "node scripts/test-meta-whatsapp-webhook.cjs"
+    "test:meta-whatsapp-webhook": "node scripts/test-meta-whatsapp-webhook.cjs",
+    "test:restaurant-whatsapp": "node scripts/test-whatsapp-cloud.cjs",
+    "test:restaurant-auto-dispatch": "node scripts/test-restaurant-auto-dispatch.cjs",
+    "test:restaurant-auto-dispatch-sql": "node scripts/test-restaurant-auto-dispatch-sql.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

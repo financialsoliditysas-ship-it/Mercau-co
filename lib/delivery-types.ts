@@ -91,6 +91,9 @@ export type DeliveryOrder = {
   shipday_tracking_url: string | null;
   shipday_last_error: string | null;
   dispatch_attempted_at?: string | null;
+  dispatch_scheduled_at?: string | null;
+  dispatch_search_started_at?: string | null;
+  dispatch_search_source?: string | null;
   shipday_event_at?: string | null;
   shipday_carrier_id?: string | null;
   courier_name?: string | null;

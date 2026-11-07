@@ -1,5 +1,5 @@
 const customerSelection='*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status)';
-const managerSelection='*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status,product_subtotal,merchant_commission_rate_bps,merchant_commission_total,merchant_net)';
+const managerSelection='*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at,actor_type,actor_reference,metadata),finance:order_financial_snapshots(payment_method,payment_status,product_subtotal,merchant_commission_rate_bps,merchant_commission_total,merchant_net)';
 
 export function pilotOrderSelection(manager:boolean):typeof customerSelection|typeof managerSelection {
   return manager?managerSelection:customerSelection;
