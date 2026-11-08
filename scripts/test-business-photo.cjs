@@ -57,10 +57,10 @@ global.fetch=async(url,options={})=>{
   const query=(result)=>({select(){return this;},eq(){return this;},order(){return this;},limit(){return this;},maybeSingle:async()=>result});
   const supabaseDb={
     from(table){return query(table==='directory_businesses'?{data:{status:'Publicado'},error:null}:{data:{storage_path:'business-media/'+id+'/logo.jpg'},error:null});},
-    storage:{from(bucket){assert.equal(bucket,'business-catalog');return {createSignedUrl:async(path,seconds)=>{assert.equal(path,'business-media/'+id+'/logo.jpg');assert.equal(seconds,3600);return {data:{signedUrl:'https://storage.example.invalid/signed-logo'},error:null};}};}}
+    storage:{from(bucket){assert.equal(bucket,'business-catalog');return {download:async(path)=>{assert.equal(path,'business-media/'+id+'/logo.jpg');return {data:new Blob(['logo'],{type:'image/jpeg'}),error:null};}};}}
   };
   const supabaseRoute=load('app/api/negocios/[businessId]/foto/route.ts',{'@/lib/business-photo':photo,'@/lib/supabase-admin':{getSupabaseAdminClient:()=>supabaseDb}});
   const supabaseResponse=await supabaseRoute.GET(new NextRequest('https://example.invalid/api/negocios/'+id+'/foto?source=supabase'),context);
-  assert.equal(supabaseResponse.status,302);assert.equal(supabaseResponse.headers.get('location'),'https://storage.example.invalid/signed-logo');assert.equal(supabaseResponse.headers.get('cache-control'),'private, no-store');
+  assert.equal(supabaseResponse.status,200);assert.equal(supabaseResponse.headers.get('content-type'),'image/jpeg');assert.equal(supabaseResponse.headers.get('cache-control'),'public, max-age=300, s-maxage=300');assert.equal(await supabaseResponse.text(),'logo');
   console.log('PASS photo validation, auth, conflict, upload, preservation, retry and failed upload');
 }finally{global.fetch=oldFetch;}})().catch(error=>{console.error(error);process.exitCode=1;});
