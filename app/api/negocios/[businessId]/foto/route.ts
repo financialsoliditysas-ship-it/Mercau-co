@@ -13,10 +13,11 @@ export async function GET(_request:NextRequest,{params}:{params:{businessId:stri
       if (media.error || !media.data?.storage_path) return new NextResponse(null,{status:404});
       const signed = await db.storage.from('business-catalog').createSignedUrl(media.data.storage_path, 3600);
       if (signed.error || !signed.data?.signedUrl) return new NextResponse(null,{status:404});
-      const downloaded = await fetch(signed.data.signedUrl, { cache: 'no-store' });
-      if (!downloaded.ok) return new NextResponse(null,{status:404});
-      const contentType = downloaded.headers.get('content-type') || 'application/octet-stream';
-      return new NextResponse(await downloaded.arrayBuffer(), { headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=3600' } });
+      const redirect = NextResponse.redirect(signed.data.signedUrl, 302);
+      // The signed object remains valid longer than this redirect cache, so a
+      // stale browser redirect cannot outlive its usable image URL.
+      redirect.headers.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+      return redirect;
     }
 
     const key=process.env.AIRTABLE_API_KEY,base=process.env.AIRTABLE_BASE_ID,table=process.env.AIRTABLE_NEGOCIOS_TABLE_ID;

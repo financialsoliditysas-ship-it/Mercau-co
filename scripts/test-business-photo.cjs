@@ -54,5 +54,13 @@ global.fetch=async(url,options={})=>{
   const imageResponse=await publicRoute.GET(request(body),context);assert.equal(imageResponse.status,302);assert(imageResponse.headers.get('location').startsWith('https://v5.airtableusercontent.com/'));
   published=false;assert.equal((await publicRoute.GET(request(body),context)).status,404);
   assert.equal((await publicRoute.GET(request(body),{params:{businessId:'bad'}})).status,404);
+  const query=(result)=>({select(){return this;},eq(){return this;},order(){return this;},limit(){return this;},maybeSingle:async()=>result});
+  const supabaseDb={
+    from(table){return query(table==='directory_businesses'?{data:{status:'Publicado'},error:null}:{data:{storage_path:'business-media/'+id+'/logo.jpg'},error:null});},
+    storage:{from(bucket){assert.equal(bucket,'business-catalog');return {createSignedUrl:async(path,seconds)=>{assert.equal(path,'business-media/'+id+'/logo.jpg');assert.equal(seconds,3600);return {data:{signedUrl:'https://storage.example.invalid/signed-logo'},error:null};}};}}
+  };
+  const supabaseRoute=load('app/api/negocios/[businessId]/foto/route.ts',{'@/lib/business-photo':photo,'@/lib/supabase-admin':{getSupabaseAdminClient:()=>supabaseDb}});
+  const supabaseResponse=await supabaseRoute.GET(new NextRequest('https://example.invalid/api/negocios/'+id+'/foto?source=supabase'),context);
+  assert.equal(supabaseResponse.status,302);assert.equal(supabaseResponse.headers.get('location'),'https://storage.example.invalid/signed-logo');assert.equal(supabaseResponse.headers.get('cache-control'),'public, max-age=300, s-maxage=300');
   console.log('PASS photo validation, auth, conflict, upload, preservation, retry and failed upload');
 }finally{global.fetch=oldFetch;}})().catch(error=>{console.error(error);process.exitCode=1;});
