@@ -61,6 +61,6 @@ global.fetch=async(url,options={})=>{
   };
   const supabaseRoute=load('app/api/negocios/[businessId]/foto/route.ts',{'@/lib/business-photo':photo,'@/lib/supabase-admin':{getSupabaseAdminClient:()=>supabaseDb}});
   const supabaseResponse=await supabaseRoute.GET(new NextRequest('https://example.invalid/api/negocios/'+id+'/foto?source=supabase'),context);
-  assert.equal(supabaseResponse.status,302);assert.equal(supabaseResponse.headers.get('location'),'https://storage.example.invalid/signed-logo');assert.equal(supabaseResponse.headers.get('cache-control'),'public, max-age=300, s-maxage=300');
+  assert.equal(supabaseResponse.status,302);assert.equal(supabaseResponse.headers.get('location'),'https://storage.example.invalid/signed-logo');assert.equal(supabaseResponse.headers.get('cache-control'),'private, no-store');
   console.log('PASS photo validation, auth, conflict, upload, preservation, retry and failed upload');
 }finally{global.fetch=oldFetch;}})().catch(error=>{console.error(error);process.exitCode=1;});

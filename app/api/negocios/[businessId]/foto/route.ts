@@ -14,9 +14,9 @@ export async function GET(_request:NextRequest,{params}:{params:{businessId:stri
       const signed = await db.storage.from('business-catalog').createSignedUrl(media.data.storage_path, 3600);
       if (signed.error || !signed.data?.signedUrl) return new NextResponse(null,{status:404});
       const redirect = NextResponse.redirect(signed.data.signedUrl, 302);
-      // The signed object remains valid longer than this redirect cache, so a
-      // stale browser redirect cannot outlive its usable image URL.
-      redirect.headers.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+      // A signed object URL is time-limited. Never cache its redirect or a
+      // browser may receive the same URL after it has expired.
+      redirect.headers.set('Cache-Control', 'private, no-store');
       return redirect;
     }
 
