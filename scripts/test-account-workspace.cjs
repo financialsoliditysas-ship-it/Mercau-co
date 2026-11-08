@@ -49,6 +49,10 @@ const tables = {
       private_token: "never-return",
     },
   ],
+  directory_businesses: [
+    { id: bid, status: "Publicado" },
+    { id: foreign, status: "Publicado" },
+  ],
   account_notifications: [
     {
       id: "33333333-3333-4333-8333-333333333333",
@@ -147,18 +151,8 @@ const db = {
   rpc: async (name, args) => ({ data: args.p_version + 1, error: null }),
 };
 const admin = { getSupabaseAdminClient: () => db };
-let businessStatus = "Publicado";
 const server = load("lib/account-server.ts", {
   "./supabase-admin": admin,
-  "@/app/api/actualizaciones/[token]/route": {
-    GET: async (_request, { params }) =>
-      Response.json({
-        business: {
-          id: params.token === "owned-private" ? bid : foreign,
-          status: businessStatus,
-        },
-      }),
-  },
 });
 const mocks = {
   "@/lib/account-server": server,
@@ -368,11 +362,13 @@ async function sql() {
   response = await business.GET(request(), { params: { businessId: bid } });
   assert.equal(response.status, 200);
   assert.equal((await response.json()).status, "Publicada");
+  // Existing Supabase membership remains valid even when the old Airtable
+  // invitation token can no longer be resolved.
   tables.business_admins[1].private_token = "wrong-proof";
   response = await business.GET(request(), { params: { businessId: bid } });
-  assert.equal(response.status, 403);
+  assert.equal(response.status, 200);
   tables.business_admins[1].private_token = "owned-private";
-  businessStatus = "Suspendido";
+  tables.directory_businesses[0].status = "Suspendido";
   body = await (
     await business.GET(request(), { params: { businessId: bid } })
   ).json();
@@ -382,7 +378,7 @@ async function sql() {
     { params: { businessId: bid } },
   );
   assert.equal(response.status, 403);
-  businessStatus = "Publicado";
+  tables.directory_businesses[0].status = "Publicado";
   response = await business.PATCH(
     request(undefined, "PATCH", {
       version: 0,

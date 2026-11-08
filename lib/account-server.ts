@@ -1,6 +1,5 @@
 import type { User } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
-import { GET as readPrivateBusiness } from "@/app/api/actualizaciones/[token]/route";
 import { getSupabaseAdminClient } from "./supabase-admin";
 export class AccountError extends Error {
   constructor(
@@ -28,7 +27,7 @@ export async function accountBusiness(userId: string, businessId: string) {
     throw new AccountError("Negocio no válido.", 400);
   const { data, error } = await getSupabaseAdminClient()
     .from("business_admins")
-    .select("business_id,business_name,status,private_token")
+    .select("business_id,business_name,status")
     .eq("user_id", userId)
     .eq("business_id", businessId)
     .eq("status", "Activo")
@@ -39,23 +38,25 @@ export async function accountBusiness(userId: string, businessId: string) {
       "No tienes permiso para administrar este negocio.",
       403,
     );
-  const proof = await readPrivateBusiness(
-    new NextRequest("http://mercau.internal/owner"),
-    { params: { token: data.private_token } },
-  );
-  if (!proof.ok)
+  // Existing account links are authoritative in Supabase. Do not require the
+  // legacy Airtable invitation lookup after the directory migration.
+  const verified = await getSupabaseAdminClient()
+    .from("directory_businesses")
+    .select("id,status")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (verified.error)
+    throw new AccountError("No se pudo comprobar la ficha del negocio.", 503);
+  if (!verified.data)
     throw new AccountError(
-      "La invitación de esta ficha necesita revisión de Mercáu.",
+      "Esta ficha ya no está disponible para administrar.",
       403,
     );
-  const verified = await proof.json();
-  if (verified.business?.id !== businessId)
-    throw new AccountError("La vinculación no corresponde a esta ficha.", 403);
   return {
     business_id: data.business_id,
     business_name: data.business_name,
     status: data.status,
-    business_status: String(verified.business.status || ""),
+    business_status: String(verified.data.status || ""),
   };
 }
 export async function accountBody(request: Request, max = 24000) {
