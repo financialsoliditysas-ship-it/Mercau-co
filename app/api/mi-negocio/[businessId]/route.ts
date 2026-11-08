@@ -1,34 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { loadDirectoryBusiness } from '@/lib/airtable-directory';
 import { businessEditValues, businessEditVersion, validateBusinessEdit } from '@/lib/business-edit';
-import { GET as readPrivateBusiness } from '@/app/api/actualizaciones/[token]/route';
+import { AccountError, accountBusiness, accountUser } from '@/lib/account-server';
 
 export const dynamic = 'force-dynamic';
 type Context = { params: { businessId: string } };
 class EditError extends Error { constructor(message: string, public status: number) { super(message); } }
 async function authorizedBusiness(request: NextRequest, businessId: string) {
-  const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
-  if (!token) throw new EditError('Entra a tu cuenta para editar la ficha.',401);
-  if (!/^rec[A-Za-z0-9]{14}$/.test(businessId)) throw new EditError('Ficha no válida.',400);
-  const db = getSupabaseAdminClient();
-  const { data: auth, error: authError } = await db.auth.getUser(token);
-  if (authError || !auth.user || !auth.user.email_confirmed_at) throw new EditError('Confirma tu correo e inicia sesión.',401);
-  const { data: access, error } = await db.from('business_admins').select('private_token').eq('user_id',auth.user.id).eq('business_id',businessId).eq('status','Activo').maybeSingle();
-  if (error) throw new EditError('No se pudo comprobar tu acceso.',503);
-  if (!access) throw new EditError('No tienes permiso para editar esta ficha.',403);
-  const privateResponse = await readPrivateBusiness(request,{params:{token:access.private_token}});
-  if (!privateResponse.ok) throw new EditError('La vinculación necesita revisión de Mercáu.',403);
-  const privateBusiness = (await privateResponse.json()).business;
-  if (privateBusiness?.id !== businessId) throw new EditError('La vinculación necesita revisión de Mercáu.',403);
-  const business = await loadDirectoryBusiness(businessId) || {
-    ...privateBusiness,
-    source: 'Airtable',
-  };
-  return { business, user: auth.user };
+  const user = await accountUser(request);
+  await accountBusiness(user.id, businessId);
+  const business = await loadDirectoryBusiness(businessId);
+  if (!business) throw new EditError('Esta ficha ya no está disponible para administrar.',403);
+  return { business, user };
 }
 function fail(error: unknown) {
-  return NextResponse.json({error:error instanceof EditError ? error.message : 'No se pudo completar la operación. Intenta más tarde.'},{status:error instanceof EditError ? error.status : 503});
+  const known = error instanceof EditError || error instanceof AccountError;
+  return NextResponse.json({error:known ? error.message : 'No se pudo completar la operación. Intenta más tarde.'},{status:known ? error.status : 503});
 }
 export async function GET(request: NextRequest, { params }: Context) {
   try {

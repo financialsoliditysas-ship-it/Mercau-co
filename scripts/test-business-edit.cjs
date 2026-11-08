@@ -17,13 +17,16 @@ const classified=edit.validateBusinessEdit({...changes,category:'Comidas y bebid
 let member=true, valid=true, current={...original}, posts=0, failWrite=false;
 const rows=[];
 const filters=[];
-const db={auth:{getUser:async()=>({data:{user:valid ? {id:'user-a',email_confirmed_at:'confirmed'} : null}})},from(){const chain={select:()=>chain,eq:(k,v)=>{filters.push([k,v]);return chain;},maybeSingle:async()=>({data:member ? {private_token:'test-private-token'} : null})};return chain;}};
+class TestAccountError extends Error {constructor(message,status){super(message);this.status=status;}}
 const {NextRequest}=require('next/server');
 const route=load('app/api/mi-negocio/[businessId]/route.ts',{
-  '@/lib/supabase-admin':{getSupabaseAdminClient:()=>db},
+  '@/lib/account-server':{
+    AccountError:TestAccountError,
+    accountUser:async request=>{if(!request.headers.get('authorization')||!valid)throw new TestAccountError('No session',401);return {id:'user-a',email_confirmed_at:'confirmed'};},
+    accountBusiness:async(userId,businessId)=>{filters.push(['user_id',userId],['business_id',businessId]);if(!member)throw new TestAccountError('No access',403);return {business_id:businessId,status:'Activo'};}
+  },
   '@/lib/airtable-directory':{loadDirectoryBusiness:async()=>current},
-  '@/lib/business-edit':edit,
-  '@/app/api/actualizaciones/[token]/route':{GET:async()=>Response.json({business:{id:original.id}})}
+  '@/lib/business-edit':edit
 });
 const req=(body,authorization=true)=>new NextRequest('https://example.invalid/api/mi-negocio/'+original.id,{method:body ? 'PATCH' : 'GET',headers:authorization ? {Authorization:'Bearer test-only','Content-Type':'application/json'} : {},...(body ? {body:JSON.stringify(body)} : {})});
 const context={params:{businessId:original.id}};
@@ -60,7 +63,7 @@ global.fetch=async(_url,options)=>{
     failWrite=true;
     assert.equal((await route.PATCH(req({...body,version:edit.businessEditVersion(current),changes:{...changes,hours:'nuevo'}}),context)).status,503);
     assert.equal(current.hours,'');
-    const directory=load('lib/airtable-directory.ts',{'./pilot-directory-data':load('lib/pilot-directory-data.ts'),'./business-photo':load('lib/business-photo.ts'),'@/data/directory':{toDirectoryCategory:()=> 'Profesionales y servicios'},'next/cache':{unstable_cache:fn=>fn}});
+    const directory=load('lib/airtable-directory.ts',{'./pilot-directory-data':load('lib/pilot-directory-data.ts'),'./business-photo':load('lib/business-photo.ts'),'./supabase-directory':{loadSupabaseDirectoryBusinesses:async()=>null},'./directory-logo-assets':{directoryLogoAsset:()=>null},'@/data/directory':{toDirectoryCategory:()=> 'Profesionales y servicios'},'next/cache':{unstable_cache:fn=>fn}});
     global.fetch=async url=>String(url).includes('tblZFp7SvVV7MuBWD') ? Response.json({records:[{createdTime:'2026-10-13',fields:{fldRn5vmrSMFc4xAb:[original.id],fldvfa8cy8ZV4xquD:changes.description,fld1jU61ntd250csD:changes.neighborhood,fld5XhR6GjiKu6fF3:JSON.stringify(note)}}]}) : Response.json({records:[{id:original.id,fields:{fldZAuId3Z7tmNg1y:'Prueba',fldyyLYvoyMdiK13C:'Destacado',fldGg2RLescrYR2Z6:'old',fldkT6oBXKONCkak6:'https://old.invalid'}}]});
     process.env.AIRTABLE_NEGOCIOS_TABLE_ID='tblTestOnly000000';
     const published=(await directory.loadDirectoryBusinesses())[0];
