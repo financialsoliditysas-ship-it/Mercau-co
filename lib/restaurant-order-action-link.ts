@@ -27,7 +27,7 @@ export type RestaurantActionOrder = {
     subtotal: number;
     delivery_mode: string;
     restaurant_name: string;
-    merchant_net: number | null;
+    finance: unknown;
   };
 };
 
@@ -78,7 +78,7 @@ async function findActionOrder(token: string): Promise<RestaurantActionOrder> {
   if (link.error || !link.data || link.data.revoked_at || new Date(link.data.expires_at).getTime() <= Date.now())
     throw new RestaurantActionError('Este enlace de pedido ya no está disponible.', 410);
   const order = await db.from('pilot_food_orders')
-    .select('id,public_id,status,instructions,lines,subtotal,delivery_mode,restaurant_id,restaurant:pilot_restaurants(name),finance:order_financial_snapshots(merchant_net)')
+    .select('id,public_id,status,instructions,lines,subtotal,delivery_mode,restaurant_id,restaurant:pilot_restaurants(name),finance:order_financial_snapshots(product_subtotal,merchant_commission_rate_bps,merchant_commission_total,merchant_net)')
     .eq('id', link.data.order_id).eq('restaurant_id', link.data.restaurant_id).single();
   if (order.error || !order.data) throw new RestaurantActionError('Pedido no encontrado.', 404);
   const restaurant = Array.isArray(order.data.restaurant) ? order.data.restaurant[0] : order.data.restaurant;
@@ -94,7 +94,7 @@ async function findActionOrder(token: string): Promise<RestaurantActionOrder> {
       subtotal: order.data.subtotal,
       delivery_mode: order.data.delivery_mode || 'MERCAU',
       restaurant_name: restaurant?.name || 'Tu negocio',
-      merchant_net: finance?.merchant_net === null || finance?.merchant_net === undefined ? null : Number(finance.merchant_net)
+      finance: finance || null
     }
   };
 }

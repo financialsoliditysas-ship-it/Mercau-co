@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import RestaurantOrderPayout from './RestaurantOrderPayout';
 
 type Line = { lineId: string; name: string; quantity: number; unitPrice: number; note?: string; selections?: Array<{ groupName?: string; choices?: Array<{ name?: string }> }> };
 type OptionGroup = { id: string; name: string; type: 'single' | 'multiple'; required: boolean; maxSelections: number; choices: Array<{ id: string; name: string; priceDelta: number }> };
@@ -14,7 +15,7 @@ type Order = {
   subtotal: number;
   delivery_mode: string;
   restaurant_name: string;
-  merchant_net: number | null;
+  finance: unknown;
   menu: Product[];
 };
 
@@ -97,7 +98,7 @@ export default function RestaurantOrderAction({ token }: { token: string }) {
         <div className="rounded-xl bg-[#fff0f0] p-4"><p className="text-sm font-bold text-red-700">Estado</p><p className="mt-1 text-lg font-black">{pending ? 'Pedido pendiente' : accepted ? 'Pedido aceptado' : ready ? 'Pedido listo. Mercáu coordina la recogida.' : rejected ? 'Pedido rechazado' : order.status}</p></div>
         <div><h2 className="text-lg font-black">Productos</h2><ul className="mt-3 space-y-3">{order.lines.map((line, index) => <li key={`${line.name}-${index}`} className="border-b border-slate-100 pb-3 last:border-0"><div className="flex justify-between gap-3"><span className="font-bold">{line.quantity} x {line.name}</span><span className="font-bold">{money(line.unitPrice * line.quantity)}</span></div>{line.selections?.flatMap(group => group.choices || []).map((choice, choiceIndex) => <p key={choiceIndex} className="text-sm text-slate-600">{choice.name}</p>)}{line.note && <p className="text-sm text-slate-600">Observación: {line.note}</p>}</li>)}</ul></div>
         {order.instructions && <div><h2 className="text-lg font-black">Observaciones</h2><p className="mt-2 rounded-xl bg-slate-50 p-3 text-slate-700">{order.instructions}</p></div>}
-        <div className="flex items-center justify-between border-t border-slate-200 pt-4"><span className="font-bold">Valor para el negocio</span><strong className="text-xl text-[#e21412]">{money(order.merchant_net)}</strong></div>
+        <RestaurantOrderPayout finance={order.finance} status={order.status}/>
         {message && <p role="status" className="rounded-xl bg-green-50 p-3 font-bold text-green-800">{message}</p>}
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 font-bold text-red-800">{error}</p>}
         {(pending || accepted) && <details open={changeOpen} onToggle={event => setChangeOpen(event.currentTarget.open)} className="rounded-xl border border-slate-200 p-4"><summary className="cursor-pointer font-black">Producto agotado o no disponible</summary><p className="mt-2 text-sm text-slate-600">Propón una alternativa del menú. El comprador debe aprobarla antes de que el pedido cambie.</p><div className="mt-4 space-y-4">{order.lines.map((line, index) => {

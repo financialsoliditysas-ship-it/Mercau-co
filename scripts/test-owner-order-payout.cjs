@@ -13,7 +13,7 @@ const db={from(table){const filters=[],record={table,selection:'',filters};const
  if(table==='business_account_settings')return {data:null,error:null};
  assert.equal(table,'pilot_food_orders');queries.push(record);return {data:rows.filter(row=>filters.every(([key,value])=>row[key]===value)),error:null};
  };const query={select(value){record.selection=value;return this;},eq(key,value){filters.push([key,value]);return this;},order(){return this;},limit(){return this;},single:async()=>execute(),maybeSingle:async()=>execute(),then(resolve,reject){return Promise.resolve(execute()).then(resolve,reject);}};return query;}};
-const pilot=load('lib/restaurant-pilot.ts',{'./business-order-hours':load('lib/business-order-hours.ts'),'./pilot-order-finance':finance,'./supabase-admin':{getSupabaseAdminClient:()=>db},'./deliveries':{},'./business-push':{},'./catalog-validation':{catalogOptionGroups:groups=>groups},'./order-changes-config':{orderChangesEnabled:()=>false},'./order-changes-model':{changeSelection:''}});
+const pilot=load('lib/restaurant-pilot.ts',{'./business-order-hours':load('lib/business-order-hours.ts'),'./pilot-order-finance':finance,'./supabase-admin':{getSupabaseAdminClient:()=>db},'./deliveries':{},'./business-push':{},'./catalog-validation':{catalogOptionGroups:groups=>groups},'./order-changes-config':{orderChangesEnabled:()=>false},'./order-changes-model':{changeSelection:''},'./restaurant-order-action-link':{},'./restaurant-order-messages':{}});
 async function main(){
  const manager=await pilot.listPilotOrders('owner',true,a);assert.equal(manager.length,2);assert.equal(manager[0].finance.merchant_net,51000);assert(queries.at(-1).selection.includes('merchant_net'));assert(!queries.at(-1).filters.some(([key])=>key==='customer_id'));
  const count=queries.length;await assert.rejects(()=>pilot.listPilotOrders('customer',true,a),error=>error.status===403);await assert.rejects(()=>pilot.listPilotOrders('owner',true,b),error=>error.status===403);await assert.rejects(()=>pilot.listPilotOrders('unknown',true,demo),error=>error.status===403);assert.equal(queries.length,count,'Unauthorized users must not query order/financial rows');
@@ -24,10 +24,14 @@ async function main(){
  assert.equal(finance.merchantOrderPayout({...snapshot,merchant_net:'1'}).net,1);assert.equal(finance.merchantOrderPayout({...snapshot,merchant_net:0}).net,0);assert.equal(finance.merchantOrderPayout({...snapshot,merchant_net:51001}).net,51001,'Must read the recorded amount, not recalculate');
  for(const value of [null,[],[snapshot,snapshot],{}, {...snapshot,merchant_net:undefined},{...snapshot,merchant_net:-1},{...snapshot,merchant_net:NaN},{...snapshot,merchant_net:''},{...snapshot,merchant_net:Number.MAX_SAFE_INTEGER+1}])assert.equal(finance.merchantOrderPayout(value),null);
  const Component=load('components/RestaurantOrderPayout.tsx',{'@/lib/pilot-order-finance':finance}).default;
+ const actionScreen=fs.readFileSync('components/RestaurantOrderAction.tsx','utf8');
+ const actionLink=fs.readFileSync('lib/restaurant-order-action-link.ts','utf8');
+ assert(actionScreen.includes("<RestaurantOrderPayout finance={order.finance} status={order.status}/>"),'El enlace protegido debe reutilizar el desglose del panel del negocio.');
+ assert(actionLink.includes('order_financial_snapshots(product_subtotal,merchant_commission_rate_bps,merchant_commission_total,merchant_net)'),'El enlace protegido debe consultar el desglose financiero registrado.');
  const html=renderToStaticMarkup(React.createElement(Component,{finance:snapshot,status:'accepted'}));assert(html.includes('Valor a recibir por productos'));assert(html.includes('51.000'));assert(html.includes('15 %'));assert(html.includes('No incluye el domicilio.'));assert(!html.includes('65.000'));
  const negotiated=renderToStaticMarkup(React.createElement(Component,{finance:manager[1].finance,status:'pending'}));assert(negotiated.includes('8 %'));assert(negotiated.includes('55.200'));
  const missing=renderToStaticMarkup(React.createElement(Component,{finance:null,status:'accepted'}));assert(missing.includes('no disponible'));assert(!missing.includes('$'));
  const rejected=renderToStaticMarkup(React.createElement(Component,{finance:snapshot,status:'rejected'}));assert(rejected.includes('no indica un pago pendiente'));assert(!rejected.includes('Valor a recibir por productos'));
- console.log('PASS authorized owner/demo access, restaurant/customer isolation, financial fields withheld from buyer, authoritative net including negotiated rates and zero, missing-data state and rendering. Read-only mocked queries; no orders or dispatches.');
+ console.log('PASS authorized owner/demo access, restaurant/customer isolation, financial fields withheld from buyer, and the protected WhatsApp link reuses the authoritative payout breakdown. Read-only mocked queries; no orders or dispatches.');
 }
 main().catch(error=>{console.error(error.stack);process.exitCode=1;});
