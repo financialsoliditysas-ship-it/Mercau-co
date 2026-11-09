@@ -93,17 +93,6 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "No se pudo comprobar la sesión. Intenta más tarde." }, { status: 503 });
   }
-  const token = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-  const tableId = process.env.AIRTABLE_NEGOCIOS_TABLE_ID;
-
-  if (!token || !baseId || !tableId) {
-    return NextResponse.json(
-      { error: "Airtable no esta configurado en este entorno." },
-      { status: 503 }
-    );
-  }
-
   const body = await request.json();
   const businessName = cleanText(body.businessName, 100);
   const ownerName = cleanText(body.ownerName, 100);
@@ -126,7 +115,7 @@ export async function POST(request: NextRequest) {
     ? requestedMunicipality
     : "";
   const updateToken = randomBytes(18).toString("base64url");
-  const updateLink = `${appUrl(request)}/actualizar/${updateToken}`;
+  const businessId = `rec${randomBytes(7).toString("hex")}`;
 
   if (!businessName || !ownerName || !whatsapp || !category || !municipality) {
     return NextResponse.json(
@@ -135,80 +124,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const notes = [
-    "Inscripcion recibida desde el MVP publico de Mercáu.",
-    subcategory ? `Subcategoria: ${subcategory}.` : "",
-    secondaryCategories.length ? `Categorias secundarias: ${secondaryCategories.join(", ")}.` : "",
-    tags ? `Etiquetas o servicios: ${tags}.` : "",
-    otherActivity ? `Otra actividad para revision: ${otherActivity}.` : ""
-  ].filter(Boolean).join("\n");
-
-  const fields: Record<string, string | string[]> = {
-    [FIELD_IDS.businessName]: businessName,
-    [FIELD_IDS.ownerName]: ownerName,
-    [FIELD_IDS.whatsapp]: whatsapp,
-    [FIELD_IDS.category]: category,
-    [FIELD_IDS.municipality]: municipality,
-    [FIELD_IDS.neighborhood]: cleanText(body.neighborhood, 100),
-    [FIELD_IDS.description]: cleanText(body.description, 600),
-    [FIELD_IDS.hours]: cleanText(body.hours, 80) || "Consultar por WhatsApp",
-    [FIELD_IDS.deliveries]:
-      body.deliveries === "Si" ? "Si" : body.deliveries === "No" ? "No" : "Consultar",
-    [FIELD_IDS.wantsMarketplace]: body.wantsMarketplace === "Si" ? "Si" : "Despues",
-    [FIELD_IDS.instagram]: cleanSocial(body.instagram),
-    [FIELD_IDS.facebook]: cleanSocial(body.facebook),
-    [FIELD_IDS.status]: "Pendiente",
-    [FIELD_IDS.source]: "Formulario",
-    [FIELD_IDS.notes]: notes,
-    [FIELD_IDS.updateToken]: updateToken,
-    [FIELD_IDS.updateLink]: updateLink
-  };
-
-  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.primaryCategory, category);
-  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.subcategory, subcategory);
-  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.secondaryCategories, secondaryCategories);
-  setOptionalField(
-    fields,
-    OPTIONAL_CATEGORY_FIELD_IDS.tags,
-    tags
-      .split(",")
-      .map((tag) => cleanText(tag, 60))
-      .filter(Boolean)
-  );
-  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.legacyCategory, category);
-  setOptionalField(fields, OPTIONAL_CATEGORY_FIELD_IDS.otherActivity, otherActivity);
-
-  Object.keys(fields).forEach((key) => {
-    if (!fields[key]) delete fields[key];
-  });
-
-  const response = await fetch(`https://api.airtable.com/v0/${baseId}/${tableId}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ fields, typecast: true })
-  });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    return NextResponse.json(
-      {
-        error: "No se pudo crear el registro en Airtable.",
-        detail: result?.error?.message || result?.error || "Error desconocido"
-      },
-      { status: response.status }
-    );
-  }
-
-  let linked=false;
-  if(/^rec[A-Za-z0-9]{14}$/.test(result.id)){
-    try{const link=await getSupabaseAdminClient().from('business_admins').insert({user_id:userId,business_id:result.id,business_name:businessName,owner_name:ownerName,owner_whatsapp:whatsapp,private_token:updateToken,status:'Activo'});linked=!link.error;}catch{linked=false;}
-  }
+  if (!/^rec[A-Za-z0-9]{14}$/.test(businessId)) return NextResponse.json({ error: "No se pudo generar la referencia del negocio." }, { status: 503 });
+  const db=getSupabaseAdminClient();
+  const duplicate=await db.from('directory_businesses').select('id,name').eq('municipality',municipality);
+  if(duplicate.error)return NextResponse.json({error:'No se pudo comprobar si el negocio ya existe.'},{status:503});
+  const normalizedName=businessName.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-CO');
+  if(duplicate.data?.some(item=>String(item.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es-CO')===normalizedName))return NextResponse.json({error:'Ya existe una ficha con ese nombre en el municipio. Solicita a Mercáu vincularla a tu cuenta.'},{status:409});
+  const hours=cleanText(body.hours,80)||'Consultar por WhatsApp';
+  const created=await db.from('directory_businesses').insert({id:businessId,name:businessName,category,municipality,
+    neighborhood:cleanText(body.neighborhood,100),description:cleanText(body.description,600),whatsapp,
+    instagram:cleanSocial(body.instagram),facebook:cleanSocial(body.facebook),
+    delivery_notes:body.deliveries==='Si'?'Si':body.deliveries==='No'?'No':'Consultar',status:'Borrador',source:'Formulario Supabase',claimed_at:new Date().toISOString()});
+  if(created.error)return NextResponse.json({error:'No se pudo guardar la ficha del negocio. Intenta nuevamente.'},{status:503});
+  const schedule=await db.from('directory_business_hours').insert({business_id:businessId,schedule:{display:hours},timezone:'America/Bogota'});
+  if(schedule.error){await db.from('directory_businesses').delete().eq('id',businessId);return NextResponse.json({error:'No se pudo guardar el horario. No se creó un registro incompleto.'},{status:503});}
+  const linked=await db.from('business_admins').insert({user_id:userId,business_id:businessId,business_name:businessName,owner_name:ownerName,owner_whatsapp:whatsapp,private_token:updateToken,status:'Activo'});
+  if(linked.error){await db.from('directory_business_hours').delete().eq('business_id',businessId);await db.from('directory_businesses').delete().eq('id',businessId);return NextResponse.json({error:'No se pudo vincular la ficha a tu cuenta. No se creó un registro incompleto.'},{status:503});}
   return NextResponse.json(
-    { ok: true, recordId: result.id, status: "Pendiente",linked,message:linked?'Inscripción recibida y vinculada a tu cuenta.':'Inscripción recibida. La vinculación está pendiente; no repitas el registro y contacta a Mercáu.' },
+    { ok: true, recordId: businessId, status: "Borrador",linked:true,message:'Inscripción recibida y vinculada a tu cuenta.' },
     { status: 201 }
   );
 }

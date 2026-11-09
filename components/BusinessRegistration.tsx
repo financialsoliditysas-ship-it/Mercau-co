@@ -88,9 +88,7 @@ export default function BusinessRegistration({ onRegistered, compact = false }: 
         else window.location.assign("/mi-cuenta/negocio?onboarding=producto");
       }
     } catch (error) {
-      setStatus(
-        "No se pudo enviar la inscripción. Revisa la conexión e intenta nuevamente.",
-      );
+      setStatus(error instanceof Error ? error.message : "No se pudo enviar la inscripción. Intenta nuevamente.");
     } finally {
       setIsSubmitting(false);
     }
