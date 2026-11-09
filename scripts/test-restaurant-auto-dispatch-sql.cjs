@@ -28,6 +28,7 @@ async function main() {
     await execFile('supabase/migrations/20261106193000_restaurant_auto_dispatch.sql');
     await execFile('supabase/migrations/20261108193000_immediate_restaurant_dispatch.sql');
     await execFile('supabase/migrations/20261108200000_fix_test_order_ids_and_whatsapp_queue.sql');
+    await execFile('supabase/migrations/20261109000100_align_test_shipday_order_ids.sql');
     await db.exec('grant all on all tables in schema public to service_role; grant usage, select on all sequences in schema public to service_role;');
     await db.exec(`insert into pilot_restaurants(id,name,pickup_address,pickup_phone,enabled,is_live,delivery_mode,preparation_minutes,dispatch_lead_minutes)
       values('qa-auto','Asadero ficticio','Calle de prueba','3000000000',true,false,'MERCAU',15,3);
@@ -41,7 +42,7 @@ async function main() {
     const order = await create();
     assert.match(order.public_id, /^PRB-\d{6}$/, 'Los pedidos de un restaurante de prueba deben usar el consecutivo PRB.');
     const transition = async (action, actorType = 'business', actor = manager, actorReference = manager) =>
-      (await db.query('select pilot_food_transition_v5($1,$2,$3,$4,$5) as result', [order.id, actor, action, actorType, actorReference])).rows[0].result;
+      (await db.query('select pilot_food_transition_v6($1,$2,$3,$4,$5) as result', [order.id, actor, action, actorType, actorReference])).rows[0].result;
 
     const accepted = await transition('accepted');
     assert.equal(accepted.dispatch, true);
@@ -51,6 +52,8 @@ async function main() {
     assert.ok(Math.abs(new Date(stored.dispatch_due_at) - new Date(stored.accepted_at)) < 1000);
     assert.ok(stored.delivery_order_id, 'Aceptar debe crear un único registro de despacho programado.');
     assert.equal((await db.query('select count(*)::int as count from delivery_orders where id=$1', [stored.delivery_order_id])).rows[0].count, 1);
+    assert.equal((await db.query('select public_id from delivery_orders where id=$1', [stored.delivery_order_id])).rows[0].public_id, order.public_id,
+      'El despacho de prueba debe conservar la misma referencia PRB del pedido.');
     const acceptedDelivery = (await db.query('select expected_pickup_at from delivery_orders where id=$1', [stored.delivery_order_id])).rows[0];
     assert.equal(Math.round((new Date(acceptedDelivery.expected_pickup_at) - new Date(stored.accepted_at)) / 60000), 15,
       'La recogida debe conservar el tiempo configurado del negocio.');
@@ -69,7 +72,7 @@ async function main() {
     assert.ok(scheduled.expected_pickup_at);
 
     const rejectedOrder = await create();
-    const rejected = (await db.query('select pilot_food_transition_v5($1,$2,$3,$4,$5) as result', [rejectedOrder.id, manager, 'rejected', 'business', manager])).rows[0].result;
+    const rejected = (await db.query('select pilot_food_transition_v6($1,$2,$3,$4,$5) as result', [rejectedOrder.id, manager, 'rejected', 'business', manager])).rows[0].result;
     assert.equal(rejected.status, 'rejected');
     assert.equal((await db.query('select delivery_order_id from pilot_food_orders where id=$1', [rejectedOrder.id])).rows[0].delivery_order_id, null);
 
