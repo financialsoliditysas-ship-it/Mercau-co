@@ -27,6 +27,7 @@ async function main() {
     await execFile('supabase/migrations/20261030174526_order_change_proposals.sql');
     await execFile('supabase/migrations/20261106193000_restaurant_auto_dispatch.sql');
     await execFile('supabase/migrations/20261108193000_immediate_restaurant_dispatch.sql');
+    await execFile('supabase/migrations/20261108200000_fix_test_order_ids_and_whatsapp_queue.sql');
     await db.exec('grant all on all tables in schema public to service_role; grant usage, select on all sequences in schema public to service_role;');
     await db.exec(`insert into pilot_restaurants(id,name,pickup_address,pickup_phone,enabled,is_live,delivery_mode,preparation_minutes,dispatch_lead_minutes)
       values('qa-auto','Asadero ficticio','Calle de prueba','3000000000',true,false,'MERCAU',15,3);
@@ -38,6 +39,7 @@ async function main() {
       subtotal,delivery_fee,payment_method,delivery_mode,commission_rate_bps,customer_markup_bps)
       values('qa-auto','${customer}',gen_random_uuid(),'Cliente ficticio','3000000000','Dirección ficticia','Centro','',$1::jsonb,20000,5000,'CASH','MERCAU',1500,0) returning *`, [lines])).rows[0];
     const order = await create();
+    assert.match(order.public_id, /^PRB-\d{6}$/, 'Los pedidos de un restaurante de prueba deben usar el consecutivo PRB.');
     const transition = async (action, actorType = 'business', actor = manager, actorReference = manager) =>
       (await db.query('select pilot_food_transition_v5($1,$2,$3,$4,$5) as result', [order.id, actor, action, actorType, actorReference])).rows[0].result;
 

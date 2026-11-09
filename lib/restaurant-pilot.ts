@@ -183,7 +183,9 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
       restaurantId,
       restaurantName: restaurant.name,
       restaurantPhone: restaurant.pickup_phone
-      }).then(() => processRestaurantOrderMessages(1)).catch(() => undefined);
+      }).then(() => processRestaurantOrderMessages(1)).catch(error => {
+        console.error('No se pudo procesar el aviso de WhatsApp del pedido.', error);
+      });
   }
   await sendNewOrderPush({ businessId: restaurantId, orderId: data.public_id,
     customerName: input.customer_name, total: input.subtotal + Number(restaurant.delivery_fee || 0) }).catch(() => undefined);
