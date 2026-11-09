@@ -134,14 +134,14 @@ export async function POST(request: NextRequest) {
   const created=await db.from('directory_businesses').insert({id:businessId,name:businessName,category,municipality,
     neighborhood:cleanText(body.neighborhood,100),description:cleanText(body.description,600),whatsapp,
     instagram:cleanSocial(body.instagram),facebook:cleanSocial(body.facebook),
-    delivery_notes:body.deliveries==='Si'?'Si':body.deliveries==='No'?'No':'Consultar',status:'Borrador',source:'Formulario Supabase',claimed_at:new Date().toISOString()});
+    delivery_notes:body.deliveries==='Si'?'Si':body.deliveries==='No'?'No':'Consultar',status:'Publicado',source:'Formulario Supabase',claimed_at:new Date().toISOString()});
   if(created.error)return NextResponse.json({error:'No se pudo guardar la ficha del negocio. Intenta nuevamente.'},{status:503});
   const schedule=await db.from('directory_business_hours').insert({business_id:businessId,schedule:{display:hours},timezone:'America/Bogota'});
   if(schedule.error){await db.from('directory_businesses').delete().eq('id',businessId);return NextResponse.json({error:'No se pudo guardar el horario. No se creó un registro incompleto.'},{status:503});}
   const linked=await db.from('business_admins').insert({user_id:userId,business_id:businessId,business_name:businessName,owner_name:ownerName,owner_whatsapp:whatsapp,private_token:updateToken,status:'Activo'});
   if(linked.error){await db.from('directory_business_hours').delete().eq('business_id',businessId);await db.from('directory_businesses').delete().eq('id',businessId);return NextResponse.json({error:'No se pudo vincular la ficha a tu cuenta. No se creó un registro incompleto.'},{status:503});}
   return NextResponse.json(
-    { ok: true, recordId: businessId, status: "Borrador",linked:true,message:'Inscripción recibida y vinculada a tu cuenta.' },
+    { ok: true, recordId: businessId, status: "Publicado",linked:true,message:'Negocio creado y publicado en Mercáu.' },
     { status: 201 }
   );
 }

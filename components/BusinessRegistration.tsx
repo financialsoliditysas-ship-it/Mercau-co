@@ -80,9 +80,7 @@ export default function BusinessRegistration({ onRegistered, compact = false }: 
       form.reset();
       setSignupCategory("");
       setStep(0);
-      setStatus(
-        `${result.message || "Inscripción recibida."} Queda pendiente de revisión antes de publicarse.`,
-      );
+      setStatus(result.message || "Negocio creado y publicado en Mercáu.");
       if (result.linked) {
         if (onRegistered) onRegistered();
         else window.location.assign("/mi-cuenta/negocio?onboarding=producto");
@@ -108,8 +106,8 @@ export default function BusinessRegistration({ onRegistered, compact = false }: 
             Inscribe tu negocio en Mercáu
           </h2>
           <p className="mt-3 leading-7 text-slate-600">
-            El formulario está pensado para celular. Tu solicitud queda en
-            revisión y se publica cuando Mercáu apruebe la información.
+            El formulario está pensado para celular. Al terminar, tu negocio
+            queda creado y puedes completar su ficha, fotos y catálogo.
           </p>
         </div>}
 
@@ -345,7 +343,7 @@ export default function BusinessRegistration({ onRegistered, compact = false }: 
               ? "Enviando..."
               : step < 2
                 ? "Continuar"
-                : "Enviar inscripción para revisión"}
+                : "Crear mi negocio"}
           </button>
           {status ? (
             <p className="rounded-2xl bg-[#FFF1F0] p-4 font-bold text-[#1F2937] sm:col-span-2">
