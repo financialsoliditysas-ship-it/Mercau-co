@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { validMetaSignature, validMetaVerificationToken } from '@/lib/whatsapp-webhook';
+import { validMetaSignature, validMetaVerificationToken, whatsappDeliveryEvents } from '@/lib/whatsapp-webhook';
+import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,7 +31,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    JSON.parse(rawBody);
+    const events = whatsappDeliveryEvents(JSON.parse(rawBody));
+    if (events.length) {
+      const { error } = await getSupabaseAdminClient()
+        .from('whatsapp_message_delivery_events')
+        .upsert(events, { onConflict: 'message_id,status,occurred_at', ignoreDuplicates: true });
+      if (error) return new NextResponse('Storage unavailable', { status: 503 });
+    }
   } catch {
     return new NextResponse('Bad request', { status: 400 });
   }
