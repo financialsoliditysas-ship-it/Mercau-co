@@ -36,7 +36,7 @@ export default async function BusinessCatalogPage({params}:{params:{id:string}})
   const [catalogResult,restaurantResult]=await Promise.allSettled([loadMenuCatalog(business.id),pilotRestaurant(business.id)]);
   const unavailable=catalogResult.status==='rejected';
   const catalog=catalogResult.status==='fulfilled'?catalogResult.value:null;
-  const liveOrders=restaurantResult.status==='fulfilled'&&restaurantResult.value.is_live===true;
+  const ordersEnabled=restaurantResult.status==='fulfilled'&&(restaurantResult.value.is_live===true||business.source==='mercau-test');
   const catalogPath=businessCatalogPath(business);
   const catalogUrl=`https://www.mercau.co${catalogPath}`;
   return <main className="min-h-screen bg-[#FCFBF9] text-[#1F2937]">
@@ -50,7 +50,7 @@ export default async function BusinessCatalogPage({params}:{params:{id:string}})
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-start-2"><CatalogShareActions businessName={business.name} catalogUrl={catalogUrl} noun={catalogNoun(business.category)} /><InstallMercau prominent /></div>
     </section>
       {business.pilotRestaurant && <PilotBusinessNotice />}
-      {liveOrders ? <RestaurantPilot embedded visualMenu={isFoodBusiness(business.category)} restaurantId={business.id} businessName={business.name} returnPath={catalogPath} coverImage={menuCover(business,catalog?.products || []).imageUrl} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} demoLines={business.source==='mercau-test'?{'Tecnología':['Celulares','Audio','Wearables','Computadores','Creadores','Accesorios'],'Moda, belleza y variedades':['Ropa infantil','Ropa femenina','Ropa masculina','Vestidos de baño','Belleza y cuidado','Accesorios de moda']}:undefined} />}
+      {ordersEnabled ? <RestaurantPilot embedded visualMenu={isFoodBusiness(business.category)} restaurantId={business.id} businessName={business.name} returnPath={catalogPath} coverImage={menuCover(business,catalog?.products || []).imageUrl} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} demoLines={business.source==='mercau-test'?{'Tecnología':['Celulares','Audio','Wearables','Computadores','Creadores','Accesorios'],'Moda, belleza y variedades':['Ropa infantil','Ropa femenina','Ropa masculina','Vestidos de baño','Belleza y cuidado','Accesorios de moda']}:undefined} />}
     </div>
   </main>;
 }

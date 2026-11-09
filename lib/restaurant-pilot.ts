@@ -10,6 +10,7 @@ import { ensureRestaurantOrderActionLink } from './restaurant-order-action-link'
 import { processRestaurantOrderMessages } from './restaurant-order-messages';
 
 export const pilotId = 'restaurante-mercado';
+const testCatalogRestaurantIds = new Set(['recTiendaMercau01']);
 export class PilotError extends Error {
   constructor(message: string, public status = 400, public previousPublicId?: string, public canRepeat = false) { super(message); }
 }
@@ -26,8 +27,12 @@ export async function pilotMember(userId: string, manager = false, restaurantId 
   if (restaurantId !== pilotId) {
     const restaurant = await pilotRestaurant(restaurantId,false,false);
     if (!manager) return;
-    const { data, error } = await getSupabaseAdminClient().from('business_admins').select('business_id')
-      .eq('business_id', restaurant.directory_business_id).eq('user_id', userId).eq('status', 'Activo').maybeSingle();
+    const membership = restaurant.is_live
+      ? getSupabaseAdminClient().from('business_admins').select('business_id')
+        .eq('business_id', restaurant.directory_business_id).eq('user_id', userId).eq('status', 'Activo').maybeSingle()
+      : getSupabaseAdminClient().from('pilot_restaurant_members').select('role')
+        .eq('restaurant_id', restaurantId).eq('user_id', userId).eq('role', 'manager').maybeSingle();
+    const { data, error } = await membership;
     if (error) throw new PilotError('No se pudo comprobar tu acceso al negocio.', 503);
     if (!data) throw new PilotError('No administras este negocio.', 403);
     return;
@@ -42,7 +47,8 @@ export async function pilotRestaurant(restaurantId = pilotId, includeMenu = true
   if (restaurantId !== pilotId && !/^rec[a-zA-Z0-9]{14}$/.test(restaurantId)) throw new PilotError('Negocio no disponible.', 404);
   const { data, error } = await getSupabaseAdminClient().from('pilot_restaurants').select('*').eq('id', restaurantId).single();
   if (error || !data) throw new PilotError('La prueba todavia no esta configurada.', 503);
-  if (restaurantId !== pilotId && (!data.is_live || !data.directory_initialized || data.directory_business_id !== restaurantId))
+  const testCatalog = testCatalogRestaurantIds.has(restaurantId) && data.is_live === false;
+  if (restaurantId !== pilotId && ((!data.is_live && !testCatalog) || !data.directory_initialized || data.directory_business_id !== restaurantId))
     throw new PilotError('Este negocio no tiene pedidos habilitados.', 404);
   if(checkHours && data.is_live && data.directory_business_id){
     const settings=await getSupabaseAdminClient().from('business_account_settings').select('data').eq('business_id',data.directory_business_id).maybeSingle();

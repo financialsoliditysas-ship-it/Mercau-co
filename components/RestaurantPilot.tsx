@@ -105,7 +105,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   legacyPreview?:boolean;previewDeliveryProfile?:{name:string;phone:string;address:string;neighborhood:string;instructions:string};
   discovery?:boolean;discoveryProductId?:string;beforeDiscoveryAdd?:()=>Promise<boolean>;onDiscoveryAdded?:()=>void;
 }) {
-  const live = Boolean(restaurantId);
+  const [restaurantLive, setRestaurantLive] = useState(false);
+  const live = Boolean(restaurantId) && restaurantLive;
   const title = businessName || 'Restaurante Mercado';
   const supabase = useMemo(() => getSupabaseBrowserClient(), []);
   const [session, setSession] = useState<Session | null>(null);
@@ -385,7 +386,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   }, [manager, session, pushApi]);
   useEffect(() => {
     if (manager) return;
-    api('?mode=menu').then(r => { setMenu(r.menu); setFee(r.fee); setEnabled(r.enabled); setAvailabilityMessage(r.availabilityMessage || ''); setDeliveryMode(r.deliveryMode || 'MERCAU'); })
+    api('?mode=menu').then(r => { setMenu(r.menu); setFee(r.fee); setEnabled(r.enabled); setAvailabilityMessage(r.availabilityMessage || ''); setDeliveryMode(r.deliveryMode || 'MERCAU'); setRestaurantLive(r.live === true); })
       .catch(e => setNotice(e.message));
   }, [api, manager]);
   useEffect(()=>{
@@ -708,7 +709,7 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
     {!embedded && <header className="pilot-header"><a href="/" aria-label="Volver a Mercau"><img src="/logo-mercau.png" alt="Mercau" /></a><span>{manager ? 'Panel de mi negocio' : title}</span>
       {preview ? <a href="/comprar">Volver al Inicio</a> : <BackToAccount />}{session && !preview && <button onClick={signOut}>Cerrar sesion</button>}</header>}
     {preview && <p className="pilot-preview-banner">Vista de prueba · Datos ficticios. No se cobra dinero ni se despachan pedidos.</p>}
-    {!live && <div className="pilot-test">Restaurante ficticio de prueba. No se preparan productos. Si eliges Bre-B, la transferencia sí mueve dinero real a Mercáu y debe acordarse previamente.</div>}
+    {!live && <div className="pilot-test">{title} es una prueba. No se preparan productos, no se recauda dinero y no se coordina un despacho real.</div>}
     {notice && !(preview&&checkout) && <p key={visualMenu?addedNoticeId:undefined} role="status" className={visualMenu&&notice==='Producto agregado a tu pedido.'?'pilot-notice menu-added-toast':'pilot-notice'}>{notice}</p>}
     {previousOrderReference && <div ref={duplicateActionsRef} role="group" aria-label="Pedido reciente"><button disabled={busy} className="pilot-secondary" onClick={()=>{
       const scope=`mercau:order-intent:${session?.user.id || 'preview'}:${restaurantId || 'restaurante-mercado'}`;
@@ -796,13 +797,13 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
             {locationStatus && <p role="status" className="mt-2 text-sm font-bold">{locationStatus}</p>}
             <p className="mt-2 text-xs text-gray-600">Mercáu guarda este punto para realizar la entrega. No sigue tu recorrido.</p>
           </section>
-          <fieldset className="pilot-payment-choice"><legend>Pago contra entrega</legend><label><input type="radio" name="payment" checked={paymentMethod === 'CASH'} onChange={() => { setPaymentMethod('CASH'); setRequestKey(''); }}/> Pagar en efectivo</label><label><input type="radio" name="payment" checked={paymentMethod === 'BREB_QR'} onChange={() => { setPaymentMethod('BREB_QR'); setRequestKey(''); }}/> Pagar por transferencia Bre-B</label></fieldset>
+          <fieldset className="pilot-payment-choice"><legend>Pago contra entrega</legend><label><input type="radio" name="payment" checked={paymentMethod === 'CASH'} onChange={() => { setPaymentMethod('CASH'); setRequestKey(''); }}/> {live ? 'Pagar en efectivo' : 'Efectivo simulado'}</label>{live && <label><input type="radio" name="payment" checked={paymentMethod === 'BREB_QR'} onChange={() => { setPaymentMethod('BREB_QR'); setRequestKey(''); }}/> Pagar por transferencia Bre-B</label>}</fieldset>
           <p>{live ? 'Solo casco urbano de Nechí.' : 'Solo casco urbano de Nechi. La prueba no recauda dinero real.'}</p>
           <button className="pilot-primary" disabled={busy}>Revisar solicitud</button></form> : <section ref={reviewRef} className="pilot-review">{visualMenu?<OrderReviewPresentation businessName={title} lines={cart.map(line=>({...line,name:menu.find(item=>item.id===line.productId)?.name || '',unitPrice:configuredUnitPrice(line),options:selectedLineOptions(line)}))} subtotal={subtotal} fee={fee} customer={customer} paymentMethod={paymentMethod} hasPoint={Boolean(customerMapsUrl)} live={live} busy={busy} canConfirm={enabled&&Boolean(session)} onConfirm={()=>void submit()} onEdit={()=>setReview(false)}/>:<><h3>Revisa tu solicitud</h3>
           <p>{customer.name} · {customer.phone}</p><p>{customer.address}, {customer.neighborhood}</p><p>{customer.instructions}</p>
           {customerMapsUrl && <p className="font-bold text-emerald-700">Ubicación exacta agregada</p>}
           <div className="pilot-review-lines"><h4>Resumen del pedido</h4>{cart.map(line=>{const product=menu.find(item=>item.id===line.productId);return <div key={line.lineId} className="pilot-cart-line"><p><strong>{line.quantity} x {product?.name}</strong> · {money(configuredUnitPrice(line)*line.quantity)}</p>{selectedLineOptions(line).map(choice=><p key={choice.id} className="pilot-line-detail">{choice.groupName}: {choice.name}{choice.priceDelta>0&&<> <strong>+{money(choice.priceDelta)} c/u</strong></>}</p>)}{line.note&&<p className="pilot-line-detail">Observación: {line.note}</p>}</div>})}</div>
-          <p>Productos: <strong>{money(subtotal)}</strong></p><p>Domicilio: <strong>{money(fee)}</strong></p><p>{live ? 'Total a pagar' : 'Total de prueba'}: <strong>{money(subtotal + fee)}</strong></p><p>Pago contra entrega: {paymentMethod === 'BREB_QR' ? 'transferencia Bre-B; el mensajero mostrará el QR' : 'efectivo'}.</p><p>El restaurante debe confirmar antes del despacho.</p>
+          <p>Productos: <strong>{money(subtotal)}</strong></p><p>Domicilio: <strong>{money(fee)}</strong></p><p>{live ? 'Total a pagar' : 'Total de prueba'}: <strong>{money(subtotal + fee)}</strong></p><p>Pago contra entrega: {paymentMethod === 'BREB_QR' ? 'transferencia Bre-B; el mensajero mostrará el QR' : live ? 'efectivo' : 'efectivo simulado'}.</p><p>{live ? 'El negocio debe confirmar antes del despacho.' : 'El negocio recibirá esta prueba para gestionarla desde Mercáu o WhatsApp.'}</p>
           <button disabled={busy || !enabled || !session} className="pilot-primary" onClick={()=>void submit()}>{busy ? 'Guardando...' : live ? 'Confirmar pedido' : 'Confirmar pedido de prueba'}</button>
           <button disabled={busy} onClick={() => setReview(false)}>Corregir datos</button></>}</section>)}
       </aside></div>
