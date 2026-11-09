@@ -10,6 +10,7 @@
 .pilot h3{font-size:18px;font-weight:700}.pilot p{line-height:1.6;margin:8px 0}.pilot strong{font-weight:750}
 .pilot label{display:grid;gap:6px;font-weight:600;margin:12px 0}.pilot input{width:100%;min-height:46px;padding:10px;border:1px solid #d1d5db;border-radius:6px;background:white;font-size:16px}
 .pilot-login{max-width:560px;margin:24px 0}.pilot-login-actions{display:grid;grid-template-columns:minmax(110px,.72fr) minmax(0,1.28fr);gap:10px;align-items:stretch}.pilot-login-actions>button,.pilot-login-actions>a{min-height:48px;margin:0}.pilot-categories{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}
+.pilot-demo-lines{margin:20px 0 0}.pilot-demo-lines p{margin:0 0 8px;font-size:14px;font-weight:800}.pilot-demo-lines nav{display:flex;flex-wrap:wrap;gap:8px}.pilot-demo-lines button[aria-pressed=true]{background:#D82016;color:#fff;border-color:#D82016}
 .pilot-categories button[aria-pressed=true]{background:#D82016;color:white;border-color:#D82016}
 .pilot-shop{display:grid;grid-template-columns:1fr 340px;gap:24px}.pilot-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-content:start}
 .pilot-menu article{display:flex;height:100%;flex-direction:column;background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.pilot-menu article>div{padding:14px}.pilot-menu article>.pilot-product-image{padding:0}.pilot-product-body{display:flex;flex:1;flex-direction:column}.pilot-product-body>.pilot-primary{margin-top:auto}.pilot-product-price{font-weight:800}

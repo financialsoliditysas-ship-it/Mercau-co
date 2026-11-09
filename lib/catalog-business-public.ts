@@ -1,4 +1,5 @@
 import fallbackBusinesses from '../data/directory-fallback.json';
+import { loadSupabaseDirectoryBusiness } from './supabase-directory';
 
 const pending=new Map<string,{until:number;result:Promise<boolean>}>();
 const continuityPublicIds=new Set(fallbackBusinesses.map(business=>business.id));
@@ -12,6 +13,10 @@ export async function catalogBusinessPublic(businessId:string) {
   return entry.result;
 }
 async function readPublication(businessId:string) {
+  // Supabase is the current source of the public directory. This also permits
+  // the direct-only Mercau test catalog without placing it in the main listing.
+  const supabaseBusiness=await loadSupabaseDirectoryBusiness(businessId);
+  if(supabaseBusiness)return true;
   const key=process.env.AIRTABLE_API_KEY,base=process.env.AIRTABLE_BASE_ID,table=process.env.AIRTABLE_NEGOCIOS_TABLE_ID;
   if(!key || !base || !table)return continuityPublicIds.has(businessId);
   try {

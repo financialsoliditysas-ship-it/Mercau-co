@@ -100,10 +100,12 @@ function createOrderChimeUrl() {
   return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
 }
 
-export default function RestaurantPilot({ manager = false, restaurantId, businessName, embedded = false, returnPath = '', preview = false, visualMenu = false, coverImage = '', legacyPreview = false, previewDeliveryProfile, discovery = false, discoveryProductId = '', beforeDiscoveryAdd, onDiscoveryAdded }: {
+type DemoLines = Record<string,string[]>;
+export default function RestaurantPilot({ manager = false, restaurantId, businessName, embedded = false, returnPath = '', preview = false, visualMenu = false, coverImage = '', legacyPreview = false, previewDeliveryProfile, discovery = false, discoveryProductId = '', beforeDiscoveryAdd, onDiscoveryAdded, demoLines }: {
   manager?: boolean; restaurantId?: string; businessName?: string; embedded?: boolean; returnPath?: string; preview?: boolean; visualMenu?: boolean; coverImage?: string;
   legacyPreview?:boolean;previewDeliveryProfile?:{name:string;phone:string;address:string;neighborhood:string;instructions:string};
   discovery?:boolean;discoveryProductId?:string;beforeDiscoveryAdd?:()=>Promise<boolean>;onDiscoveryAdded?:()=>void;
+  demoLines?:DemoLines;
 }) {
   const [restaurantLive, setRestaurantLive] = useState(false);
   const live = Boolean(restaurantId) && restaurantLive;
@@ -124,6 +126,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
   const [deliveryMode, setDeliveryMode] = useState<'MERCAU'|'OWN'>('MERCAU');
   const [category, setCategory] = useState('Todo');
   const [visibleCategory,setVisibleCategory]=useState('Todo');
+  const demoLineEntries=Object.entries(demoLines || {});
+  const [demoLine,setDemoLine]=useState(demoLineEntries[0]?.[0] || '');
   const categoriesRef=useRef<HTMLElement|null>(null);
   const [cart, setCart] = useState<Line[]>([]);
   const [customizing,setCustomizing]=useState<PilotProduct|null>(null);
@@ -750,9 +754,10 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
       {live && deliveryMode==='OWN' && <p className="pilot-delivery-owner"><strong>Entrega realizada por el negocio.</strong> El pedido será llevado por el equipo de {title}, no por un domiciliario de Mercáu.</p>}
       {embedded && !enabled && <p role="status">{availabilityMessage || 'Pedidos pausados.'}</p>}
       {!menu.length && <p>No hay productos disponibles para pedir.</p>}
-      <nav ref={categoriesRef} className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.map(p => p.category)))].map(c =>
+      {demoLineEntries.length>0&&<section className="pilot-demo-lines" aria-label="Líneas de demostración"><p>Línea de demostración</p><nav>{demoLineEntries.map(([line])=><button key={line} aria-pressed={line===demoLine} onClick={()=>{setDemoLine(line);setCategory('Todo');setVisibleCategory('Todo');}}>{line}</button>)}</nav></section>}
+      <nav ref={categoriesRef} className="pilot-categories" aria-label="Categorias del menu">{['Todo', ...Array.from(new Set(menu.filter(p=>!demoLine || !demoLines || demoLines[demoLine]?.includes(p.category)).map(p => p.category)))].map(c =>
         <button key={c} data-category={c} aria-pressed={c === (visualMenu&&category==='Todo'?visibleCategory:category)} onClick={() => {setCategory(c);setVisibleCategory(c);if(visualMenu)requestAnimationFrame(()=>categoriesRef.current?.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'}));}}>{c}</button>)}</nav>
-      <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => category === 'Todo' || p.category === category).map((p,index) => {
+      <div className={(preview||visualMenu)&&checkout?'pilot-shop pilot-checkout-active':'pilot-shop'}><section className="pilot-menu">{menu.filter(p => (!demoLine || !demoLines || demoLines[demoLine]?.includes(p.category)) && (category === 'Todo' || p.category === category)).map((p,index) => {
         const count = cart.filter(l => l.productId === p.id).reduce((sum,line)=>sum+line.quantity,0);
         return <article key={p.id} data-menu-category={p.category}>
           {visualMenu && <button type="button" className="menu-product-open" aria-label={`Ver detalle de ${p.name}`} onClick={()=>openCustomization(p)} disabled={busy}/>}
