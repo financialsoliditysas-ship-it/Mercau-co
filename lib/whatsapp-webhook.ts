@@ -80,9 +80,26 @@ export type MetaMessageStatus = {
 };
 
 export function messageStatuses(payload: unknown): MetaMessageStatus[] {
-  return whatsappDeliveryEvents(payload).map((event) => ({
-    id: event.message_id,
-    status: event.status,
-    error: event.error_title
-  }));
+  const output: MetaMessageStatus[] = [];
+  const entries = (payload as { entry?: unknown })?.entry;
+  if (!Array.isArray(entries)) return output;
+  for (const entry of entries) {
+    const changes = (entry as { changes?: unknown })?.changes;
+    if (!Array.isArray(changes)) continue;
+    for (const change of changes) {
+      const statuses = (change as { value?: { statuses?: unknown } })?.value?.statuses;
+      if (!Array.isArray(statuses)) continue;
+      for (const status of statuses) {
+        const item = status as { id?: unknown; status?: unknown; errors?: unknown };
+        if (typeof item.id !== 'string' || !deliveryStatuses.has(String(item.status))) continue;
+        const firstError = Array.isArray(item.errors) ? item.errors[0] as { title?: unknown; message?: unknown } | undefined : undefined;
+        output.push({
+          id: item.id,
+          status: item.status as MetaMessageStatus['status'],
+          error: typeof firstError?.title === 'string' ? firstError.title : typeof firstError?.message === 'string' ? firstError.message : null
+        });
+      }
+    }
+  }
+  return output;
 }

@@ -56,10 +56,12 @@ async function main() {
   const migration = fs.readFileSync('supabase/migrations/20261106193000_restaurant_auto_dispatch.sql', 'utf8');
   const worker = fs.readFileSync('lib/restaurant-order-messages.ts', 'utf8');
   const route = fs.readFileSync('app/api/webhooks/meta-whatsapp/route.ts', 'utf8');
+  const orderCreation = fs.readFileSync('lib/restaurant-pilot.ts', 'utf8');
   assert.match(migration, /status in \('blocked_provider', 'queued', 'processing', 'sent', 'failed', 'uncertain'\)/);
   assert.match(worker, /eq\('status', 'queued'\)/);
   assert.match(worker, /eq\('status', candidate\.status\)/);
   assert.match(route, /x-hub-signature-256/);
+  assert.match(orderCreation, /processRestaurantOrderMessages\(1\)/);
   console.log('PASS WhatsApp Cloud: payload de plantilla, número colombiano, firma del webhook y reclamación única simulados. No se contactó Meta ni se enviaron mensajes.');
 }
 

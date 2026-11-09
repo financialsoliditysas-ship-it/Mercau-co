@@ -30,7 +30,9 @@ assert.deepEqual(events,[{message_id:'wamid.test',status:'delivered',occurred_at
 const stored=[];
 const routeModule=load('app/api/webhooks/meta-whatsapp/route.ts',{
   '@/lib/whatsapp-webhook':webhook,
-  '@/lib/supabase-admin':{getSupabaseAdminClient:()=>({from:table=>({upsert:async(rows,options)=>{assert.equal(table,'whatsapp_message_delivery_events');assert.equal(options.onConflict,'message_id,status,occurred_at');stored.push(...rows);return {error:null};}})})}
+  '@/lib/supabase-admin':{getSupabaseAdminClient:()=>({from:table=>table==='whatsapp_message_delivery_events'
+    ? {upsert:async(rows,options)=>{assert.equal(options.onConflict,'message_id,status,occurred_at');stored.push(...rows);return {error:null};}}
+    : {update:()=>({eq:()=>({error:null})})}})}
 });
 process.env.META_APP_SECRET=appSecret;
 const deliveryBody=JSON.stringify({entry:[{changes:[{value:{metadata:{phone_number_id:'sender-id'},statuses:[{id:'wamid.test',status:'delivered',timestamp:'1794181200'}]}}]}]});
