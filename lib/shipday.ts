@@ -35,6 +35,13 @@ function utcTimeAfter(minutes: number) {
   return new Date(Date.now() + minutes * 60 * 1000).toISOString().slice(11, 19);
 }
 
+function expectedPickupTime(order: Pick<DeliveryOrder, 'expected_pickup_at'>) {
+  const expected = order.expected_pickup_at ? new Date(order.expected_pickup_at) : null;
+  return expected && !Number.isNaN(expected.getTime())
+    ? expected.toISOString().slice(11, 19)
+    : utcTimeAfter(20);
+}
+
 export function deliveryMapsUrl(order: Pick<DeliveryOrder, "delivery_latitude" | "delivery_longitude">) {
   if (order.delivery_latitude === null || order.delivery_longitude === null) return null;
   const destination = `${order.delivery_latitude},${order.delivery_longitude}`;
@@ -98,7 +105,7 @@ export class ShipdayProvider implements LogisticsProvider {
         ),
         restaurantPhoneNumber: cleanPhone(order.pickup_phone || order.customer_phone),
         expectedDeliveryDate: todayUtcDate(),
-        expectedPickupTime: utcTimeAfter(20),
+        expectedPickupTime: expectedPickupTime(order),
         expectedDeliveryTime: utcTimeAfter(60),
         orderItem: order.commerce_items?.map(({ name, unitPrice, quantity }) => ({ name, unitPrice, quantity })) || [
           {

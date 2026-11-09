@@ -4,12 +4,13 @@ import { loadDirectoryBusiness,loadDirectoryBusinesses } from './airtable-direct
 export type BusinessOrderConfig={
   id:string;name:string;directory_business_id:string|null;enabled:boolean;is_live:boolean;
   delivery_mode:'MERCAU'|'OWN';delivery_fee:number;commission_rate_bps:number;customer_markup_bps:number;
+  preparation_minutes:number;
   pickup_address:string;pickup_phone:string;directory_initialized:boolean;published_products:number;
 };
 
 export async function listBusinessOrderConfigs():Promise<BusinessOrderConfig[]> {
   const db=getSupabaseAdminClient();
-  const restaurants=await db.from('pilot_restaurants').select('id,name,directory_business_id,enabled,is_live,delivery_mode,delivery_fee,commission_rate_bps,customer_markup_bps,pickup_address,pickup_phone,directory_initialized').order('name');
+  const restaurants=await db.from('pilot_restaurants').select('id,name,directory_business_id,enabled,is_live,delivery_mode,delivery_fee,commission_rate_bps,customer_markup_bps,preparation_minutes,pickup_address,pickup_phone,directory_initialized').order('name');
   if(restaurants.error)throw new Error('No se pudieron cargar los negocios con pedidos.');
   const ids=(restaurants.data||[]).map(row=>row.directory_business_id).filter(Boolean);
   const products=ids.length?await db.from('business_catalog_products').select('business_id').in('business_id',ids).eq('status','published').eq('available',true):{data:[],error:null};
@@ -50,6 +51,7 @@ export async function updateBusinessOrderConfig(id:string,input:Record<string,un
   const deliveryFee=integer(input.delivery_fee,0,100000,'el valor del domicilio');
   const commissionRate=integer(input.commission_rate_bps,0,3000,'la comisión total');
   const customerMarkup=integer(input.customer_markup_bps,0,commissionRate,'la parte asumida por el comprador');
+  const preparationMinutes=integer(input.preparation_minutes,1,240,'el tiempo de preparación');
   const pickupAddress=String(input.pickup_address||'').trim().slice(0,300);
   const pickupPhone=String(input.pickup_phone||'').replace(/[^\d+]/g,'').slice(0,24);
   if(typeof input.enabled!=='boolean')throw new Error('Revisa el estado de los pedidos.');
@@ -64,7 +66,7 @@ export async function updateBusinessOrderConfig(id:string,input:Record<string,un
     if(catalog.error||!catalog.count)throw new Error('Publica al menos un producto disponible antes de abrir pedidos.');
   }
   const updated=await db.from('pilot_restaurants').update({enabled:input.enabled,delivery_mode:deliveryMode,delivery_fee:deliveryFee,
-    commission_rate_bps:commissionRate,customer_markup_bps:customerMarkup,pickup_address:pickupAddress,pickup_phone:pickupPhone}).eq('id',id).select('id').single();
+    commission_rate_bps:commissionRate,customer_markup_bps:customerMarkup,preparation_minutes:preparationMinutes,pickup_address:pickupAddress,pickup_phone:pickupPhone}).eq('id',id).select('id').single();
   if(updated.error)throw new Error('No se pudo guardar la configuración.');
   return {ok:true};
 }

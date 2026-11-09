@@ -158,7 +158,7 @@ export async function transitionRestaurantOrderByActionLink(token: string, actio
   const result = await findActionOrder(token);
   if (!['accepted', 'rejected', 'ready'].includes(action)) throw new RestaurantActionError('Acción no disponible.', 400);
   const db = getSupabaseAdminClient();
-  const transition = await db.rpc('pilot_food_transition_v4', {
+  const transition = await db.rpc('pilot_food_transition_v5', {
     p_order: result.order.id,
     p_actor: null,
     p_action: action,

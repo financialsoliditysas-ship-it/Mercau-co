@@ -220,7 +220,7 @@ export async function transitionPilotOrder(userId: string, id: string, action: s
     .eq('id', id).eq('restaurant_id', restaurantId).maybeSingle();
   if (target.error) throw new PilotError('No se pudo comprobar el pedido.', 503);
   if (!target.data) throw new PilotError('Pedido no encontrado en este negocio.', 404);
-  const { data, error } = await db.rpc('pilot_food_transition_v4', {
+  const { data, error } = await db.rpc('pilot_food_transition_v5', {
     p_order: id, p_actor: userId, p_action: action, p_actor_type: 'business', p_actor_reference: userId
   });
   if (error) throw new PilotError('El pedido cambio o esta accion no esta disponible. Actualiza la lista.', 409);

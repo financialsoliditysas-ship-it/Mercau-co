@@ -26,7 +26,10 @@ async function main(){
    for(const key of ['expectedPickupTime','expectedDeliveryTime']){assert.equal(typeof after[key],'string');delete before[key];delete after[key];}
    assert.deepEqual(after,before,'Only pickup presentation may change');
   }
+  const configuredPickup='2026-11-08T18:20:00.000Z';
+  await new ShipdayProvider().createOrder({...order,expected_pickup_at:configuredPickup});
+  assert.equal(payload.expectedPickupTime,'18:20:00','Shipday must receive the business pickup estimate when it is stored on the delivery.');
  }finally{global.fetch=realFetch;if(oldKey===undefined)delete process.env.SHIPDAY_API_KEY;else process.env.SHIPDAY_API_KEY=oldKey;}
- assert.equal(calls,6);console.log('PASS pickup amount first, COP grouping without rounding, free text preserved, cash/Bre-B/confirmed variants; all other provider fields unchanged. Six mocked calls, zero real dispatches.');
+ assert.equal(calls,7);console.log('PASS pickup amount first, COP grouping without rounding, configured pickup estimate, free text preserved, cash/Bre-B/confirmed variants; all other provider fields unchanged. Seven mocked calls, zero real dispatches.');
 }
 main().catch(error=>{console.error(error.stack);process.exitCode=1;});

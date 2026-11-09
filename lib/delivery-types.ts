@@ -92,6 +92,7 @@ export type DeliveryOrder = {
   shipday_last_error: string | null;
   dispatch_attempted_at?: string | null;
   dispatch_scheduled_at?: string | null;
+  expected_pickup_at?: string | null;
   dispatch_search_started_at?: string | null;
   dispatch_search_source?: string | null;
   shipday_event_at?: string | null;
