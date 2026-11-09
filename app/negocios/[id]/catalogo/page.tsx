@@ -23,7 +23,7 @@ export async function generateMetadata({params}:{params:{id:string}}) {
   const description=business?.description || (business ? `Consulta ${catalogNoun(business.category).toLocaleLowerCase('es-CO')} de ${business.name} en Mercáu.` : 'Catálogo en Mercáu');
   const path=business ? businessCatalogPath(business) : '/';
   let coverVersion='';
-  if(business&&isFoodBusiness(business.category)) {
+  if(business) {
     try {coverVersion=menuCover(business,(await loadMenuCatalog(business.id))?.products || []).version;}catch{/* Keep the business preview if the catalog is temporarily unavailable. */}
   }
   const image=business?new URL(coverVersion?`/api/negocios/${business.id}/catalogo/og?v=${coverVersion}`:`/api/negocios/${business.id}/og?v=${business.photoVersion||'1'}`,businessSiteUrl).href:new URL('/og-mercau.jpg',businessSiteUrl).href;
