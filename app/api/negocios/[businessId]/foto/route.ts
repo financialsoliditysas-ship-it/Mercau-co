@@ -9,7 +9,12 @@ export async function GET(_request:NextRequest,{params}:{params:{businessId:stri
       const db = getSupabaseAdminClient();
       const business = await db.from('directory_businesses').select('status').eq('id', params.businessId).maybeSingle();
       if (business.error || !business.data || !['Destacado','Verificado','Publicado'].includes(business.data.status)) return new NextResponse(null,{status:404});
-      const media = await db.from('directory_business_media').select('storage_path').eq('business_id', params.businessId).eq('kind', 'logo').order('position').order('created_at').limit(1).maybeSingle();
+      const requested=_request.nextUrl.searchParams.get('image');
+      if(requested&&!/^[a-f\d-]{36}$/i.test(requested))return new NextResponse(null,{status:404});
+      if(requested){const settings=await db.from('business_account_settings').select('data').eq('business_id',params.businessId).maybeSingle();if(settings.error)return new NextResponse(null,{status:503});if(settings.data?.data?.galleryHiddenIds?.includes(requested))return new NextResponse(null,{status:404});}
+      let query=db.from('directory_business_media').select('storage_path').eq('business_id',params.businessId);
+      query=requested?query.eq('id',requested).in('kind',['cover','gallery']):query.eq('kind','logo').order('position').order('created_at').limit(1);
+      const media = await query.maybeSingle();
       if (media.error || !media.data?.storage_path) return new NextResponse(null,{status:404});
       const file = await db.storage.from('business-catalog').download(media.data.storage_path);
       if (file.error || !file.data) return new NextResponse(null,{status:404});
