@@ -16,7 +16,7 @@ const benefits = [
 
 const included = ["Ficha pública del negocio", "Categoría, municipio y ubicación", "Horarios y medios de contacto", "Logo, portada y fotografías", "Catálogo de productos o menú", "Enlace público para compartir"];
 
-export default function BusinessRegistrationEntry() {
+export default function BusinessRegistrationEntry({ selectedPlan = "" }: { selectedPlan?: string }) {
   const { session, ready, recovering, data, loading } = useAccount();
   useEffect(() => localStorage.setItem("mercau.businessRegistrationIntent", "business"), []);
   const businesses = (data?.businesses || []).filter((business) => business.status === "Activo");
@@ -38,12 +38,13 @@ export default function BusinessRegistrationEntry() {
   if (stage === "register") {
     return <main className="ma min-h-screen bg-[#FCFBF9]">
       <header className="ma-business-header"><div className="ma-business-header-inner"><a href="/" className="ma-brand"><img src="/logo-mercau.png" alt="Mercáu" width="44" height="44" /><strong>Mercáu</strong></a><nav aria-label="Acciones principales"><a href="/mi-cuenta" className="ma-button">Mi cuenta</a></nav></div></header>
-      <section id="registro" className="mx-auto max-w-3xl px-4 py-8 sm:py-12">{access}</section>
+      <section id="registro" className="mx-auto max-w-3xl px-4 py-8 sm:py-12">{selectedPlan&&<p className="ma-notice"><strong>Plan seleccionado:</strong> {selectedPlan}</p>}{access}</section>
     </main>;
   }
 
   return (
     <main className="ma ma-business-landing">
+      {selectedPlan&&<p className="ma-notice mx-auto max-w-7xl"><strong>Plan seleccionado:</strong> {selectedPlan}</p>}
       <header className="ma-business-header"><div className="ma-business-header-inner"><a href="/" className="ma-brand"><img src="/logo-mercau.png" alt="Mercáu" width="44" height="44" /><strong>Mercáu</strong></a><nav aria-label="Acciones principales"><a href="/" className="ma-button">Explorar negocios</a><a href="/mi-cuenta?entry=general" className="ma-button">Entrar a mi cuenta</a><a href="#registro" className="ma-button primary">Registrar mi negocio</a></nav></div></header>
 
       <section className="ma-business-hero"><div className="ma-business-hero-overlay" /><div className="ma-business-hero-content"><p className="ma-business-kicker">NEGOCIOS DEL BAJO CAUCA</p><h1>Tu negocio merece una vitrina digital</h1><p>Regístralo gratis, crea su página en Mercáu y publica su catálogo o menú para que más personas conozcan lo que ofreces.</p><div className="ma-business-hero-actions"><a href="#registro" className="ma-button primary">Registrar mi negocio gratis <ArrowRight size={18} /></a><a href="/negocios/recGLMhJYXTRE46st" className="ma-button ma-button-light">Ver una página publicada</a></div><small>Una sola cuenta para comprar y administrar tu negocio.</small></div></section>
