@@ -62,7 +62,7 @@ export async function pilotRestaurant(restaurantId = pilotId, includeMenu = true
       .eq('business_id',data.directory_business_id).eq('status','published').eq('available',true).order('position').order('created_at');
     if(menu.error)throw new PilotError('No se pudo cargar el catálogo de la prueba.',503);
     data.menu=(menu.data || []).filter(product=>!data.is_live || product.price > 0).map(product=>({id:product.id,name:product.name,description:product.description,category:product.section || 'Otros',price:product.price,
-      image:product.image_path ? `/api/negocios/${data.directory_business_id}/catalogo/${product.id}/foto?v=${product.version}` : '',optionGroups:catalogOptionGroups(product.option_groups || [])}));
+      image:product.image_path?.startsWith('static:') ? `/${product.image_path.slice('static:'.length)}` : product.image_path ? `/api/negocios/${data.directory_business_id}/catalogo/${product.id}/foto?v=${product.version}` : '',optionGroups:catalogOptionGroups(product.option_groups || [])}));
   } else {
     data.menu=(data.menu || []).map((product:PilotProduct)=>({...product,optionGroups:catalogOptionGroups(product.optionGroups || [])}));
   }
