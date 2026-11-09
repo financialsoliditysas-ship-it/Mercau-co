@@ -3,7 +3,7 @@ import { unstable_cache } from 'next/cache';
 import fallbackBusinesses from '../data/directory-fallback.json';
 import { photoDetails, photoFieldId } from './business-photo';
 import { isPilotBusinessNote } from './pilot-directory-data';
-import { loadSupabaseDirectoryBusinesses } from './supabase-directory';
+import { loadSupabaseDirectoryBusiness, loadSupabaseDirectoryBusinesses } from './supabase-directory';
 import { directoryLogoAsset } from './directory-logo-assets';
 
 const DIRECTORY_REVALIDATE_SECONDS = 6 * 60 * 60;
@@ -306,5 +306,6 @@ export const loadDirectoryBusinesses = unstable_cache(
 
 export async function loadDirectoryBusiness(id: string) {
   const businesses = await loadDirectoryBusinesses();
-  return businesses.find((business) => business.id === id) || null;
+  const listed = businesses.find((business) => business.id === id);
+  return listed || await loadSupabaseDirectoryBusiness(id);
 }

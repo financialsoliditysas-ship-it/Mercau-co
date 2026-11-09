@@ -4,15 +4,20 @@ import type { CatalogFields } from '@/lib/catalog-validation';
 import CatalogProductImage from './CatalogProductImage';
 import { trackCommerceEvent } from '@/lib/commerce-tracking';
 type Product=CatalogFields & {id:string;imageUrl?:string};
-export default function PublicCatalog({products,phone,businessId,businessName,catalogPath,productLinksEnabled}:{products:Product[];phone:string;businessId:string;businessName:string;catalogPath:string;productLinksEnabled:boolean}) {
+type DemoLines=Record<string,string[]>;
+export default function PublicCatalog({products,phone,businessId,businessName,catalogPath,productLinksEnabled,demoLines}:{products:Product[];phone:string;businessId:string;businessName:string;catalogPath:string;productLinksEnabled:boolean;demoLines?:DemoLines}) {
   const [section,setSection]=useState('');
+  const lines=demoLines ? Object.entries(demoLines) : [];
+  const [line,setLine]=useState(lines[0]?.[0] || '');
   const viewed=useRef(false);
   useEffect(()=>{if(viewed.current)return;viewed.current=true;trackCommerceEvent('Menu visto','ViewContent',{businessId,businessName});},[businessId,businessName]);
-  const sections=Array.from(new Set(products.map(p=>p.section).filter(Boolean)));
+  const lineProducts=line && demoLines ? products.filter(product=>demoLines[line]?.includes(product.section)) : products;
+  const sections=Array.from(new Set(lineProducts.map(p=>p.section).filter(Boolean)));
   const digits=phone.replace(/\D/g,'');const normalized=digits.length===10 && digits.startsWith('3')?`57${digits}`:digits;
-  const visible=products.filter(product=>!section || product.section===section);
+  const visible=lineProducts.filter(product=>!section || product.section===section);
   const money=(price:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(price);
   return <section className="py-6">
+    {lines.length>0&&<div className="mb-5"><p className="mb-2 text-sm font-bold text-slate-700">Línea de demostración</p><nav aria-label="Líneas de demostración" className="flex flex-wrap gap-2">{lines.map(([value])=><button key={value} onClick={()=>{setLine(value);setSection('');}} aria-pressed={line===value} className={`min-h-11 rounded-md border px-4 py-2 text-sm font-semibold ${line===value?'border-[#D82016] bg-[#D82016] text-white':'border-gray-300 bg-white text-slate-800'}`}>{value}</button>)}</nav></div>}
     {sections.length>0 && <nav aria-label="Secciones del catálogo" className="mb-5 flex flex-wrap gap-2">{['',...sections].map(value=><button key={value} onClick={()=>setSection(value)} aria-pressed={section===value} className={`min-h-11 max-w-full break-words rounded-md border px-4 py-2 text-sm font-semibold ${section===value?'border-[#D82016] bg-[#FFF1F0] text-[#D82016]':'border-gray-300 bg-white'}`}>{value || 'Todo'}</button>)}</nav>}
     {!products.length && <p className="py-6 text-gray-600">Este negocio aún no ha publicado productos en su catálogo. Puedes consultar su oferta desde la ficha.</p>}
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{visible.map((product,index)=><article key={product.id} className="min-w-0 overflow-hidden rounded-md border border-gray-200 bg-white">

@@ -5,6 +5,7 @@ import { loadDirectoryBusiness } from './airtable-directory';
 import { CatalogFields, CatalogProduct, catalogOptionGroups, sameCatalogFields } from './catalog-validation';
 
 export const catalogBucket='business-catalog';
+const staticImagePrefix='static:';
 const columns='id,business_id,name,description,section,price,available,status,position,option_groups,version,image_path,updated_at';
 type CatalogRow=Omit<CatalogFields,'optionGroups'> & {option_groups:CatalogFields['optionGroups'];id:string;business_id:string;version:number;image_path:string|null;updated_at:string};
 export type PublicCatalogProduct=CatalogFields & {id:string;imageUrl?:string};
@@ -24,11 +25,16 @@ export async function catalogProduct(businessId:string,id:string) {
 }
 export function publicProduct(row:CatalogRow):PublicCatalogProduct {
   const {name,description,section,price,available,status,position,id}=row;
-  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],id,imageUrl:row.image_path ? `/api/negocios/${row.business_id}/catalogo/${row.id}/foto?v=${row.version}` : undefined};
+  const imageUrl=row.image_path?.startsWith(staticImagePrefix)
+    ? `/${row.image_path.slice(staticImagePrefix.length)}`
+    : row.image_path ? `/api/negocios/${row.business_id}/catalogo/${row.id}/foto?v=${row.version}` : undefined;
+  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],id,imageUrl};
 }
 export async function ownerProduct(row:CatalogRow):Promise<CatalogProduct> {
   let imageUrl;
-  if(row.image_path) {
+  if(row.image_path?.startsWith(staticImagePrefix)) {
+    imageUrl=`/${row.image_path.slice(staticImagePrefix.length)}`;
+  } else if(row.image_path) {
     const {data,error}=await getSupabaseAdminClient().storage.from(catalogBucket).createSignedUrl(row.image_path,600);
     if(error)throw new CatalogError('El producto está guardado, pero no se pudo cargar su foto. Actualiza la lista.',503);
     imageUrl=data?.signedUrl;
@@ -39,8 +45,10 @@ export async function ownerProducts(businessId:string) {
   const rows=await catalogRows(businessId,false);
   const paths=rows.map(row=>row.image_path).filter((path):path is string=>Boolean(path));
   const urls=new Map<string,string>();
-  if(paths.length) {
-    const {data,error}=await getSupabaseAdminClient().storage.from(catalogBucket).createSignedUrls(paths,600);
+  const storedPaths=paths.filter(path=>!path.startsWith(staticImagePrefix));
+  for(const path of paths.filter(path=>path.startsWith(staticImagePrefix))) urls.set(path,`/${path.slice(staticImagePrefix.length)}`);
+  if(storedPaths.length) {
+    const {data,error}=await getSupabaseAdminClient().storage.from(catalogBucket).createSignedUrls(storedPaths,600);
     if(error)throw new CatalogError('No se pudieron cargar las fotos del catálogo. Intenta nuevamente.',503);
     (data || []).forEach(item=>{if(item.path && item.signedUrl)urls.set(item.path,item.signedUrl);});
   }
