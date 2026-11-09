@@ -12,6 +12,10 @@ export function getSupabaseAdminClient() {
     auth: {
       autoRefreshToken: false,
       persistSession: false
+    },
+    // Directory, catalog, and order reads must reflect updates immediately.
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, cache: 'no-store' })
     }
   });
 }
