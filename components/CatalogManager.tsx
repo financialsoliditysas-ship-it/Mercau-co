@@ -140,9 +140,9 @@ export default function CatalogManager({businessId}:{businessId:string}) {
             <label className="grid min-w-0 gap-2 text-sm font-semibold md:col-span-2">Descripción del producto<textarea rows={3} maxLength={600} value={values.description} onChange={e=>setValues(v=>({...v,description:e.target.value}))} className={field} /></label>
             <div className="grid min-w-0 gap-2 text-sm font-semibold"><label htmlFor="catalog-product-status">Estado</label><select id="catalog-product-status" value={values.status} onChange={e=>setValues(v=>({...v,status:e.target.value as CatalogFields['status']}))} className={field}><option value="draft">Borrador</option><option value="published">Publicado</option><option value="archived">Archivado</option></select></div>
             <label className="flex min-h-12 items-center gap-3 text-sm font-semibold"><input type="checkbox" checked={values.available} onChange={e=>setValues(v=>({...v,available:e.target.checked}))} className="h-5 w-5 accent-[#D82016]" />Disponible</label>
-            <CatalogOptionGroupsEditor value={values.optionGroups} onChange={optionGroups=>setValues(v=>({...v,optionGroups}))} disabled={busy}/>
+            {business&&isFoodBusiness(business.category)&&<CatalogOptionGroupsEditor value={values.optionGroups} onChange={optionGroups=>setValues(v=>({...v,optionGroups}))} disabled={busy}/>}
           <fieldset className="grid min-w-0 gap-3 md:col-span-2"><legend className="font-bold">Foto del producto</legend>
-            <CatalogPhotoHelp />
+            <CatalogPhotoHelp food={Boolean(business&&isFoodBusiness(business.category))} />
             {(photo || editing?.imageUrl) && <div className="h-48 w-full max-w-sm overflow-hidden rounded-md bg-white"><CatalogProductImage name={values.name || 'producto'} imageUrl={photo || editing?.imageUrl} contain /></div>}
             <label className="grid min-w-0 gap-2 text-sm font-semibold">Seleccionar foto<input type="file" accept="image/jpeg,image/png,image/webp" onChange={choosePhoto} disabled={busy} className="min-h-11 min-w-0 w-full max-w-full text-sm" /></label>
             {editing && <button type="button" disabled={busy || !photo} onClick={uploadPhoto} className={`${primary} w-fit`}>Guardar foto</button>}

@@ -1,10 +1,10 @@
 import { CircleHelp } from 'lucide-react';
 
-export default function CatalogPhotoHelp() {
+export default function CatalogPhotoHelp({food=false}:{food?:boolean}) {
   return <details className="group rounded-md border border-gray-200 bg-white">
     <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-3 py-2 font-bold text-[#1F2937]">
       <CircleHelp className="h-5 w-5 shrink-0 text-[#D82016]" aria-hidden="true" />
-      ¿Cómo debe ser la foto de mi producto o plato?
+      ¿Cómo debe ser la foto de mi {food?'plato':'producto'}?
       <span className="ml-auto text-[#D82016] group-open:rotate-45" aria-hidden="true">+</span>
     </summary>
     <div className="border-t border-gray-200 px-4 py-4 text-sm leading-6 text-gray-700">
