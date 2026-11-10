@@ -10,15 +10,16 @@ import CatalogPhotoHelp from './CatalogPhotoHelp';
 import CatalogOptionGroupsEditor from './CatalogOptionGroupsEditor';
 import CatalogShareActions from './CatalogShareActions';
 import CatalogSharedOptions from './CatalogSharedOptions';
+import CatalogProfessionalFields from './CatalogProfessionalFields';
 
-const empty:CatalogFields={name:'',description:'',section:'',price:0,available:true,status:'draft',position:0,optionGroups:[]};
+const empty:CatalogFields={name:'',description:'',section:'',price:0,available:true,status:'draft',position:0,optionGroups:[],publicationType:'product',category:'',subcategory:'',brand:'',condition:'',sku:'',priceMode:'fixed',attributes:[],variants:[]};
 const field='min-h-12 min-w-0 w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[#D82016]';
 const primary='min-h-11 rounded-md bg-[#D82016] px-4 py-2 text-sm font-bold text-white disabled:opacity-50';
 const secondary='min-h-11 max-w-full break-words rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold disabled:opacity-50';
 const money=(price:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(price);
 const statusLabel={draft:'Borrador',published:'Publicado',archived:'Archivado'};
 export default function CatalogManager({businessId}:{businessId:string}) {
-  const [business,setBusiness]=useState<{name:string;category:string}|null>(null);
+  const [business,setBusiness]=useState<{name:string;category:string;subcategory?:string;secondaryCategories?:string[]}|null>(null);
   const [orderConfig,setOrderConfig]=useState<{enabled:boolean;delivery_mode:'MERCAU'|'OWN';commission_rate_bps:number;customer_markup_bps:number}|null>(null);
   const [products,setProducts]=useState<CatalogProduct[]>([]);
   const [ready,setReady]=useState(false),[busy,setBusy]=useState(false),[notice,setNotice]=useState('Cargando catálogo...');
@@ -53,7 +54,7 @@ export default function CatalogManager({businessId}:{businessId:string}) {
   function replace(product:CatalogProduct) {setProducts(current=>current.some(p=>p.id===product.id)?current.map(p=>p.id===product.id?product:p):[...current,product]);}
   function open(product?:CatalogProduct) {
     setNotice('');setPhoto('');setEditing(product || null);setShowForm(true);setNewId(product?.id || crypto.randomUUID());
-    setValues(product?Object.fromEntries(catalogKeys.map(key=>[key,product[key]])) as CatalogFields:{...empty});
+    setValues(product?Object.fromEntries(catalogKeys.map(key=>[key,product[key]])) as CatalogFields:{...empty,category:business?.category||'',subcategory:business?.subcategory||''});
     setPriceText(formatCatalogPrice(product?.price ?? 0));
   }
   async function save(event:FormEvent<HTMLFormElement>) {
@@ -109,6 +110,7 @@ export default function CatalogManager({businessId}:{businessId:string}) {
   const visible=products.filter(p=>filter==='all'?p.status!=='archived':p.status===filter).sort((a,b)=>a.position-b.position || a.name.localeCompare(b.name,'es'));
   const sections=Array.from(new Set(products.map(p=>p.section).filter(Boolean)));
   const publishedCount=products.filter(product=>product.status==='published').length;
+  const allowedCategories=business?[business.category,...(business.secondaryCategories||[])]:[];
   return <main className="min-h-screen bg-[#FCFBF9] text-[#1F2937]">
     <header className="border-b border-gray-200 bg-white px-4 py-4"><div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3"><Link href="/mi-negocio" className="min-h-11 content-center font-semibold text-[#D82016]">Panel de mi negocio</Link><BackToAccount /></div></header>
     <section className="mx-auto max-w-5xl px-4 py-6">
@@ -124,6 +126,7 @@ export default function CatalogManager({businessId}:{businessId:string}) {
         {showForm && <section ref={editorRef} tabIndex={-1} className="mt-6 min-w-0 scroll-mt-4 border-y border-gray-200 py-5 outline-none" aria-label={editing?`Editar ${editing.name}`:'Agregar producto'}>
           <h2 className="text-xl font-bold">{editing?'Editar producto':'Nuevo producto'}</h2>
           <form onSubmit={save} className="mt-4 grid min-w-0 gap-4 md:grid-cols-2">
+            {business?.category!=='Comidas y bebidas'&&<CatalogProfessionalFields value={values} onChange={setValues} allowedCategories={allowedCategories} disabled={busy}/>}
             <label className="grid min-w-0 gap-2 text-sm font-semibold">Nombre del producto<input required maxLength={120} value={values.name} onChange={e=>setValues(v=>({...v,name:e.target.value}))} className={field} /></label>
             <label className="grid min-w-0 gap-2 text-sm font-semibold">Precio (COP)<input required type="text" inputMode="numeric" maxLength={16} value={priceText} onChange={e=>setPriceText(e.target.value)} onBlur={()=>{try{setPriceText(formatCatalogPrice(parseCatalogPrice(priceText)));}catch{}}} className={field} /></label>
             <label className="grid min-w-0 gap-2 text-sm font-semibold">Sección<input list="catalog-sections" maxLength={80} value={values.section} onChange={e=>setValues(v=>({...v,section:e.target.value}))} placeholder="Ej: Bebidas o accesorios" className={field} /><datalist id="catalog-sections">{sections.map(section=><option key={section} value={section} />)}</datalist></label>

@@ -6,8 +6,9 @@ import { CatalogFields, CatalogProduct, catalogOptionGroups, sameCatalogFields }
 
 export const catalogBucket='business-catalog';
 const staticImagePrefix='static:';
-const columns='id,business_id,name,description,section,price,available,status,position,option_groups,version,image_path,updated_at';
-type CatalogRow=Omit<CatalogFields,'optionGroups'> & {option_groups:CatalogFields['optionGroups'];id:string;business_id:string;version:number;image_path:string|null;updated_at:string};
+const columns='id,business_id,name,description,section,price,available,status,position,option_groups,publication_type,category,subcategory,brand,condition,sku,price_mode,attributes,variants,gallery,version,image_path,updated_at';
+const legacyColumns='id,business_id,name,description,section,price,available,status,position,option_groups,version,image_path,updated_at';
+type CatalogRow=Omit<CatalogFields,'optionGroups'|'publicationType'|'priceMode'> & {option_groups:CatalogFields['optionGroups'];publication_type:CatalogFields['publicationType'];price_mode:CatalogFields['priceMode'];gallery:unknown[];id:string;business_id:string;version:number;image_path:string|null;updated_at:string};
 export type PublicCatalogProduct=CatalogFields & {id:string;imageUrl?:string};
 export class CatalogError extends Error { constructor(message:string,public status=400){super(message);} }
 export async function catalogOwner(request:NextRequest,businessId:string) {
@@ -18,7 +19,8 @@ export async function catalogOwner(request:NextRequest,businessId:string) {
 }
 function databaseError() { return new CatalogError('No se pudo cargar o guardar el catálogo. Intenta nuevamente; si persiste, contacta a Mercáu.',503); }
 export async function catalogProduct(businessId:string,id:string) {
-  const {data,error}=await getSupabaseAdminClient().from('business_catalog_products').select(columns).eq('business_id',businessId).eq('id',id).maybeSingle();
+  let {data,error}=await getSupabaseAdminClient().from('business_catalog_products').select(columns).eq('business_id',businessId).eq('id',id).maybeSingle();
+  if(error?.code==='42703')({data,error}=await getSupabaseAdminClient().from('business_catalog_products').select(legacyColumns).eq('business_id',businessId).eq('id',id).maybeSingle());
   if(error)throw databaseError();
   if(!data)throw new CatalogError('Producto no encontrado.',404);
   return data;
@@ -28,8 +30,9 @@ export function publicProduct(row:CatalogRow):PublicCatalogProduct {
   const imageUrl=row.image_path?.startsWith(staticImagePrefix)
     ? `/${row.image_path.slice(staticImagePrefix.length)}`
     : row.image_path ? `/api/negocios/${row.business_id}/catalogo/${row.id}/foto?v=${row.version}` : undefined;
-  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],id,imageUrl};
+  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],publicationType:(row as any).publication_type||'product',category:(row as any).category||'',subcategory:(row as any).subcategory||'',brand:(row as any).brand||'',condition:(row as any).condition||'',sku:(row as any).sku||'',priceMode:(row as any).price_mode||'fixed',attributes:(row as any).attributes||[],variants:(row as any).variants||[],id,imageUrl};
 }
+function databaseFields(fields:CatalogFields){const {optionGroups,publicationType,priceMode,...plain}=fields;return {...plain,option_groups:optionGroups,publication_type:publicationType,price_mode:priceMode};}
 export async function ownerProduct(row:CatalogRow):Promise<CatalogProduct> {
   let imageUrl;
   if(row.image_path?.startsWith(staticImagePrefix)) {
@@ -60,7 +63,13 @@ async function catalogRows(businessId:string,published:boolean) {
   for(let start=0;;start+=200) {
     let query=db.from('business_catalog_products').select(columns).eq('business_id',businessId);
     if(published)query=query.eq('status','published');
-    const {data,error}=await query.order('position').order('created_at').range(start,start+199);
+    let result:any=await query.order('position').order('created_at').range(start,start+199);
+    let {data,error}=result;
+    if(error?.code==='42703'){
+      let legacy=db.from('business_catalog_products').select(legacyColumns).eq('business_id',businessId);
+      if(published)legacy=legacy.eq('status','published');
+      result=await legacy.order('position').order('created_at').range(start,start+199);data=result.data;error=result.error;
+    }
     if(error)throw databaseError();
     rows.push(...(data || []));
     if(!data || data.length<200)break;
@@ -74,11 +83,10 @@ export async function publicCatalog(businessId:string) {
 }
 export async function createCatalogProduct(businessId:string,id:string,fields:CatalogFields) {
   const db=getSupabaseAdminClient();
-  const {optionGroups,...plain}=fields;
-  const {data,error}=await db.from('business_catalog_products').insert({id,business_id:businessId,...plain,option_groups:optionGroups}).select(columns).single();
+  const {data,error}=await db.from('business_catalog_products').insert({id,business_id:businessId,...databaseFields(fields)}).select(columns).single();
   if(error?.code==='23505') {
     const existing=await catalogProduct(businessId,id);
-    if(sameCatalogFields({...existing,optionGroups:existing.option_groups},fields))return ownerProduct(existing);
+    if(sameCatalogFields(publicProduct(existing),fields))return ownerProduct(existing);
     throw new CatalogError('Este producto ya se guardó con otros datos. Recarga el catálogo.',409);
   }
   if(error)throw databaseError();
@@ -86,7 +94,7 @@ export async function createCatalogProduct(businessId:string,id:string,fields:Ca
 }
 export async function updateCatalogProduct(businessId:string,id:string,version:number,fields:CatalogFields) {
   const existing=await catalogProduct(businessId,id);
-  if(sameCatalogFields({...existing,optionGroups:existing.option_groups},fields))return ownerProduct(existing);
+  if(sameCatalogFields(publicProduct(existing),fields))return ownerProduct(existing);
   const db=getSupabaseAdminClient();
   const {data:links,error:linksError}=await db.from('business_catalog_product_option_groups').select('group_id').eq('business_id',businessId).eq('product_id',id);
   if(linksError)throw databaseError();
@@ -100,8 +108,7 @@ export async function updateCatalogProduct(businessId:string,id:string,version:n
       if(JSON.stringify(submitted.get(row.id))!==JSON.stringify(canonical))throw new CatalogError('Este producto usa opciones compartidas. Edita sus nombres y precios desde la Biblioteca de opciones.',409);
     }
   }
-  const {optionGroups,...plain}=fields;
-  const {data,error}=await db.from('business_catalog_products').update({...plain,option_groups:optionGroups}).eq('business_id',businessId).eq('id',id).eq('version',version).select(columns).maybeSingle();
+  const {data,error}=await db.from('business_catalog_products').update(databaseFields(fields)).eq('business_id',businessId).eq('id',id).eq('version',version).select(columns).maybeSingle();
   if(error)throw databaseError();
   if(!data)throw new CatalogError('El producto cambió. Recarga antes de editarlo nuevamente.',409);
   return ownerProduct(data);

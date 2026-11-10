@@ -15,6 +15,7 @@
     "test:restaurant-whatsapp": "node scripts/test-whatsapp-cloud.cjs",
     "test:restaurant-auto-dispatch": "node scripts/test-restaurant-auto-dispatch.cjs",
     "test:restaurant-auto-dispatch-sql": "node scripts/test-restaurant-auto-dispatch-sql.cjs"
+    ,"test:professional-catalog": "node scripts/test-professional-catalog.cjs && node scripts/test-professional-catalog-sql.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

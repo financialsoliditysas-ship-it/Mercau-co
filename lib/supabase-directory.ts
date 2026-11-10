@@ -1,4 +1,4 @@
-import { toDirectoryCategory, type DirectoryBusiness } from '@/data/directory';
+import { toDirectoryCategory, type DirectoryBusiness, type DirectoryCategory } from '@/data/directory';
 import { getSupabaseAdminClient } from './supabase-admin';
 import { pilotBusinessName } from './pilot-directory-data';
 import { directoryLogoAsset } from './directory-logo-assets';
@@ -17,6 +17,9 @@ type DirectoryRow = {
   delivery_notes: string;
   status: string;
   source: string;
+  subcategory:string;
+  secondary_categories:string[];
+  tags:string[];
 };
 
 type HoursRow = { business_id: string; schedule: { display?: string } | null };
@@ -32,6 +35,9 @@ function toDirectoryBusiness(row: DirectoryRow, hours: Map<string, string>, medi
     id: row.id,
     name: row.name,
     category: toDirectoryCategory(row.category),
+    subcategory: row.subcategory || undefined,
+    secondaryCategories: (row.secondary_categories || []).map(toDirectoryCategory).filter((item):item is DirectoryCategory=>Boolean(item)),
+    tags: row.tags || [],
     municipality: row.municipality as DirectoryBusiness['municipality'],
     neighborhood: row.neighborhood,
     description: row.description,
@@ -70,7 +76,8 @@ async function directoryMetadata(businessIds?: string[]) {
 export async function loadSupabaseDirectoryBusinesses(): Promise<DirectoryBusiness[] | null> {
   try {
     const db = getSupabaseAdminClient();
-    const businesses = await db.from('directory_businesses').select('id,name,category,municipality,neighborhood,description,whatsapp,instagram,facebook,maps_url,delivery_notes,status,source').in('status', publicStatuses).neq('source', 'mercau-test').order('name');
+    let businesses:any = await db.from('directory_businesses').select('id,name,category,subcategory,secondary_categories,tags,municipality,neighborhood,description,whatsapp,instagram,facebook,maps_url,delivery_notes,status,source').in('status', publicStatuses).neq('source', 'mercau-test').order('name');
+    if(businesses.error?.code==='42703')businesses=await db.from('directory_businesses').select('id,name,category,municipality,neighborhood,description,whatsapp,instagram,facebook,maps_url,delivery_notes,status,source').in('status', publicStatuses).neq('source', 'mercau-test').order('name');
     const metadata = await directoryMetadata();
     if (businesses.error || !metadata) return null;
     if (!businesses.data?.length) return null;
@@ -83,7 +90,8 @@ export async function loadSupabaseDirectoryBusinesses(): Promise<DirectoryBusine
 export async function loadSupabaseDirectoryBusiness(id: string): Promise<DirectoryBusiness | null> {
   try {
     const db = getSupabaseAdminClient();
-    const business = await db.from('directory_businesses').select('id,name,category,municipality,neighborhood,description,whatsapp,instagram,facebook,maps_url,delivery_notes,status,source').eq('id', id).in('status', publicStatuses).maybeSingle();
+    let business:any = await db.from('directory_businesses').select('id,name,category,subcategory,secondary_categories,tags,municipality,neighborhood,description,whatsapp,instagram,facebook,maps_url,delivery_notes,status,source').eq('id', id).in('status', publicStatuses).maybeSingle();
+    if(business.error?.code==='42703')business=await db.from('directory_businesses').select('id,name,category,municipality,neighborhood,description,whatsapp,instagram,facebook,maps_url,delivery_notes,status,source').eq('id', id).in('status', publicStatuses).maybeSingle();
     if (business.error || !business.data) return null;
     const metadata = await directoryMetadata([id]);
     if (!metadata) return null;

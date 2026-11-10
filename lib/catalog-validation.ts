@@ -3,13 +3,18 @@ export type CatalogOptionGroup = {
   id:string; name:string; type:'single'|'multiple'; required:boolean;
   minSelections:number; maxSelections:number; choices:CatalogOptionChoice[];
 };
+export type CatalogAttribute={key:string;label:string;value:string};
+export type CatalogVariant={id:string;label:string;options:Record<string,string>;available:boolean;inventory:number|null;price:number|null;sku:string;imagePath?:string};
 export type CatalogFields = {
   name: string; description: string; section: string; price: number;
   available: boolean; status: 'draft'|'published'|'archived'; position: number;
   optionGroups: CatalogOptionGroup[];
+  publicationType:'product'|'service'; category:string; subcategory:string;
+  brand:string; condition:string; sku:string; priceMode:'fixed'|'from'|'quote';
+  attributes:CatalogAttribute[]; variants:CatalogVariant[];
 };
 export type CatalogProduct = CatalogFields & {id:string;version:number;imageUrl?:string;updated_at:string};
-export const catalogKeys = ['name','description','section','price','available','status','position','optionGroups'] as const;
+export const catalogKeys = ['name','description','section','price','available','status','position','optionGroups','publicationType','category','subcategory','brand','condition','sku','priceMode','attributes','variants'] as const;
 const optionId=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 export function catalogOptionGroups(value:unknown):CatalogOptionGroup[] {
   if(!Array.isArray(value) || value.length>8)throw new Error('Puedes crear hasta 8 grupos de opciones por producto.');
@@ -60,7 +65,12 @@ export function catalogFields(value:unknown):CatalogFields {
   if (!Number.isInteger(input.price) || Number(input.price)<0 || Number(input.price)>100000000) throw new Error('Escribe un precio en pesos colombianos, sin decimales.');
   if (typeof input.available!=='boolean' || !['draft','published','archived'].includes(String(input.status))) throw new Error('Revisa la disponibilidad y el estado.');
   if (!Number.isInteger(input.position) || Number(input.position)<0 || Number(input.position)>10000) throw new Error('Revisa el orden del producto.');
-  return {name:(input.name as string).trim(),description:(input.description as string).trim(),section:(input.section as string).trim(),price:Number(input.price),available:input.available,status:input.status as CatalogFields['status'],position:Number(input.position),optionGroups:catalogOptionGroups(input.optionGroups ?? [])};
+  const publicationType=input.publicationType==='service'?'service':'product';
+  const priceMode=['fixed','from','quote'].includes(String(input.priceMode))?input.priceMode as CatalogFields['priceMode']:'fixed';
+  const short=(key:string,limit=120)=>typeof input[key]==='string'?(input[key] as string).trim().slice(0,limit):'';
+  const attributes=Array.isArray(input.attributes)?input.attributes.slice(0,24).map(raw=>{const item=raw as Record<string,unknown>;return {key:String(item.key||'').slice(0,60),label:String(item.label||'').trim().slice(0,80),value:String(item.value||'').trim().slice(0,240)};}).filter(item=>item.key&&item.label&&item.value):[];
+  const variants=Array.isArray(input.variants)?input.variants.slice(0,120).map(raw=>{const item=raw as Record<string,unknown>;const options=item.options&&typeof item.options==='object'&&!Array.isArray(item.options)?Object.fromEntries(Object.entries(item.options as Record<string,unknown>).slice(0,8).map(([k,v])=>[k.slice(0,60),String(v).slice(0,80)])):{};return {id:optionId.test(String(item.id||''))?String(item.id):'',label:String(item.label||'').trim().slice(0,160),options,available:item.available!==false,inventory:Number.isInteger(item.inventory)&&Number(item.inventory)>=0?Number(item.inventory):null,price:Number.isInteger(item.price)&&Number(item.price)>=0?Number(item.price):null,sku:String(item.sku||'').trim().slice(0,120),...(typeof item.imagePath==='string'&&item.imagePath?{imagePath:item.imagePath.slice(0,500)}:{})};}).filter(item=>item.id&&item.label):[];
+  return {name:(input.name as string).trim(),description:(input.description as string).trim(),section:(input.section as string).trim(),price:Number(input.price),available:input.available,status:input.status as CatalogFields['status'],position:Number(input.position),optionGroups:catalogOptionGroups(input.optionGroups ?? []),publicationType,category:short('category',100),subcategory:short('subcategory',120),brand:short('brand'),condition:short('condition',80),sku:short('sku'),priceMode,attributes,variants};
 }
 export function sameCatalogFields(a:CatalogFields,b:CatalogFields) {
   return catalogKeys.every(key=>key==='optionGroups'

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect,useRef,useState } from 'react';
+import Link from 'next/link';
 import type { CatalogFields } from '@/lib/catalog-validation';
 import CatalogProductImage from './CatalogProductImage';
 import { trackCommerceEvent } from '@/lib/commerce-tracking';
@@ -7,6 +8,7 @@ type Product=CatalogFields & {id:string;imageUrl?:string};
 type DemoLines=Record<string,string[]>;
 export default function PublicCatalog({products,phone,businessId,businessName,catalogPath,productLinksEnabled,demoLines}:{products:Product[];phone:string;businessId:string;businessName:string;catalogPath:string;productLinksEnabled:boolean;demoLines?:DemoLines}) {
   const [section,setSection]=useState('');
+  const [search,setSearch]=useState('');
   const lines=demoLines ? Object.entries(demoLines) : [];
   const [line,setLine]=useState(lines[0]?.[0] || '');
   const viewed=useRef(false);
@@ -14,16 +16,18 @@ export default function PublicCatalog({products,phone,businessId,businessName,ca
   const lineProducts=line && demoLines ? products.filter(product=>demoLines[line]?.includes(product.section)) : products;
   const sections=Array.from(new Set(lineProducts.map(p=>p.section).filter(Boolean)));
   const digits=phone.replace(/\D/g,'');const normalized=digits.length===10 && digits.startsWith('3')?`57${digits}`:digits;
-  const visible=lineProducts.filter(product=>!section || product.section===section);
+  const query=search.trim().toLocaleLowerCase('es-CO');
+  const visible=lineProducts.filter(product=>(!section || product.section===section)&&(!query||`${product.name} ${product.description} ${product.section} ${product.category} ${product.subcategory}`.toLocaleLowerCase('es-CO').includes(query)));
   const money=(price:number)=>new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',maximumFractionDigits:0}).format(price);
   return <section className="py-6">
     {lines.length>0&&<div className="mb-5"><p className="mb-2 text-sm font-bold text-slate-700">Línea de demostración</p><nav aria-label="Líneas de demostración" className="flex flex-wrap gap-2">{lines.map(([value])=><button key={value} onClick={()=>{setLine(value);setSection('');}} aria-pressed={line===value} className={`min-h-11 rounded-md border px-4 py-2 text-sm font-semibold ${line===value?'border-[#D82016] bg-[#D82016] text-white':'border-gray-300 bg-white text-slate-800'}`}>{value}</button>)}</nav></div>}
+    <label className="mb-4 grid max-w-xl gap-2 text-sm font-bold">Buscar en este catálogo<input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nombre, categoría o referencia" className="min-h-12 rounded-md border border-slate-300 bg-white px-3"/></label>
     {sections.length>0 && <nav aria-label="Secciones del catálogo" className="mb-5 flex flex-wrap gap-2">{['',...sections].map(value=><button key={value} onClick={()=>setSection(value)} aria-pressed={section===value} className={`min-h-11 max-w-full break-words rounded-md border px-4 py-2 text-sm font-semibold ${section===value?'border-[#D82016] bg-[#FFF1F0] text-[#D82016]':'border-gray-300 bg-white'}`}>{value || 'Todo'}</button>)}</nav>}
     {!products.length && <p className="py-6 text-gray-600">Este negocio aún no ha publicado productos en su catálogo. Puedes consultar su oferta desde la ficha.</p>}
     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{visible.map((product,index)=><article key={product.id} className="min-w-0 overflow-hidden rounded-md border border-gray-200 bg-white">
       <div className="grid aspect-[4/3] w-full place-items-center overflow-hidden bg-gray-100"><CatalogProductImage name={product.name} imageUrl={product.imageUrl} priority={index<2} /></div>
       <div className="p-4"><p className="text-xs text-gray-600">{product.section}</p><h2 className="mt-1 break-words text-xl font-bold">{product.name}</h2><p className="mt-2 break-words text-sm leading-6 text-gray-600">{product.description}</p><p className="mt-3 text-lg font-bold">{money(product.price)}</p>
-        {!product.available?<p className="mt-3 min-h-11 content-center text-sm font-semibold text-gray-500">Agotado</p>:normalized && <a onClick={()=>trackCommerceEvent('Producto visto','ViewContent',{businessId,businessName,productId:product.id,productName:product.name,value:product.price})} target="_blank" rel="noopener noreferrer" href={`https://wa.me/${normalized}?text=${encodeURIComponent(productLinksEnabled
+        {!product.available?<p className="mt-3 min-h-11 content-center text-sm font-semibold text-gray-500">Agotado</p>:productLinksEnabled?<Link onClick={()=>trackCommerceEvent('Producto visto','ViewContent',{businessId,businessName,productId:product.id,productName:product.name,value:product.price})} href={`${catalogPath}/${product.id}`} className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#D82016] px-3 py-2 text-center text-sm font-bold text-white">Ver producto</Link>:normalized && <a onClick={()=>trackCommerceEvent('Producto visto','ViewContent',{businessId,businessName,productId:product.id,productName:product.name,value:product.price})} target="_blank" rel="noopener noreferrer" href={`https://wa.me/${normalized}?text=${encodeURIComponent(productLinksEnabled
           ? `Hola, vi este producto en el catálogo de ${businessName} en Mercáu:\n\n${product.name}\n${money(product.price)}\n\nhttps://www.mercau.co${catalogPath}/${product.id}\n\nQuiero consultar su disponibilidad.`
           : `Hola, vi ${product.name} (${money(product.price)}) en el catálogo de ${businessName} en Mercáu. Quiero consultar su disponibilidad.`)}`} className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#D82016] px-3 py-2 text-center text-sm font-bold text-white">Consultar por WhatsApp</a>}
       </div>
