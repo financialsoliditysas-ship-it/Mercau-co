@@ -4,13 +4,14 @@ import Link from 'next/link';
 import BackToAccount from './BackToAccount';
 import CatalogProductImage from './CatalogProductImage';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
-import { CatalogFields,CatalogProduct,catalogKeys,parseCatalogPrice,formatCatalogPrice,catalogNoun,catalogLabel } from '@/lib/catalog-validation';
+import { CatalogFields,CatalogProduct,catalogKeys,parseCatalogPrice,formatCatalogPrice,catalogNoun,catalogLabel,isFoodBusiness } from '@/lib/catalog-validation';
 import { prepareImage } from '@/lib/prepare-image';
 import CatalogPhotoHelp from './CatalogPhotoHelp';
 import CatalogOptionGroupsEditor from './CatalogOptionGroupsEditor';
 import CatalogShareActions from './CatalogShareActions';
 import CatalogSharedOptions from './CatalogSharedOptions';
 import CatalogProfessionalFields from './CatalogProfessionalFields';
+import CommercePaymentSettings from './CommercePaymentSettings';
 
 const empty:CatalogFields={name:'',description:'',section:'',price:0,available:true,status:'draft',position:0,optionGroups:[],publicationType:'product',category:'',subcategory:'',brand:'',condition:'',sku:'',priceMode:'fixed',attributes:[],variants:[]};
 const field='min-h-12 min-w-0 w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[#D82016]';
@@ -120,6 +121,7 @@ export default function CatalogManager({businessId}:{businessId:string}) {
     <section className="mx-auto max-w-5xl px-4 py-6">
       <p className="text-sm font-bold text-[#D82016]">{business?.name || 'Panel de mi negocio'}</p><h1 className="mt-1 text-3xl font-black">Mi {business?catalogNoun(business.category).toLocaleLowerCase('es-CO'):'catálogo'}</h1>
       {orderConfig&&<section className="mt-4 rounded-md border border-red-200 bg-[#FFF1F0] p-4"><p className="font-black">Condiciones comerciales de pedidos</p><p className="mt-1 text-sm">Comisión total acordada: {(orderConfig.commission_rate_bps/100).toLocaleString('es-CO')} %. Referencia comercial para ajustar tus precios en Mercáu: {(orderConfig.customer_markup_bps/100).toLocaleString('es-CO')} %. Esta referencia no se cobra por separado ni reduce la comisión. Tú decides y guardas el precio final publicado.</p><p className="mt-2 text-sm font-bold">Pedidos {orderConfig.enabled?'activos':'pausados'} · {orderConfig.delivery_mode==='OWN'?'entrega con tu domiciliario':'entrega con domiciliario Mercáu'}</p></section>}
+      {business&&!isFoodBusiness(business.category)&&<CommercePaymentSettings businessId={businessId}/>}
       <div className="mt-5 flex flex-wrap gap-3">{ready && <button disabled={busy} onClick={()=>open()} className={primary}>Agregar producto</button>}{ready&&products.length>0&&<button disabled={busy} onClick={()=>setShowBulkPrice(value=>!value)} className={secondary}>Ajustar precios</button>}<Link href={`/negocios/${businessId}/catalogo`} className={secondary}>{business?`${catalogLabel(business.category)} público`:'Ver catálogo público'}</Link><button disabled={busy} onClick={()=>setReload(value=>value+1)} className={secondary}>Actualizar lista</button></div>
       {business&&<div className="mt-3"><CatalogShareActions businessName={business.name} catalogUrl={`https://www.mercau.co/negocios/${businessId}/catalogo`} noun={catalogNoun(business.category)} /></div>}
       {notice && <p role="status" className="mt-4 rounded-md bg-[#FFF1F0] p-3 text-sm">{notice}</p>}
