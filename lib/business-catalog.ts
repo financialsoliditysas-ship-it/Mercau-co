@@ -9,7 +9,7 @@ const staticImagePrefix='static:';
 const columns='id,business_id,name,description,section,price,available,status,position,option_groups,publication_type,category,subcategory,brand,condition,sku,price_mode,attributes,variants,gallery,version,image_path,updated_at';
 const legacyColumns='id,business_id,name,description,section,price,available,status,position,option_groups,version,image_path,updated_at';
 type CatalogRow=Omit<CatalogFields,'optionGroups'|'publicationType'|'priceMode'> & {option_groups:CatalogFields['optionGroups'];publication_type:CatalogFields['publicationType'];price_mode:CatalogFields['priceMode'];gallery:unknown[];id:string;business_id:string;version:number;image_path:string|null;updated_at:string};
-export type PublicCatalogProduct=CatalogFields & {id:string;imageUrl?:string};
+export type PublicCatalogProduct=CatalogFields & {id:string;imageUrl?:string;galleryUrls:string[]};
 export class CatalogError extends Error { constructor(message:string,public status=400){super(message);} }
 export async function catalogOwner(request:NextRequest,businessId:string) {
   const response=await authorizedBusinessDetails(request,{params:{businessId}});
@@ -30,7 +30,8 @@ export function publicProduct(row:CatalogRow):PublicCatalogProduct {
   const imageUrl=row.image_path?.startsWith(staticImagePrefix)
     ? `/${row.image_path.slice(staticImagePrefix.length)}`
     : row.image_path ? `/api/negocios/${row.business_id}/catalogo/${row.id}/foto?v=${row.version}` : undefined;
-  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],publicationType:(row as any).publication_type||'product',category:(row as any).category||'',subcategory:(row as any).subcategory||'',brand:(row as any).brand||'',condition:(row as any).condition||'',sku:(row as any).sku||'',priceMode:(row as any).price_mode||'fixed',attributes:(row as any).attributes||[],variants:(row as any).variants||[],id,imageUrl};
+  const gallery=Array.isArray(row.gallery)?row.gallery.filter((item):item is string=>typeof item==='string'):[];
+  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],publicationType:(row as any).publication_type||'product',category:(row as any).category||'',subcategory:(row as any).subcategory||'',brand:(row as any).brand||'',condition:(row as any).condition||'',sku:(row as any).sku||'',priceMode:(row as any).price_mode||'fixed',attributes:(row as any).attributes||[],variants:(row as any).variants||[],id,imageUrl,galleryUrls:gallery.map((_,index)=>`/api/negocios/${row.business_id}/catalogo/${row.id}/foto?slot=${index+1}&v=${row.version}`)};
 }
 function databaseFields(fields:CatalogFields){const {optionGroups,publicationType,priceMode,...plain}=fields;return {...plain,option_groups:optionGroups,publication_type:publicationType,price_mode:priceMode};}
 export async function ownerProduct(row:CatalogRow):Promise<CatalogProduct> {
@@ -42,7 +43,10 @@ export async function ownerProduct(row:CatalogRow):Promise<CatalogProduct> {
     if(error)throw new CatalogError('El producto está guardado, pero no se pudo cargar su foto. Actualiza la lista.',503);
     imageUrl=data?.signedUrl;
   }
-  return {...publicProduct({...row,image_path:null}),version:row.version,updated_at:row.updated_at,imageUrl};
+  const result=publicProduct({...row,image_path:null});
+  const gallery=Array.isArray(row.gallery)?row.gallery.filter((item):item is string=>typeof item==='string'):[];
+  let galleryUrls:string[]=[];if(gallery.length){const signed=await getSupabaseAdminClient().storage.from(catalogBucket).createSignedUrls(gallery,600);if(!signed.error)galleryUrls=(signed.data||[]).map(item=>item.signedUrl).filter((item):item is string=>Boolean(item));}
+  return {...result,version:row.version,updated_at:row.updated_at,imageUrl,galleryUrls};
 }
 export async function ownerProducts(businessId:string) {
   const rows=await catalogRows(businessId,false);
@@ -55,7 +59,7 @@ export async function ownerProducts(businessId:string) {
     if(error)throw new CatalogError('No se pudieron cargar las fotos del catálogo. Intenta nuevamente.',503);
     (data || []).forEach(item=>{if(item.path && item.signedUrl)urls.set(item.path,item.signedUrl);});
   }
-  return rows.map(row=>({...publicProduct({...row,image_path:null}),version:row.version,updated_at:row.updated_at,imageUrl:urls.get(row.image_path || '')}));
+  return Promise.all(rows.map(row=>ownerProduct(row)));
 }
 async function catalogRows(businessId:string,published:boolean) {
   const rows:CatalogRow[]=[];
@@ -119,3 +123,4 @@ export async function setCatalogImage(businessId:string,id:string,version:number
   if(!data)throw new CatalogError('El producto cambió. Recarga antes de guardar su foto.',409);
   return ownerProduct(data);
 }
+export async function addCatalogGalleryImage(businessId:string,id:string,version:number,path:string){const current=await catalogProduct(businessId,id);const gallery=Array.isArray(current.gallery)?current.gallery.filter((item):item is string=>typeof item==='string'):[];if(gallery.length>=8)throw new CatalogError('Puedes publicar hasta 8 fotos por producto.');const {data,error}=await getSupabaseAdminClient().from('business_catalog_products').update({gallery:[...gallery,path]}).eq('business_id',businessId).eq('id',id).eq('version',version).select(columns).maybeSingle();if(error)throw databaseError();if(!data)throw new CatalogError('El producto cambió. Recarga antes de guardar la galería.',409);return ownerProduct(data);}

@@ -13,7 +13,7 @@ export type CatalogFields = {
   brand:string; condition:string; sku:string; priceMode:'fixed'|'from'|'quote';
   attributes:CatalogAttribute[]; variants:CatalogVariant[];
 };
-export type CatalogProduct = CatalogFields & {id:string;version:number;imageUrl?:string;updated_at:string};
+export type CatalogProduct = CatalogFields & {id:string;version:number;imageUrl?:string;galleryUrls:string[];updated_at:string};
 export const catalogKeys = ['name','description','section','price','available','status','position','optionGroups','publicationType','category','subcategory','brand','condition','sku','priceMode','attributes','variants'] as const;
 const optionId=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 export function catalogOptionGroups(value:unknown):CatalogOptionGroup[] {

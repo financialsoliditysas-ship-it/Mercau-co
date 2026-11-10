@@ -16,6 +16,7 @@ import { Clock3, MapPin, Truck } from 'lucide-react';
 import InstallMercau from '@/components/InstallMercau';
 import {businessSiteUrl} from '@/lib/business-public-url';
 import { menuCover } from '@/lib/menu-cover';
+import CommerceCartPanel from '@/components/CommerceCartPanel';
 const loadMenuCatalog=typeof cache==='function'?cache(publicCatalog):publicCatalog;
 export const dynamic='force-dynamic';
 export async function generateMetadata({params}:{params:{id:string}}) {
@@ -51,6 +52,7 @@ export default async function BusinessCatalogPage({params}:{params:{id:string}})
     </section>
       {business.pilotRestaurant && <PilotBusinessNotice />}
       {ordersEnabled ? <RestaurantPilot embedded visualMenu={isFoodBusiness(business.category)} restaurantId={business.id} businessName={business.name} returnPath={catalogPath} coverImage={menuCover(business,catalog?.products || []).imageUrl} demoLines={business.source==='mercau-test'?{'Tecnología':['Celulares','Audio','Wearables','Computadores','Creadores','Accesorios'],'Moda, belleza y variedades':['Ropa infantil','Ropa femenina','Ropa masculina','Vestidos de baño','Belleza y cuidado','Accesorios de moda']}:undefined} /> : unavailable?<p role="status" className="mt-6 rounded-md bg-[#FFF1F0] p-4">No se pudo cargar el catálogo. Intenta nuevamente o consulta desde la ficha del negocio.</p>:<PublicCatalog products={catalog?.products || []} phone={business.whatsapp} businessId={business.id} businessName={business.name} catalogPath={catalogPath} productLinksEnabled={!isFoodBusiness(business.category)} demoLines={business.source==='mercau-test'?{'Tecnología':['Celulares','Audio','Wearables','Computadores','Creadores','Accesorios'],'Moda, belleza y variedades':['Ropa infantil','Ropa femenina','Ropa masculina','Vestidos de baño','Belleza y cuidado','Accesorios de moda']}:undefined} />}
+      {!isFoodBusiness(business.category)&&['ventas','ventas_plus'].includes(business.commercePlan||'')&&<CommerceCartPanel businessId={business.id} businessName={business.name}/>}
     </div>
   </main>;
 }

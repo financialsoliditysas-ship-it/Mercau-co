@@ -20,6 +20,7 @@ export type DirectoryMunicipality =
   | "Zaragoza";
 
 export type DirectoryBusiness = {
+  commercePlan?: 'presencia'|'vitrina'|'ventas'|'ventas_plus';
   publicSlug?: string;
   photoUrl?: string;
   hasCatalog?: boolean;

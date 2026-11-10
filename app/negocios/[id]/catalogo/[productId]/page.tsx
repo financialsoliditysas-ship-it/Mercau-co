@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import CommerceProductDetail from '@/components/CommerceProductDetail';
+import CommerceCartPanel from '@/components/CommerceCartPanel';
 import { publicCatalog } from '@/lib/business-catalog';
 import { businessCatalogPath, businessPath } from '@/lib/business-public-url';
 import { isFoodBusiness, validProductId } from '@/lib/catalog-validation';
@@ -46,8 +47,9 @@ export default async function CatalogProductPage({params}:{params:{id:string;pro
   return <main className="min-h-screen bg-[#FCFBF9] px-4 py-6 text-[#1F2937]">
     <div className="mx-auto max-w-4xl">
       <header className="flex flex-wrap items-center justify-between gap-3"><Link href="/" className="flex items-center gap-2 font-black text-[#D82016]"><img src="/logo-mercau.png" alt="Mercáu" className="h-11 w-11 object-contain"/>Mercáu</Link><Link href={businessCatalogPath(business)} className="inline-flex min-h-11 items-center rounded-md border px-4 font-bold">Volver al catálogo</Link></header>
-      <CommerceProductDetail product={product} related={related} businessName={business.name} phone={phone} url={url} catalogPath={businessCatalogPath(business)}/>
+      <CommerceProductDetail product={product} related={related} businessId={business.id} businessName={business.name} phone={phone} url={url} catalogPath={businessCatalogPath(business)} commercePlan={business.commercePlan}/>
       <Link href={businessPath(business)} className="mt-5 block text-center text-sm font-bold text-[#D82016]">Ver página del negocio</Link>
+      {['ventas','ventas_plus'].includes(business.commercePlan||'')&&<CommerceCartPanel businessId={business.id} businessName={business.name}/>}
     </div>
   </main>;
 }

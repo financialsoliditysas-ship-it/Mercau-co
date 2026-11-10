@@ -29,6 +29,7 @@ export default function CatalogManager({businessId}:{businessId:string}) {
   const [values,setValues]=useState<CatalogFields>(empty);
   const [priceText,setPriceText]=useState('0');
   const [photo,setPhoto]=useState(''),[photoId,setPhotoId]=useState('');
+  const [galleryPhoto,setGalleryPhoto]=useState(''),[galleryPhotoId,setGalleryPhotoId]=useState('');
   const [reload,setReload]=useState(0);
   const [showBulkPrice,setShowBulkPrice]=useState(false),[bulkPercent,setBulkPercent]=useState(''),[bulkSection,setBulkSection]=useState('all'),[bulkRounding,setBulkRounding]=useState(500);
   const editorRef=useRef<HTMLElement|null>(null);
@@ -107,6 +108,8 @@ export default function CatalogManager({businessId}:{businessId:string}) {
       replace(product);setEditing(product);setPhoto('');setNotice('Foto guardada.');
     }catch(error){setNotice(error instanceof Error?error.message:'No se pudo subir la foto.');}finally{setBusy(false);}
   }
+  async function chooseGalleryPhoto(event:ChangeEvent<HTMLInputElement>){const file=event.target.files?.[0];if(!file)return;setBusy(true);try{setGalleryPhoto(await prepareImage(file));setGalleryPhotoId(crypto.randomUUID());setNotice('Foto de galería lista para guardar.');}catch(error){setNotice(error instanceof Error?error.message:'No se pudo preparar la foto.');}finally{event.target.value='';setBusy(false);}}
+  async function uploadGalleryPhoto(){if(!editing||!galleryPhoto)return;setBusy(true);setNotice('Subiendo foto de galería...');try{const result=await api(`/${editing.id}/galeria`,'POST',{version:editing.version,requestId:galleryPhotoId,file:galleryPhoto.split(',')[1]});replace(result.product);setEditing(result.product);setGalleryPhoto('');setNotice('Foto agregada a la galería.');}catch(error){setNotice(error instanceof Error?error.message:'No se pudo guardar la galería.');}finally{setBusy(false);}}
   const visible=products.filter(p=>filter==='all'?p.status!=='archived':p.status===filter).sort((a,b)=>a.position-b.position || a.name.localeCompare(b.name,'es'));
   const sections=Array.from(new Set(products.map(p=>p.section).filter(Boolean)));
   const publishedCount=products.filter(product=>product.status==='published').length;
@@ -140,6 +143,7 @@ export default function CatalogManager({businessId}:{businessId:string}) {
             {(photo || editing?.imageUrl) && <div className="h-48 w-full max-w-sm overflow-hidden rounded-md bg-white"><CatalogProductImage name={values.name || 'producto'} imageUrl={photo || editing?.imageUrl} contain /></div>}
             <label className="grid min-w-0 gap-2 text-sm font-semibold">Seleccionar foto<input type="file" accept="image/jpeg,image/png,image/webp" onChange={choosePhoto} disabled={busy} className="min-h-11 min-w-0 w-full max-w-full text-sm" /></label>
             {editing && <button type="button" disabled={busy || !photo} onClick={uploadPhoto} className={`${primary} w-fit`}>Guardar foto</button>}
+            {editing&&<div className="mt-3 grid gap-3 border-t pt-3"><p className="font-bold">Galería del producto ({editing.galleryUrls.length}/8)</p><div className="flex gap-2 overflow-x-auto">{editing.galleryUrls.map((url,index)=><div key={url} className="h-24 w-32 shrink-0 overflow-hidden rounded-md border"><CatalogProductImage name={`${values.name} ${index+2}`} imageUrl={url}/></div>)}</div>{galleryPhoto&&<div className="h-32 w-44 overflow-hidden rounded-md border"><CatalogProductImage name="Nueva foto" imageUrl={galleryPhoto}/></div>}<label className="grid gap-2 text-sm font-semibold">Agregar otra fotografía<input type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseGalleryPhoto} disabled={busy||editing.galleryUrls.length>=8} className="min-h-11"/></label><button type="button" disabled={busy||!galleryPhoto} onClick={uploadGalleryPhoto} className={`${primary} w-fit`}>Guardar en galería</button></div>}
           </fieldset>
             <div className="flex flex-wrap gap-3 md:col-span-2"><button disabled={busy} className={primary}>Guardar producto</button><button type="button" disabled={busy} onClick={()=>{setShowForm(false);setEditing(null);setPhoto('');}} className={secondary}>Cerrar edición</button></div>
           </form>
