@@ -31,7 +31,8 @@ export function publicProduct(row:CatalogRow):PublicCatalogProduct {
     ? `/${row.image_path.slice(staticImagePrefix.length)}`
     : row.image_path ? `/api/negocios/${row.business_id}/catalogo/${row.id}/foto?v=${row.version}` : undefined;
   const gallery=Array.isArray(row.gallery)?row.gallery.filter((item):item is string=>typeof item==='string'):[];
-  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],publicationType:(row as any).publication_type||'product',category:(row as any).category||'',subcategory:(row as any).subcategory||'',brand:(row as any).brand||'',condition:(row as any).condition||'',sku:(row as any).sku||'',priceMode:(row as any).price_mode||'fixed',attributes:(row as any).attributes||[],variants:(row as any).variants||[],id,imageUrl,galleryUrls:gallery.map((_,index)=>`/api/negocios/${row.business_id}/catalogo/${row.id}/foto?slot=${index+1}&v=${row.version}`)};
+  const variants=((row as any).variants||[]).map((variant:any)=>({...variant,imagePath:variant.imagePath?`/api/negocios/${row.business_id}/catalogo/${row.id}/foto?variant=${encodeURIComponent(variant.id)}&v=${row.version}`:undefined}));
+  return {name,description,section,price,available,status,position,optionGroups:row.option_groups || [],publicationType:(row as any).publication_type||'product',category:(row as any).category||'',subcategory:(row as any).subcategory||'',brand:(row as any).brand||'',condition:(row as any).condition||'',sku:(row as any).sku||'',priceMode:(row as any).price_mode||'fixed',attributes:(row as any).attributes||[],variants,id,imageUrl,galleryUrls:gallery.map((_,index)=>`/api/negocios/${row.business_id}/catalogo/${row.id}/foto?slot=${index+1}&v=${row.version}`)};
 }
 function databaseFields(fields:CatalogFields){const {optionGroups,publicationType,priceMode,...plain}=fields;return {...plain,option_groups:optionGroups,publication_type:publicationType,price_mode:priceMode};}
 export async function ownerProduct(row:CatalogRow):Promise<CatalogProduct> {
@@ -98,6 +99,8 @@ export async function createCatalogProduct(businessId:string,id:string,fields:Ca
 }
 export async function updateCatalogProduct(businessId:string,id:string,version:number,fields:CatalogFields) {
   const existing=await catalogProduct(businessId,id);
+  const storedVariants=Array.isArray((existing as any).variants)?(existing as any).variants:[];
+  fields={...fields,variants:fields.variants.map(variant=>{const stored=storedVariants.find((item:any)=>item.id===variant.id);return {...variant,...(stored?.imagePath?{imagePath:stored.imagePath}:{})};})};
   if(sameCatalogFields(publicProduct(existing),fields))return ownerProduct(existing);
   const db=getSupabaseAdminClient();
   const {data:links,error:linksError}=await db.from('business_catalog_product_option_groups').select('group_id').eq('business_id',businessId).eq('product_id',id);
@@ -124,3 +127,4 @@ export async function setCatalogImage(businessId:string,id:string,version:number
   return ownerProduct(data);
 }
 export async function addCatalogGalleryImage(businessId:string,id:string,version:number,path:string){const current=await catalogProduct(businessId,id);const gallery=Array.isArray(current.gallery)?current.gallery.filter((item):item is string=>typeof item==='string'):[];if(gallery.length>=8)throw new CatalogError('Puedes publicar hasta 8 fotos por producto.');const {data,error}=await getSupabaseAdminClient().from('business_catalog_products').update({gallery:[...gallery,path]}).eq('business_id',businessId).eq('id',id).eq('version',version).select(columns).maybeSingle();if(error)throw databaseError();if(!data)throw new CatalogError('El producto cambió. Recarga antes de guardar la galería.',409);return ownerProduct(data);}
+export async function setCatalogVariantImage(businessId:string,id:string,version:number,variantId:string,path:string){const current=await catalogProduct(businessId,id);const variants=Array.isArray((current as any).variants)?(current as any).variants:[];if(!variants.some((item:any)=>item.id===variantId))throw new CatalogError('La variante ya no existe.',404);const next=variants.map((item:any)=>item.id===variantId?{...item,imagePath:path}:item);const {data,error}=await getSupabaseAdminClient().from('business_catalog_products').update({variants:next}).eq('business_id',businessId).eq('id',id).eq('version',version).select(columns).maybeSingle();if(error)throw databaseError();if(!data)throw new CatalogError('El producto cambió. Recarga antes de guardar la foto de la variante.',409);return ownerProduct(data);}

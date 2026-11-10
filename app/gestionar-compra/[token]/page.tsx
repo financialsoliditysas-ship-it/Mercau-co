@@ -1,0 +1,1 @@
+import CommerceOrderAction from '@/components/CommerceOrderAction';export const dynamic='force-dynamic';export default function Page({params}:{params:{token:string}}){return <CommerceOrderAction token={params.token}/>;}

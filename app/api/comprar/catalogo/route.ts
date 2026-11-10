@@ -3,6 +3,7 @@ import {accountUser} from '@/lib/account-server';
 import {loadDirectoryBusiness} from '@/lib/airtable-directory';
 import {publicCatalog} from '@/lib/business-catalog';
 import {getSupabaseAdminClient} from '@/lib/supabase-admin';
+import {newCommerceOrderToken,notifyCommerceOrder} from '@/lib/commerce-order-action';
 
 export const dynamic='force-dynamic';
 type Input={businessId?:unknown;items?:unknown;customer?:unknown};
@@ -27,9 +28,11 @@ export async function POST(request:NextRequest){
     const clean=(key:string,max:number)=>typeof customer[key]==='string'?String(customer[key]).trim().slice(0,max):'';
     const customerName=clean('name',120),customerPhone=clean('phone',30),municipality=clean('municipality',100),address=clean('address',300),notes=clean('notes',600);
     if(!customerName||!/^[0-9+ ()-]{7,30}$/.test(customerPhone)||!municipality||!address)throw new Error('Completa nombre, teléfono, municipio y dirección.');
-    const id=crypto.randomUUID(),publicId=`MCU-C-${id.slice(0,8).toUpperCase()}`,subtotal=items.reduce((sum,item)=>sum+item.total,0);
-    const {error}=await getSupabaseAdminClient().from('business_catalog_orders').insert({id,public_id:publicId,business_id:business.id,buyer_id:user.id,customer_name:customerName,customer_phone:customerPhone,delivery_municipality:municipality,delivery_address:address,customer_notes:notes,items,subtotal});
+    const id=crypto.randomUUID(),publicId=`MCU-C-${id.slice(0,8).toUpperCase()}`,subtotal=items.reduce((sum,item)=>sum+item.total,0),access=newCommerceOrderToken();
+    const {error}=await getSupabaseAdminClient().from('business_catalog_orders').insert({id,public_id:publicId,business_id:business.id,buyer_id:user.id,customer_name:customerName,customer_phone:customerPhone,delivery_municipality:municipality,delivery_address:address,customer_notes:notes,items,subtotal,action_token_hash:access.hash,action_expires_at:access.expiresAt});
     if(error)throw new Error('No se pudo guardar el pedido.');
-    return NextResponse.json({ok:true,publicId},{status:201,headers:{'Cache-Control':'no-store'}});
+    await getSupabaseAdminClient().from('business_catalog_order_history').insert({order_id:id,status:'received',actor_type:'buyer',actor_reference:user.id});
+    const whatsapp=await notifyCommerceOrder({id,publicId,businessName:business.name,phone:business.whatsapp,token:access.token});
+    return NextResponse.json({ok:true,publicId,whatsapp},{status:201,headers:{'Cache-Control':'no-store'}});
   }catch(error){return NextResponse.json({error:error instanceof Error?error.message:'No se pudo crear el pedido.'},{status:400,headers:{'Cache-Control':'no-store'}});}
 }

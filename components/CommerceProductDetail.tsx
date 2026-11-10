@@ -1,5 +1,5 @@
 'use client';
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import Link from 'next/link';
 import CatalogProductImage from './CatalogProductImage';
 import type {PublicCatalogProduct} from '@/lib/business-catalog';
@@ -10,6 +10,7 @@ export default function CommerceProductDetail({product,related,businessId,busine
   const [variantId,setVariantId]=useState('');
   const [photo,setPhoto]=useState(product.imageUrl||product.galleryUrls[0]);
   const variant=product.variants.find(item=>item.id===variantId);
+  useEffect(()=>{setPhoto(variant?.imagePath||product.imageUrl||product.galleryUrls[0]);},[variant?.imagePath,product.imageUrl,product.galleryUrls]);
   const price=variant?.price??product.price;
   const canContact=product.available&&(!product.variants.length||Boolean(variant?.available));
   const message=useMemo(()=>`Hola, vi este ${product.publicationType==='service'?'servicio':'producto'} en el catálogo de ${businessName} en Mercáu:\n\n${product.name}${variant?`\nOpción: ${variant.label}`:''}\n${product.priceMode==='quote'?'Precio por cotizar':money(price)}\n\n${url}\n\nQuiero consultar su disponibilidad.`,[businessName,price,product,variant,url]);

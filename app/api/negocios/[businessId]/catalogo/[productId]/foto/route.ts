@@ -12,7 +12,7 @@ export async function GET(_request:NextRequest,{params}:{params:{businessId:stri
     const width=catalogImageWidth(_request.nextUrl.searchParams.get('w'));
     if(Number.isNaN(width))return new NextResponse(null,{status:400,headers:{'Cache-Control':'no-store'}});
     const [product,published]=await Promise.all([catalogProduct(params.businessId,params.productId),catalogBusinessPublic(params.businessId)]);
-    const slot=Number(_request.nextUrl.searchParams.get('slot')||0);const gallery=Array.isArray(product.gallery)?product.gallery.filter((item):item is string=>typeof item==='string'):[];const path=slot>0?gallery[slot-1]:product.image_path;
+    const slot=Number(_request.nextUrl.searchParams.get('slot')||0),variantId=_request.nextUrl.searchParams.get('variant');const gallery=Array.isArray(product.gallery)?product.gallery.filter((item):item is string=>typeof item==='string'):[];const variants=Array.isArray((product as any).variants)?(product as any).variants:[];const variantPath=variantId?variants.find((item:any)=>item.id===variantId)?.imagePath:null;const path=variantId?variantPath:slot>0?gallery[slot-1]:product.image_path;
     if(product.status!=='published' || !path?.startsWith(`${params.businessId}/${params.productId}/`))return new NextResponse(null,{status:404,headers:{'Cache-Control':'no-store'}});
     if(!published)return new NextResponse(null,{status:404,headers:{'Cache-Control':'no-store'}});
     const webp=Boolean(width&&_request.headers.get('accept')?.includes('image/webp'));
