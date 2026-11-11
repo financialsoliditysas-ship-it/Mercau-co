@@ -1,0 +1,10 @@
+const fs=require('fs');const assert=require('assert');const {PGlite}=require('@electric-sql/pglite');
+const route=fs.readFileSync('app/api/admin/pedidos-asistidos/route.ts','utf8');
+const form=fs.readFileSync('components/admin/AssistedOrders.tsx','utf8');
+const pilot=fs.readFileSync('lib/restaurant-pilot.ts','utf8');
+const manager=fs.readFileSync('components/RestaurantPilot.tsx','utf8');
+assert.match(route,/ADMIN_METRICS_PASSWORD/);assert.match(route,/createPilotOrder\(user\.id/);assert.match(route,/assisted:true/);
+for(const label of ['Restaurante','Cliente','Celular','Dirección o referencia','Forma de pago','Observación, opcional','Enviar pedido al restaurante'])assert.ok(form.includes(label),`Falta ${label}`);
+assert.match(pilot,/order_source:'ADMIN_ASSISTED'/);assert.match(pilot,/customerName: options\.assisted\?'Mercáu Pedidos'/);
+assert.match(manager,/order_source==='ADMIN_ASSISTED'/);assert.match(manager,/Comprador: Mercáu Pedidos/);
+(async()=>{const db=new PGlite();await db.exec("create schema auth;create table auth.users(id uuid primary key);create table public.pilot_food_orders(id uuid primary key,created_at timestamptz not null default now());");await db.exec(fs.readFileSync('supabase/migrations/20261110210000_assisted_food_orders.sql','utf8'));const columns=(await db.query("select column_name from information_schema.columns where table_name='pilot_food_orders'")).rows.map(row=>row.column_name);assert.ok(columns.includes('order_source'));assert.ok(columns.includes('created_by_user_id'));await assert.rejects(()=>db.exec("insert into pilot_food_orders(id,order_source) values ('11111111-1111-4111-8111-111111111111','INVALID')"));await db.close();console.log('Pedidos asistidos: acceso privado, formulario corto, origen y privacidad verificados en aislamiento.');})().catch(error=>{console.error(error);process.exit(1);});

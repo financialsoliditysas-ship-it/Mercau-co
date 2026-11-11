@@ -33,7 +33,7 @@ type Customer = { name: string; phone: string; address: string; neighborhood: st
   deliveryLocationAccuracyM: number | null; deliveryLocationCapturedAt: string | null };
 const EMPTY_CUSTOMER: Customer = { name: '', phone: '', address: '', neighborhood: '', instructions: '',
   deliveryLatitude: null, deliveryLongitude: null, deliveryLocationAccuracyM: null, deliveryLocationCapturedAt: null };
-type Order = { id?: string; public_id: string; customer_name?: string; customer_phone?: string;
+type Order = { id?: string; public_id: string; customer_name?: string; customer_phone?: string; order_source?:string;
   changes?: OrderChange[];
   address: string; neighborhood?: string; instructions?: string;
   delivery_latitude?: number | null; delivery_longitude?: number | null;
@@ -839,8 +839,8 @@ export default function RestaurantPilot({ manager = false, restaurantId, busines
         <p>Productos: {money(o.subtotal)} · Domicilio: {money(o.delivery_fee)} · Total: {money(o.subtotal + o.delivery_fee)}</p>
         <RestaurantOrderPayout finance={o.finance} status={o.status}/>
         <OrderChangePanel publicId={o.public_id} manager changes={o.changes} fee={o.delivery_fee} lines={o.lines} menu={menu} canPropose={['pending','accepted'].includes(o.status)&&!o.delivery&&o.lines.every(line=>!!line.lineId)}/>
-        <p>Entrega: {o.address}</p>
-        {manager && <><p>{o.customer_name} · {o.customer_phone}</p><p>{o.neighborhood} · {o.instructions}</p>
+        {o.order_source!=='ADMIN_ASSISTED'&&<p>Entrega: {o.address}</p>}
+        {manager && <>{o.order_source==='ADMIN_ASSISTED'?<p><strong>Comprador: Mercáu Pedidos</strong></p>:<><p>{o.customer_name} · {o.customer_phone}</p><p>{o.neighborhood} · {o.instructions}</p></>}
           {o.delivery_latitude !== null && o.delivery_latitude !== undefined && o.delivery_longitude !== null && o.delivery_longitude !== undefined &&
             <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${o.delivery_latitude},${o.delivery_longitude}`)}&travelmode=driving`} target="_blank" rel="noreferrer" className="font-bold text-[#D82016]">Abrir entrega en Google Maps</a>}
           {o.status === 'pending' && <div className="pilot-actions"><button className="pilot-primary" disabled={busy||unresolvedChange(o.changes)} onClick={() => action(o, 'accepted')}>Aceptar pedido</button>

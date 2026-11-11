@@ -1,11 +1,12 @@
 'use client';
 
-import { Activity, BarChart3, Bike, BookOpen, Building2, Images, LayoutDashboard, Menu, ScanText, X } from 'lucide-react';
+import { Activity, BarChart3, Bike, BookOpen, Building2, Images, LayoutDashboard, Menu, ScanText, ShoppingCart, X } from 'lucide-react';
 import { ReactNode, useState } from 'react';
 
 const items = [
   { href: '/admin', label: 'Resumen', icon: LayoutDashboard, key: 'resumen' },
   { href: '/admin/operaciones', label: 'Operación diaria', icon: Activity, key: 'operaciones' },
+  { href: '/admin/pedidos-asistidos', label: 'Pedidos asistidos', icon: ShoppingCart, key: 'pedidos-asistidos' },
   { href: '/admin/negocios', label: 'Negocios', icon: Building2, key: 'negocios' },
   { href: '/admin/catalogos', label: 'Acompañamiento', icon: ScanText, key: 'catalogos' },
   { href: '/admin/catalogos/fotos', label: 'Fotos de productos', icon: Images, key: 'catalogos-fotos' },

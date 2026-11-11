@@ -154,7 +154,7 @@ export async function lookupPilotOrderIntent(userId: string, requestKey: string,
   return data;
 }
 
-export async function createPilotOrder(userId: string, body: Record<string, unknown>, restaurantId = pilotId) {
+export async function createPilotOrder(userId: string, body: Record<string, unknown>, restaurantId = pilotId, options:{assisted?:boolean}={}) {
   await pilotMember(userId, false, restaurantId);
   const db = getSupabaseAdminClient();
   const restaurant = await pilotRestaurant(restaurantId);
@@ -179,9 +179,15 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
   if(data?.outcome==='duplicate')throw new PilotError('Ya tienes un pedido reciente igual. ¿Quieres revisarlo o hacer otro?',409,data.previous_public_id,true);
   if(data?.outcome==='uncertain')throw new PilotError('El pedido anterior está registrado, pero su despacho necesita revisión. Revisa su estado o contacta a Mercáu antes de repetirlo.',409,data.previous_public_id);
   if (!data?.public_id) throw new PilotError('No se pudo comprobar el pedido. Revisa Mis pedidos antes de reintentar.',503);
-  if (data.outcome === 'existing') return { public_id: data.public_id, replayed: true };
   const createdOrder = await db.from('pilot_food_orders').select('id,public_id')
     .eq('restaurant_id', restaurantId).eq('customer_id', userId).eq('public_id', data.public_id).maybeSingle();
+  if(createdOrder.error)throw new PilotError('El pedido quedó registrado, pero no se pudo comprobar su origen. Revisa administración antes de repetirlo.',503,data.public_id);
+  if(options.assisted&&createdOrder.data){
+    const marked=await db.from('pilot_food_orders').update({order_source:'ADMIN_ASSISTED',created_by_user_id:userId})
+      .eq('id',createdOrder.data.id).eq('restaurant_id',restaurantId);
+    if(marked.error)throw new PilotError('El pedido quedó creado, pero no se pudo marcar como asistido. Revisa administración antes de repetirlo.',503,data.public_id);
+  }
+  if (data.outcome === 'existing') return { public_id: data.public_id, replayed: true };
   if (createdOrder.data) {
       await ensureRestaurantOrderActionLink({
       orderId: createdOrder.data.id,
@@ -194,7 +200,7 @@ export async function createPilotOrder(userId: string, body: Record<string, unkn
       });
   }
   await sendNewOrderPush({ businessId: restaurantId, orderId: data.public_id,
-    customerName: input.customer_name, total: input.subtotal + Number(restaurant.delivery_fee || 0) }).catch(() => undefined);
+    customerName: options.assisted?'Mercáu Pedidos':input.customer_name, total: input.subtotal + Number(restaurant.delivery_fee || 0) }).catch(() => undefined);
   return { public_id: data.public_id, replayed: false };
 }
 

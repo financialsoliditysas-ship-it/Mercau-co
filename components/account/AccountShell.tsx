@@ -50,7 +50,7 @@ export default function AccountShell({
       Icon: Heart,
     },
     {
-      label: "Mis envíos",
+      label: "Mis solicitudes",
       href: "/mi-cuenta/envios",
       section: "envios",
       Icon: Truck,

@@ -1,14 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { serviceTypes } from "@/lib/delivery-types";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import BackToAccount from "@/components/BackToAccount";
 import { ExternalLink, LocateFixed, MapPin, RotateCcw } from "lucide-react";
 import { pendingOrderIntent, clearOrderIntent, orderIntentStore, readOrderIntent } from '@/lib/order-intent';
 
 const initialForm = {
-  serviceType: "Recoger una compra",
+  serviceType: "Mercáu Favor",
   pickupName: "",
   pickupAddress: "",
   pickupNeighborhood: "",
@@ -220,7 +219,7 @@ export default function SendPage() {
       const response = await fetch("/api/deliveries", {
         method: "POST",
         headers,
-        body: JSON.stringify({ ...form, source: "WEB",pickupBusinessId,requestKey:requestKey.current,
+        body: JSON.stringify({ ...form,serviceType:'Mercáu Favor',pickupName:form.pickupName||'Punto de recogida',pickupContact:form.pickupContact||'Contacto de recogida',deliveryName:form.deliveryName||'Persona que recibe',customerName:form.customerName||'Cliente Mercáu Favor',customerPhone:form.customerPhone||form.deliveryPhone,source: "WEB",pickupBusinessId,requestKey:requestKey.current,
           ...(repeatOf?{repeatOf,repeatConfirmed:true}:{}) })
       });
       const payload = await response.json();
@@ -256,7 +255,7 @@ export default function SendPage() {
             <img src="/logo-mercau.png" alt="Mercáu" className="h-11 w-11 rounded-2xl object-cover" />
             <div>
               <strong className="block text-2xl font-black leading-none text-[#D82016]">Mercáu</strong>
-              <span className="block text-xs font-semibold text-slate-500">Mensajería y domicilios</span>
+              <span className="block text-xs font-semibold text-slate-500">Mercáu Favor</span>
             </div>
           </a>
           <div className="flex flex-wrap justify-end gap-2"><a href="/" className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-black">Inicio</a><BackToAccount /></div>
@@ -265,29 +264,20 @@ export default function SendPage() {
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         <section className="rounded-[1.5rem] bg-[#D82016] p-5 text-white shadow-soft">
-          <p className="text-sm font-black uppercase tracking-normal text-white/80">MVP logístico</p>
-          <h1 className="mt-2 text-3xl font-black leading-tight">Solicita un envío</h1>
-          <p className="mt-2 font-semibold text-white/90">Recogemos y llevamos por ti.</p>
+          <p className="text-sm font-black uppercase tracking-normal text-white/80">Mercáu Favor</p>
+          <h1 className="mt-2 text-3xl font-black leading-tight">¿Qué recogemos y dónde lo llevamos?</h1>
+          <p className="mt-2 font-semibold text-white/90">Dinos el origen y el destino. Nosotros nos encargamos del resto.</p>
         </section>
 
         {step === "form" ? (
           <form onSubmit={handleReview} className="mt-5 grid gap-4 rounded-[1.5rem] bg-white p-4 shadow-soft md:p-6">
-            <label className="grid gap-2 font-black">
-              Tipo de servicio
-              <select value={form.serviceType} onChange={(event) => updateField("serviceType", event.target.value)} className="min-h-12 rounded-xl border border-slate-200 px-4 font-semibold">
-                {serviceTypes.map((type) => (
-                  <option key={type}>{type}</option>
-                ))}
-              </select>
-            </label>
+            <TextArea label="¿Qué recogemos?" value={form.description} onChange={(value) => updateField("description", value)} required />
 
-            <h2 className="mt-2 text-xl font-black">Datos de recogida</h2>
-            <Field label="Nombre del punto/persona" value={form.pickupName} onChange={(value) => updateField("pickupName", value)} required />
+            <section className="grid gap-4 rounded-2xl border border-slate-200 p-4">
+            <div><p className="text-xs font-black uppercase text-[#D82016]">1. Recogida</p><h2 className="mt-1 text-xl font-black">¿Dónde lo recogemos?</h2></div>
             <Field label="Dirección de recogida" value={form.pickupAddress} onChange={(value) => updateField("pickupAddress", value)} required />
-            <Field label="Barrio/sector" value={form.pickupNeighborhood} onChange={(value) => updateField("pickupNeighborhood", value)} />
-            <Field label="Nombre de contacto" value={form.pickupContact} onChange={(value) => updateField("pickupContact", value)} />
-            <Field label="Teléfono" value={form.pickupPhone} onChange={(value) => updateField("pickupPhone", value)} required />
-            <TextArea label="Referencia/instrucciones" value={form.pickupInstructions} onChange={(value) => updateField("pickupInstructions", value)} />
+            <Field label="Teléfono de quien entrega" value={form.pickupPhone} onChange={(value) => updateField("pickupPhone", value)} required />
+            <Field label="Enlace de ubicación de WhatsApp o Google Maps (opcional)" value={form.pickupInstructions} onChange={(value) => updateField("pickupInstructions", value)} />
 
             <LocationControl
               id="pickup-location-title"
@@ -300,37 +290,29 @@ export default function SendPage() {
               onCapture={capturePickupLocation}
               onClear={clearPickupLocation}
             />
+            </section>
 
-            <h2 className="mt-2 text-xl font-black">Datos de entrega</h2>
-            <Field label="Nombre del destinatario" value={form.deliveryName} onChange={(value) => updateField("deliveryName", value)} required />
-            <Field label="Dirección o descripción del lugar" value={form.deliveryAddress} onChange={(value) => updateField("deliveryAddress", value)} required />
-            <Field label="Barrio/sector" value={form.deliveryNeighborhood} onChange={(value) => updateField("deliveryNeighborhood", value)} />
-            <Field label="Teléfono" value={form.deliveryPhone} onChange={(value) => updateField("deliveryPhone", value)} required />
-            <TextArea label="Referencia para encontrar el lugar" value={form.deliveryInstructions} onChange={(value) => updateField("deliveryInstructions", value)} />
+            <section className="grid gap-4 rounded-2xl border border-slate-200 p-4">
+            <div><p className="text-xs font-black uppercase text-[#D82016]">2. Entrega</p><h2 className="mt-1 text-xl font-black">¿A dónde lo llevamos?</h2></div>
+            <Field label="Dirección de entrega" value={form.deliveryAddress} onChange={(value) => updateField("deliveryAddress", value)} required />
+            <Field label="Teléfono de quien recibe" value={form.deliveryPhone} onChange={(value) => updateField("deliveryPhone", value)} required />
+            <Field label="Enlace de ubicación de WhatsApp o Google Maps (opcional)" value={form.deliveryInstructions} onChange={(value) => updateField("deliveryInstructions", value)} />
 
             <LocationControl id="delivery-location-title" title="Ubicación exacta de entrega" help="Úsala cuando la calle no aparezca en el mapa o no tenga nomenclatura." mapsUrl={deliveryMapsUrl} accuracy={form.deliveryLocationAccuracyM} locating={locating} status={locationStatus} onCapture={captureDeliveryLocation} onClear={clearDeliveryLocation} />
-
-            <h2 className="mt-2 text-xl font-black">Detalle</h2>
-            <TextArea label="¿Qué vamos a llevar?" value={form.description} onChange={(value) => updateField("description", value)} required />
-            <TextArea label="Observaciones" value={form.notes} onChange={(value) => updateField("notes", value)} />
-
-            <h2 className="mt-2 text-xl font-black">Cliente que solicita</h2>
-            <Field label="Nombre" value={form.customerName} onChange={(value) => updateField("customerName", value)} required />
-            <Field label="WhatsApp/teléfono" value={form.customerPhone} onChange={(value) => updateField("customerPhone", value)} required />
+            </section>
 
             <button className="mt-2 min-h-12 rounded-2xl bg-[#D82016] px-5 font-black text-white hover:bg-[#B91C1C]">
-              Revisar solicitud
+              Ver resumen y tarifa
             </button>
           </form>
         ) : null}
 
         {step === "confirm" ? (
           <section className="mt-5 rounded-[1.5rem] bg-white p-4 shadow-soft md:p-6">
-            <h2 className="text-2xl font-black">Revisa tu solicitud</h2>
-            <Summary title="Recogida" lines={[form.pickupName, form.pickupAddress, form.pickupNeighborhood, form.pickupContact, form.pickupPhone, form.pickupInstructions, pickupMapsUrl ? "Ubicación exacta agregada" : ""]} />
-            <Summary title="Entrega" lines={[form.deliveryName, form.deliveryAddress, form.deliveryNeighborhood, form.deliveryPhone, form.deliveryInstructions, deliveryMapsUrl ? "Ubicación exacta agregada" : ""]} />
-            <Summary title="Servicio" lines={[form.serviceType]} />
-            <Summary title="Descripción" lines={[form.description, form.notes]} />
+            <p className="text-sm font-black uppercase text-[#D82016]">Mercáu Favor</p><h2 className="mt-1 text-2xl font-black">Revisa el recorrido</h2>
+            <Summary title="Qué recogemos" lines={[form.description]} />
+            <Summary title="Recogida" lines={[form.pickupAddress, form.pickupPhone, form.pickupInstructions, pickupMapsUrl ? "Ubicación exacta agregada" : ""]} />
+            <Summary title="Entrega" lines={[form.deliveryAddress, form.deliveryPhone, form.deliveryInstructions, deliveryMapsUrl ? "Ubicación exacta agregada" : ""]} />
             <div className="mt-4 rounded-2xl bg-[#FFF1F0] p-4">
               <p className="text-sm font-black uppercase tracking-normal text-[#D82016]">Tarifa</p>
               <p className="text-2xl font-black">{deliveryFee === null ? "Consultando" : money(deliveryFee)}</p>
@@ -348,7 +330,7 @@ export default function SendPage() {
                 Corregir datos
               </button>
               <button onClick={()=>void submitDelivery()} className="min-h-12 rounded-2xl bg-[#D82016] px-5 font-black text-white hover:bg-[#B91C1C]">
-                Confirmar y solicitar mensajero
+                Pedir Mercáu Favor
               </button>
             </div>
           </section>

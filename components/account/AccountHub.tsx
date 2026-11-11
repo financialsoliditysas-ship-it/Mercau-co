@@ -427,14 +427,14 @@ export default function AccountHub({ section }: { section: string }) {
               <div className="ma-page-heading">
                 <div>
                   <p className="ma-eyebrow">TUS SOLICITUDES</p>
-                  <h1>Mis envíos</h1>
+                  <h1>Mis solicitudes de Mercáu Favor</h1>
                   <p>
                     Solicitudes hechas desde tu cuenta. No incluye contactos por
                     WhatsApp.
                   </p>
                 </div>
                 <a className="ma-button primary" href="/enviar">
-                  Solicitar envío
+                  Pedir Mercáu Favor
                 </a>
               </div>
               {current?.deliveries?.length ? (
