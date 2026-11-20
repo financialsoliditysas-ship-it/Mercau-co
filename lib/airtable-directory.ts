@@ -6,7 +6,7 @@ import { isPilotBusinessNote } from './pilot-directory-data';
 import { loadSupabaseDirectoryBusiness, loadSupabaseDirectoryBusinesses } from './supabase-directory';
 import { directoryLogoAsset } from './directory-logo-assets';
 
-const DIRECTORY_REVALIDATE_SECONDS = 6 * 60 * 60;
+const DIRECTORY_REVALIDATE_SECONDS = 60;
 const continuityDirectory = fallbackBusinesses as DirectoryBusiness[];
 
 function withRecoveredLogo(business: DirectoryBusiness): DirectoryBusiness {
@@ -300,7 +300,7 @@ async function readDirectoryBusinesses() {
 
 export const loadDirectoryBusinesses = unstable_cache(
   readDirectoryBusinesses,
-  ['mercau-directory-v1'],
+  ['mercau-directory-v2'],
   { revalidate: DIRECTORY_REVALIDATE_SECONDS }
 );
 
