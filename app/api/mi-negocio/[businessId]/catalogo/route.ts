@@ -4,6 +4,7 @@ import { catalogBody,catalogFailure } from '@/lib/catalog-http';
 import { catalogFields,validProductId } from '@/lib/catalog-validation';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { catalogSubcategories } from '@/lib/catalog-templates';
+import { catalogProductLimit } from '@/lib/catalog-plan-limits';
 export const dynamic='force-dynamic';
 type Context={params:{businessId:string}};
 function permitted(fields:ReturnType<typeof catalogFields>,business:{category:string;secondaryCategories?:string[]}){const allowed=[business.category,...(business.secondaryCategories||[])];if(fields.category&&!allowed.includes(fields.category))throw new CatalogError('La categoría no está habilitada para este negocio.');if(fields.subcategory&&!catalogSubcategories(fields.category||business.category).includes(fields.subcategory))throw new CatalogError('La subcategoría no pertenece a la categoría elegida.');}
@@ -23,6 +24,12 @@ export async function POST(request:NextRequest,{params}:Context) {
     let fields;
     try{fields=catalogFields(body.fields);}catch(error){throw new CatalogError(error instanceof Error?error.message:'Revisa el producto.');}
     permitted(fields,business);
+    const limit=catalogProductLimit(business.category,business.commercePlan);
+    if(limit!==null){
+      const count=await getSupabaseAdminClient().from('business_catalog_products').select('id',{count:'exact',head:true}).eq('business_id',business.id).neq('id',body.id);
+      if(count.error)throw new CatalogError('No se pudo comprobar el límite del catálogo.',503);
+      if((count.count||0)>=limit)throw new CatalogError(`El plan Presencia permite hasta ${limit} publicaciones. Elige otro plan para ampliar el catálogo.`,403);
+    }
     return NextResponse.json({product:await createCatalogProduct(params.businessId,body.id,fields)},{status:201,headers:{'Cache-Control':'no-store'}});
   }catch(error){return catalogFailure(error);}
 }
