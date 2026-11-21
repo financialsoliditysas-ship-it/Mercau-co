@@ -4,7 +4,8 @@ import { loadDirectoryBusiness } from '@/lib/airtable-directory';
 import {isFoodBusiness} from '@/lib/catalog-validation';
 import CommerceOrdersManager from '@/components/CommerceOrdersManager';
 export const dynamic = 'force-dynamic';
-export default async function BusinessOrdersPage({ params }: { params: { businessId: string } }) {
+export default async function BusinessOrdersPage(props: { params: Promise<{ businessId: string }> }) {
+  const params = await props.params;
   const business = await loadDirectoryBusiness(params.businessId);
   if (!business) notFound();
   return isFoodBusiness(business.category)?<RestaurantPilot manager restaurantId={params.businessId} businessName={business.name} />:<CommerceOrdersManager businessId={params.businessId} businessName={business.name}/>;

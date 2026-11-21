@@ -4,7 +4,11 @@ import { catalogBody,catalogFailure,catalogVersion } from '@/lib/catalog-http';
 import { catalogFields,validProductId } from '@/lib/catalog-validation';
 import { catalogSubcategories } from '@/lib/catalog-templates';
 export const dynamic='force-dynamic';
-export async function PATCH(request:NextRequest,{params}:{params:{businessId:string;productId:string}}) {
+export async function PATCH(
+  request:NextRequest,
+  props:{params: Promise<{businessId:string;productId:string}>}
+) {
+  const params = await props.params;
   try {
     const business=await catalogOwner(request,params.businessId);
     if(!validProductId(params.productId))throw new CatalogError('Producto inválido.');

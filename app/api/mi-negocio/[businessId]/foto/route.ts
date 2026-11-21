@@ -11,9 +11,9 @@ function version(rows:{id:string;storage_path:string}[]) {
   return createHash('sha256').update(JSON.stringify(rows.map(row=>[row.id,row.storage_path]))).digest('hex');
 }
 
-export async function POST(request:NextRequest,context:{params:{businessId:string}}) {
+export async function POST(request:NextRequest,context:{params: Promise<{businessId:string}>}) {
   try {
-    const access=await authorizedDetails(request,context);
+    const access=await authorizedDetails(request, context);
     if (!access.ok) return access;
     const {business}=await access.json();
     const raw=await request.text();

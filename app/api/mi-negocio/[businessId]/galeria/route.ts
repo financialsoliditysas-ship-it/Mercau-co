@@ -13,7 +13,7 @@ import {
   galleryLimit,
 } from "@/lib/business-gallery";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
-type Context = { params: { businessId: string } };
+type Context = { params: Promise<{ businessId: string }> };
 export const dynamic = "force-dynamic";
 async function owner(request: NextRequest, context: Context) {
   const response = await authorizedDetails(request, context);
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, context: Context) {
   try {
     await owner(request, context);
     return accountJson({
-      photos: await businessGallery(context.params.businessId, true),
+      photos: await businessGallery((await context.params).businessId, true),
       limit: galleryLimit,
     });
   } catch (error) {
@@ -41,12 +41,12 @@ export async function POST(request: NextRequest, context: Context) {
   try {
     const user = await owner(request, context);
     const body = await accountBody(request, 2900000);
-    const photos = await addGalleryPhoto(context.params.businessId, body);
+    const photos = await addGalleryPhoto((await context.params).businessId, body);
     const audit = await getSupabaseAdminClient()
       .from("account_audit")
       .insert({
         actor_id: user.id,
-        business_id: context.params.businessId,
+        business_id: (await context.params).businessId,
         action: "business_photo_uploaded",
         fields: [body.kind === "cover" ? "cover" : "gallery"],
       });
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, context: Context) {
   try {
     const user = await owner(request, context),
       body = await accountBody(request),
-      id = context.params.businessId;
+      id = (await context.params).businessId;
     if (typeof body.hidden !== "boolean" || typeof body.id !== "string")
       throw new AccountError("Foto no válida.");
     const photos = await businessGallery(id, true);

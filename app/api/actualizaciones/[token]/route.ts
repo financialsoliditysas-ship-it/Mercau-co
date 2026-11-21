@@ -102,10 +102,8 @@ async function findBusinessByToken(tokenValue: string) {
   return { config, record };
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const token = cleanText(params.token, 100);
   if (!tokenIsValid(token)) {
     return NextResponse.json({ error: "Enlace privado invalido." }, { status: 400 });
@@ -140,10 +138,8 @@ export async function GET(
   });
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const token = cleanText(params.token, 100);
   if (!tokenIsValid(token)) {
     return NextResponse.json({ error: "Enlace privado invalido." }, { status: 400 });

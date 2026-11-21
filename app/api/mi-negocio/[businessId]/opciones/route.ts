@@ -7,10 +7,12 @@ function failure(error:unknown) {
   return NextResponse.json({error:error instanceof Error?error.message:'No se pudo completar la operación.'},{status:error instanceof CatalogError?error.status:400});
 }
 
-export async function GET(request:NextRequest,{params}:{params:{businessId:string}}) {
+export async function GET(request:NextRequest, props:{params: Promise<{businessId:string}>}) {
+  const params = await props.params;
   try{await catalogOwner(request,params.businessId);return NextResponse.json({groups:await listSharedGroups(params.businessId)});}catch(error){return failure(error);}
 }
-export async function POST(request:NextRequest,{params}:{params:{businessId:string}}) {
+export async function POST(request:NextRequest, props:{params: Promise<{businessId:string}>}) {
+  const params = await props.params;
   try{
     await catalogOwner(request,params.businessId);const body=await request.json();
     if(body.action==='link') {
@@ -20,7 +22,8 @@ export async function POST(request:NextRequest,{params}:{params:{businessId:stri
     return NextResponse.json({group:await createSharedGroup(params.businessId,body.group)});
   }catch(error){return failure(error);}
 }
-export async function PATCH(request:NextRequest,{params}:{params:{businessId:string}}) {
+export async function PATCH(request:NextRequest, props:{params: Promise<{businessId:string}>}) {
+  const params = await props.params;
   try{
     await catalogOwner(request,params.businessId);const body=await request.json();
     if(!validProductId(body.id)||!Number.isInteger(body.version))throw new CatalogError('Actualiza la biblioteca e intenta nuevamente.');

@@ -2,7 +2,8 @@ import { NextRequest,NextResponse } from 'next/server';
 import { photoAttachments, photoFieldId, safeAttachmentUrl } from '@/lib/business-photo';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 export const dynamic='force-dynamic';
-export async function GET(_request:NextRequest,{params}:{params:{businessId:string}}) {
+export async function GET(_request:NextRequest, props:{params: Promise<{businessId:string}>}) {
+  const params = await props.params;
   if (!/^rec[A-Za-z0-9]{14}$/.test(params.businessId)) return new NextResponse(null,{status:404});
   try {
     if (_request.nextUrl.searchParams.get('source') === 'supabase') {

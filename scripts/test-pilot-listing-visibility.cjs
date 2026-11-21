@@ -13,8 +13,9 @@ function load(file, mocks) {
 const real = { id: 'real', name: 'Negocio real' };
 const pilot = { id: 'demo', name: 'Prueba', pilotRestaurant: 'restaurante-mercado' };
 const directory = [real, pilot];
+const loadDirectoryBusiness = async id => directory.find(business => business.id === id) || null;
 const mocks = {
-  '@/lib/airtable-directory': { loadDirectoryBusinesses: async () => directory },
+  '@/lib/airtable-directory': { loadDirectoryBusiness, loadDirectoryBusinesses: async () => directory },
   '@/lib/business-public-links': { withPublicBusinessLinks: async rows => rows },
   '@/lib/catalog-availability': { catalogBusinessAvailability: async ids => {
     assert.deepEqual(ids, ['real']); return new Map();
@@ -31,8 +32,12 @@ const mocks = {
   assert(!sitemap.some(row => row.url.endsWith('/demo')));
   const direct = load('lib/public-business.ts', {
     react: { cache: fn => fn },
-    './airtable-directory': { loadDirectoryBusinesses: async () => directory },
-    './business-public-links': { withPublicBusinessLinks: async rows => rows },
+    './airtable-directory': { loadDirectoryBusiness, loadDirectoryBusinesses: async () => directory },
+    './business-public-links': {
+      canonicalBusinessSlug: async id => id,
+      publicLinkBusinessId: async () => null,
+      withPublicBusinessLinks: async rows => rows
+    },
     './business-public-url': { validBusinessSlug: () => true },
   });
   assert.equal((await direct.loadPublicBusiness('demo')).id, 'demo');

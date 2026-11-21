@@ -11,8 +11,9 @@ import { loadDirectoryBusiness } from "@/lib/airtable-directory";
 import { directoryMunicipalities } from "@/data/directory";
 import { accountBusinessState } from "@/lib/account-business-state";
 export const dynamic = "force-dynamic";
-type Context = { params: { businessId: string } };
-export async function GET(request: Request, { params }: Context) {
+type Context = { params: Promise<{ businessId: string }> };
+export async function GET(request: Request, props: Context) {
+  const params = await props.params;
   try {
     const user = await accountUser(request),
       access = await accountBusiness(user.id, params.businessId),
@@ -44,7 +45,8 @@ export async function GET(request: Request, { params }: Context) {
     return accountFailure(error);
   }
 }
-export async function PATCH(request: Request, { params }: Context) {
+export async function PATCH(request: Request, props: Context) {
+  const params = await props.params;
   try {
     const user = await accountUser(request);
     const access = await accountBusiness(user.id, params.businessId);

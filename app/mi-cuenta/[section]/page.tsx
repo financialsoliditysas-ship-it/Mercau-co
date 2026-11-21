@@ -5,7 +5,8 @@ export const metadata = {
   title: "Mi cuenta | Mercáu",
   robots: { index: false, follow: false },
 };
-export default function Page({ params }: { params: { section: string } }) {
+export default async function Page(props: { params: Promise<{ section: string }> }) {
+  const params = await props.params;
   if(params.section === "comprador")return <BuyerExperience section="cuenta"/>;
   if (
     ![

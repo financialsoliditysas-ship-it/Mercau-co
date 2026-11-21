@@ -5,7 +5,11 @@ import { validProductId } from '@/lib/catalog-validation';
 import { validatePhoto } from '@/lib/business-photo';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 export const dynamic='force-dynamic';
-export async function POST(request:NextRequest,{params}:{params:{businessId:string;productId:string}}) {
+export async function POST(
+  request:NextRequest,
+  props:{params: Promise<{businessId:string;productId:string}>}
+) {
+  const params = await props.params;
   try {
     await catalogOwner(request,params.businessId);
     if(!validProductId(params.productId))throw new CatalogError('Producto inválido.');

@@ -5,6 +5,7 @@ import {getCommerceOrderByToken} from '@/lib/commerce-order-action';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RestaurantOrderActionPage({ params }: { params: { token: string } }) {
+export default async function RestaurantOrderActionPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try{await getRestaurantActionOrder(params.token);return <RestaurantOrderAction token={params.token}/>;}catch{try{await getCommerceOrderByToken(params.token);return <CommerceOrderAction token={params.token}/>;}catch{return <RestaurantOrderAction token={params.token}/>;}}
 }

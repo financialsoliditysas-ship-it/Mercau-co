@@ -8,10 +8,8 @@ import {
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { deliveryLabels } from "@/lib/account-model";
 export const dynamic = "force-dynamic";
-export async function GET(
-  request: Request,
-  { params }: { params: { businessId: string } },
-) {
+export async function GET(request: Request, props: { params: Promise<{ businessId: string }> }) {
+  const params = await props.params;
   try {
     const user = await accountUser(request);
     await accountBusiness(user.id, params.businessId);

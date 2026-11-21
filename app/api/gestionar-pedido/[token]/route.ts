@@ -3,7 +3,7 @@ import { getRestaurantActionOrder, proposeRestaurantOrderChangeByActionLink, Res
 
 export const dynamic = 'force-dynamic';
 
-type Context = { params: { token: string } };
+type Context = { params: Promise<{ token: string }> };
 
 function failure(error: unknown) {
   const status = error instanceof RestaurantActionError
@@ -12,7 +12,8 @@ function failure(error: unknown) {
   return NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-export async function GET(_request: Request, { params }: Context) {
+export async function GET(_request: Request, props: Context) {
+  const params = await props.params;
   try {
     const order = await getRestaurantActionOrder(params.token);
     return NextResponse.json({ order }, { headers: { 'Cache-Control': 'no-store' } });
@@ -21,7 +22,8 @@ export async function GET(_request: Request, { params }: Context) {
   }
 }
 
-export async function PATCH(request: Request, { params }: Context) {
+export async function PATCH(request: Request, props: Context) {
+  const params = await props.params;
   try {
     const raw = await request.text();
     if (raw.length > 20_000) return NextResponse.json({ error: 'Solicitud demasiado extensa.' }, { status: 413 });

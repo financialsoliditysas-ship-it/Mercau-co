@@ -18,7 +18,8 @@ async function loadImage(url: string) {
   }
 }
 
-export async function GET(request: Request, { params }: { params: { businessId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ businessId: string }> }) {
+  const params = await props.params;
   const business = await loadPublicBusiness(params.businessId);
   if (!business) return new Response('Negocio no encontrado', { status: 404 });
 
@@ -26,7 +27,7 @@ export async function GET(request: Request, { params }: { params: { businessId: 
   const businessLogo = business.photoUrl
     ? await loadImage(new URL(business.photoUrl, origin).href)
     : null;
-  const image = businessLogo || await loadImage(new URL('/og-mercau.jpg', origin).href);
+  const image = businessLogo || (await loadImage(new URL('/og-mercau.jpg', origin).href));
   if (!image) return new Response('Imagen no disponible', { status: 404 });
 
   return new Response(image.bytes, {

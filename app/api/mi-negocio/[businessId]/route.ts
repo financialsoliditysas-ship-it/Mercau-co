@@ -4,7 +4,7 @@ import { businessEditValues, businessEditVersion, validateBusinessEdit } from '@
 import { AccountError, accountBusiness, accountUser } from '@/lib/account-server';
 
 export const dynamic = 'force-dynamic';
-type Context = { params: { businessId: string } };
+type Context = { params: Promise<{ businessId: string }> };
 class EditError extends Error { constructor(message: string, public status: number) { super(message); } }
 async function authorizedBusiness(request: NextRequest, businessId: string) {
   const user = await accountUser(request);
@@ -17,13 +17,15 @@ function fail(error: unknown) {
   const known = error instanceof EditError || error instanceof AccountError;
   return NextResponse.json({error:known ? error.message : 'No se pudo completar la operación. Intenta más tarde.'},{status:known ? error.status : 503});
 }
-export async function GET(request: NextRequest, { params }: Context) {
+export async function GET(request: NextRequest, props: Context) {
+  const params = await props.params;
   try {
     const { business } = await authorizedBusiness(request,params.businessId);
     return NextResponse.json({business,version:businessEditVersion(business)},{headers:{'Cache-Control':'no-store'}});
   } catch (error) { return fail(error); }
 }
-export async function PATCH(request: NextRequest, { params }: Context) {
+export async function PATCH(request: NextRequest, props: Context) {
+  const params = await props.params;
   try {
     const { business, user } = await authorizedBusiness(request,params.businessId);
     const text = await request.text();

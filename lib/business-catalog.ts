@@ -12,7 +12,7 @@ type CatalogRow=Omit<CatalogFields,'optionGroups'|'publicationType'|'priceMode'>
 export type PublicCatalogProduct=CatalogFields & {id:string;imageUrl?:string;galleryUrls:string[]};
 export class CatalogError extends Error { constructor(message:string,public status=400){super(message);} }
 export async function catalogOwner(request:NextRequest,businessId:string) {
-  const response=await authorizedBusinessDetails(request,{params:{businessId}});
+  const response=await authorizedBusinessDetails(request,{params:Promise.resolve({businessId})});
   const result=await response.json();
   if(!response.ok)throw new CatalogError(result.error || 'No tienes acceso a este catálogo.',response.status);
   return result.business;

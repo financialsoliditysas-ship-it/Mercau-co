@@ -6,7 +6,11 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { catalogImage,catalogImageWidth,catalogImageTag,imageTagMatches } from '@/lib/catalog-image';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
-export async function GET(_request:NextRequest,{params}:{params:{businessId:string;productId:string}}) {
+export async function GET(
+  _request:NextRequest,
+  props:{params: Promise<{businessId:string;productId:string}>}
+) {
+  const params = await props.params;
   try {
     if(!/^rec[A-Za-z0-9]{14}$/.test(params.businessId)||!validProductId(params.productId))return new NextResponse(null,{status:404,headers:{'Cache-Control':'no-store'}});
     const width=catalogImageWidth(_request.nextUrl.searchParams.get('w'));

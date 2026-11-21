@@ -8,7 +8,8 @@ import { GET as businessPreview } from '../../og/route';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
-export async function GET(request:Request,{params}:{params:{businessId:string}}) {
+export async function GET(request:Request, props:{params: Promise<{businessId:string}>}) {
+  const params = await props.params;
   const business=await loadPublicBusiness(params.businessId);
   if(!business)return new Response('Negocio no encontrado',{status:404});
   try {
@@ -17,7 +18,7 @@ export async function GET(request:Request,{params}:{params:{businessId:string}})
       const match=url?.pathname.match(/^\/api\/negocios\/(rec[A-Za-z0-9]{14})\/catalogo\/([a-f0-9-]{36})\/foto$/i);
       if(url&&match&&match[1]===business.id) {
         url.searchParams.set('w','960');
-        const photo=await productPhoto(new NextRequest(url),{params:{businessId:business.id,productId:match[2]}});
+        const photo=await productPhoto(new NextRequest(url),{params:Promise.resolve({businessId:business.id,productId:match[2]})});
         if(photo.ok) {
           const bytes=await sharp(Buffer.from(await photo.arrayBuffer())).rotate().resize(1200,630,{fit:'cover',position:'centre'}).jpeg({quality:85}).toBuffer();
           return new Response(new Uint8Array(bytes),{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=60, s-maxage=300','X-Content-Type-Options':'nosniff'}});
@@ -31,5 +32,5 @@ export async function GET(request:Request,{params}:{params:{businessId:string}})
         }
       }
     }catch{/* Use the existing public business image when a catalog photograph cannot be read. */}
-  return businessPreview(request,{params:{businessId:business.id}});
+  return businessPreview(request,{params:Promise.resolve({businessId:business.id})});
 }

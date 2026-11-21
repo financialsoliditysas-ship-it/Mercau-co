@@ -21,7 +21,8 @@ async function productData(id:string, productId:string) {
   return product && catalog ? { business, product, related:catalog.products.filter(item=>item.id!==product.id&&item.available).sort((a,b)=>Number(b.subcategory===product.subcategory)-Number(a.subcategory===product.subcategory)||Number(b.category===product.category)-Number(a.category===product.category)).slice(0,8) } : null;
 }
 
-export async function generateMetadata({params}:{params:{id:string;productId:string}}):Promise<Metadata> {
+export async function generateMetadata(props:{params: Promise<{id:string;productId:string}>}):Promise<Metadata> {
+  const params = await props.params;
   const data = await productData(params.id, params.productId);
   if (!data) return { title: 'Producto no disponible | Mercáu', robots: { index: false, follow: false } };
   const { business, product, related } = data;
@@ -36,7 +37,8 @@ export async function generateMetadata({params}:{params:{id:string;productId:str
   };
 }
 
-export default async function CatalogProductPage({params}:{params:{id:string;productId:string}}) {
+export default async function CatalogProductPage(props:{params: Promise<{id:string;productId:string}>}) {
+  const params = await props.params;
   const data = await productData(params.id, params.productId);
   if (!data) notFound();
   const { business, product, related } = data;

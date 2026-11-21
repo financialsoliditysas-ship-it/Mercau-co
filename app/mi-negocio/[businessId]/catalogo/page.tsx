@@ -1,4 +1,5 @@
 import CatalogManager from '@/components/CatalogManager';
-export default function CatalogManagerPage({params}:{params:{businessId:string}}) {
+export default async function CatalogManagerPage(props:{params: Promise<{businessId:string}>}) {
+  const params = await props.params;
   return <CatalogManager businessId={params.businessId} />;
 }

@@ -1,5 +1,5 @@
 {
-  "lib/restaurant-pilot.ts": "eba958e62d1ba16a8fefd21724b8252e9fa9fbd2aa90430171a0fc5ea64f8207",
+  "lib/restaurant-pilot.ts": "5f16ae8cb2fff66ac47b271e60eda05d6d8175a7a85b1b3ec60ce99c7488ac38",
   "app/api/piloto/restaurante/route.ts": "0853d4e6ad897660025cd115fe04027cbf5adbbbb3beeafecb388d8a8a79b866",
   "lib/business-order-hours.ts": "ec90cce67a09cfee11f2ad0fef95f38a88e4932e0c4735d541866e07aff9ef74",
   "lib/dish-discovery.ts": "f4c2833411490d9629e2242cd9c347831b33b84cbc1856d610e38d799bd4d354"

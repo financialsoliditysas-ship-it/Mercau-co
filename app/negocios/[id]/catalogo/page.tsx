@@ -19,7 +19,8 @@ import { menuCover } from '@/lib/menu-cover';
 import CommerceCartPanel from '@/components/CommerceCartPanel';
 const loadMenuCatalog=typeof cache==='function'?cache(publicCatalog):publicCatalog;
 export const dynamic='force-dynamic';
-export async function generateMetadata({params}:{params:{id:string}}) {
+export async function generateMetadata(props:{params: Promise<{id:string}>}) {
+  const params = await props.params;
   const business=await loadPublicBusiness(params.id);
   const description=business?.description || (business ? `Consulta ${catalogNoun(business.category).toLocaleLowerCase('es-CO')} de ${business.name} en Mercáu.` : 'Catálogo en Mercáu');
   const path=business ? businessCatalogPath(business) : '/';
@@ -31,7 +32,8 @@ export async function generateMetadata({params}:{params:{id:string}}) {
   return {title:business?`${business.name} | ${catalogNoun(business.category)} | Mercáu`:'Catálogo | Mercáu',description,
     ...(business?{alternates:{canonical:path},openGraph:{type:'website',locale:'es_CO',url:path,siteName:'Mercáu',title:`${business.name} en Mercáu`,description,images:[{url:image,width:1200,height:630,alt:`${catalogNoun(business.category)} de ${business.name} en Mercáu`}]},twitter:{card:'summary_large_image',title:`${business.name} en Mercáu`,description,images:[image]}}:{})};
 }
-export default async function BusinessCatalogPage({params}:{params:{id:string}}) {
+export default async function BusinessCatalogPage(props:{params: Promise<{id:string}>}) {
+  const params = await props.params;
   const business=await loadPublicBusiness(params.id);if(!business)notFound();
   if(business.publicSlug && params.id!==business.publicSlug)permanentRedirect(businessCatalogPath(business));
   const [catalogResult,restaurantResult]=await Promise.allSettled([loadMenuCatalog(business.id),pilotRestaurant(business.id)]);

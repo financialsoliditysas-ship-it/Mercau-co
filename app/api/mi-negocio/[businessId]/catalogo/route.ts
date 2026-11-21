@@ -6,9 +6,10 @@ import { getSupabaseAdminClient } from '@/lib/supabase-admin';
 import { catalogSubcategories } from '@/lib/catalog-templates';
 import { catalogProductLimit } from '@/lib/catalog-plan-limits';
 export const dynamic='force-dynamic';
-type Context={params:{businessId:string}};
+type Context={params: Promise<{businessId:string}>};
 function permitted(fields:ReturnType<typeof catalogFields>,business:{category:string;secondaryCategories?:string[]}){const allowed=[business.category,...(business.secondaryCategories||[])];if(fields.category&&!allowed.includes(fields.category))throw new CatalogError('La categoría no está habilitada para este negocio.');if(fields.subcategory&&!catalogSubcategories(fields.category||business.category).includes(fields.subcategory))throw new CatalogError('La subcategoría no pertenece a la categoría elegida.');}
-export async function GET(request:NextRequest,{params}:Context) {
+export async function GET(request:NextRequest, props:Context) {
+  const params = await props.params;
   try {
     const business=await catalogOwner(request,params.businessId);
     const config=await getSupabaseAdminClient().from('pilot_restaurants').select('enabled,delivery_mode,commission_rate_bps,customer_markup_bps').eq('directory_business_id',business.id).maybeSingle();
@@ -16,7 +17,8 @@ export async function GET(request:NextRequest,{params}:Context) {
     return NextResponse.json({business:{id:business.id,name:business.name,category:business.category,subcategory:business.subcategory||'',secondaryCategories:business.secondaryCategories||[]},products:await ownerProducts(business.id),orderConfig:config.data||null},{headers:{'Cache-Control':'no-store'}});
   }catch(error){return catalogFailure(error);}
 }
-export async function POST(request:NextRequest,{params}:Context) {
+export async function POST(request:NextRequest, props:Context) {
+  const params = await props.params;
   try {
     const business=await catalogOwner(request,params.businessId);
     const body=await catalogBody(request);

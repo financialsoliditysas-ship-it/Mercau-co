@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GET as readInvitation } from '../route';
 import { getSupabaseAdminClient } from '@/lib/supabase-admin';
-export async function POST(request: NextRequest, context: { params: { token: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ token: string }> }) {
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1];
   if (!token) return NextResponse.json({ error: 'Entra a tu cuenta para activar la invitación.' }, { status: 401 });
   try {
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest, context: { params: { token: str
     if (lookupError) throw lookupError;
     const activeOwners=(owners||[]).filter(owner=>owner.status!=='Inactivo');
     if (activeOwners.some(owner=>owner.user_id!==data.user.id)) return NextResponse.json({ error: 'Esta ficha ya tiene una cuenta administradora. Contacta a Mercáu.' }, { status: 409 });
-    const { error: saveError } = await db.from('business_admins').upsert({ user_id: data.user.id, business_id: business.id, business_name: business.name, owner_name: data.user.user_metadata?.delivery_profile?.name || data.user.user_metadata?.name || '', owner_whatsapp: business.whatsapp || '', private_token: context.params.token, status: 'Activo' }, { onConflict: 'user_id,business_id' });
+    const { error: saveError } = await db.from('business_admins').upsert({ user_id: data.user.id, business_id: business.id, business_name: business.name, owner_name: data.user.user_metadata?.delivery_profile?.name || data.user.user_metadata?.name || '', owner_whatsapp: business.whatsapp || '', private_token: (await context.params).token, status: 'Activo' }, { onConflict: 'user_id,business_id' });
     if (saveError) throw saveError;
     return NextResponse.json({ ok: true, destination: '/mi-negocio' });
   } catch {
