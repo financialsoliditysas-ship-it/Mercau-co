@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { initializeMetaPixel, MARKETING_CONSENT_KEY, marketingConsent, trackMetaEvent } from "@/lib/meta-pixel";
 
 const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
+const posthogToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || "";
 
 export default function MarketingConsent() {
   const pathname = usePathname();
@@ -19,17 +20,18 @@ export default function MarketingConsent() {
     trackMetaEvent("PageView");
   }, [choice, pathname]);
 
-  if (!pixelId || choice) return null;
+  if ((!pixelId && !posthogToken) || choice) return null;
 
   function decide(value: "accepted" | "rejected") {
     window.localStorage.setItem(MARKETING_CONSENT_KEY, value);
     setChoice(value);
+    window.dispatchEvent(new Event("mercau:marketing-consent"));
   }
 
   return (
     <aside className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[70] mx-auto max-w-xl rounded-lg border border-slate-200 bg-white p-4 shadow-2xl md:bottom-5" aria-label="Preferencias de medición">
       <p className="font-black text-slate-950">Ayúdanos a mejorar Mercáu</p>
-      <p className="mt-1 text-sm leading-6 text-slate-600">Con tu permiso medimos qué campañas llevan a menús y pedidos. No enviamos a Meta tu nombre, teléfono ni dirección.</p>
+      <p className="mt-1 text-sm leading-6 text-slate-600">Con tu permiso medimos visitas, errores y qué campañas llevan a menús y pedidos. No medimos las áreas privadas ni enviamos nombres, teléfonos, direcciones o datos de pago.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => decide("accepted")} className="min-h-11 rounded-md bg-[#D82016] px-4 text-sm font-bold text-white">Permitir medición</button>
         <button type="button" onClick={() => decide("rejected")} className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-bold">Continuar sin medición</button>
