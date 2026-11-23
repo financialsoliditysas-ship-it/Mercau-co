@@ -6,6 +6,7 @@ import { initializeMetaPixel, MARKETING_CONSENT_KEY, marketingConsent, trackMeta
 
 const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
 const posthogToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || "";
+const googleAnalyticsId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
 
 export default function MarketingConsent() {
   const pathname = usePathname();
@@ -20,7 +21,7 @@ export default function MarketingConsent() {
     trackMetaEvent("PageView");
   }, [choice, pathname]);
 
-  if ((!pixelId && !posthogToken) || choice) return null;
+  if ((!pixelId && !posthogToken && !googleAnalyticsId) || choice) return null;
 
   function decide(value: "accepted" | "rejected") {
     window.localStorage.setItem(MARKETING_CONSENT_KEY, value);

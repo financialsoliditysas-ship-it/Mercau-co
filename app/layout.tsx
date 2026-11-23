@@ -4,6 +4,7 @@ import Script from "next/script";
 import AppLifecycleMetrics from "@/components/AppLifecycleMetrics";
 import MarketingConsent from "@/components/MarketingConsent";
 import PostHogAnalytics from "@/components/PostHogAnalytics";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 import { pwaLaunchScript } from '@/lib/pwa-launch';
 
 const siteUrl = "https://www.mercau.co";
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AppLifecycleMetrics />
         <MarketingConsent />
         <PostHogAnalytics />
+        <GoogleAnalytics />
         <main>{children}</main>
       </body>
     </html>
