@@ -6,6 +6,7 @@ import {
   DirectoryCategory,
 } from "@/data/directory";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import { trackConversion } from "@/lib/commerce-tracking";
 export default function BusinessRegistration({ onRegistered, compact = false }: { onRegistered?: () => void; compact?: boolean } = {}) {
   useEffect(() => {
     const client = getSupabaseBrowserClient();
@@ -82,6 +83,7 @@ export default function BusinessRegistration({ onRegistered, compact = false }: 
       setStep(0);
       setStatus(result.message || "Negocio creado y publicado en Mercáu.");
       if (result.linked) {
+        trackConversion("Negocio registrado", "sign_up", { registration_type: "business" });
         if (onRegistered) onRegistered();
         else window.location.assign("/mi-cuenta/negocio?onboarding=producto");
       }

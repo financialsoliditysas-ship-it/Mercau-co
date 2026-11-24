@@ -33,7 +33,7 @@ for(const [file,expected]of Object.entries(contract.sha256)){
  if(!file.endsWith('.jpeg')){
   let source=bytes.toString('utf8').replace(/\r\n/g,'\n');
   if(file==='lib/restaurant-pilot.ts')source=source.replace("import { pilotOrderSelection, customerPaymentFinance } from './pilot-order-finance';\n",'').replace('.select(pilotOrderSelection(manager))',".select('*,delivery:delivery_orders(public_id,status,shipday_order_id),history:pilot_food_history(status,created_at),finance:order_financial_snapshots(payment_method,payment_status)')").replace('finance: customerPaymentFinance(o.finance)','finance: o.finance');
-  if(file==='lib/shipday.ts')source=source.replace("import { merchantPickupText } from '@/lib/shipday-pickup-text';\n",'').replace('merchantPickupText(order.pickup_instructions),','order.pickup_instructions,');
+  if(file==='lib/shipday.ts')source=source.replace(/\r\n/g,'\n').replace("import { merchantPickupText } from '@/lib/shipday-pickup-text';\n",'').replace(/\nfunction expectedPickupTime\(order: Pick<DeliveryOrder, 'expected_pickup_at'>\) \{[\s\S]*?\n\}\n/,'\n').replace(/\n{3}/g,'\n\n').replace('merchantPickupText(order.pickup_instructions),','order.pickup_instructions,').replace('expectedPickupTime: expectedPickupTime(order),','expectedPickupTime: utcTimeAfter(20),');
   if(file==='lib/deliveries.ts')source=source.replace("import { requireShipdayWebhookToken } from '@/lib/shipday-webhook-auth';\n",'').replace('  requireShipdayWebhookToken(token);','  const expectedToken = process.env.SHIPDAY_WEBHOOK_TOKEN || "";\n  if (expectedToken && token !== expectedToken) {\n    throw new Error("Webhook no autorizado.");\n  }');
   bytes=Buffer.from(source);
  }

@@ -2,6 +2,7 @@
 
 import { trackPublicMetric } from "@/lib/marketing-attribution";
 import { trackMetaEvent } from "@/lib/meta-pixel";
+import posthog from "posthog-js";
 
 type CommerceData = {
   businessId: string;
@@ -38,4 +39,36 @@ export function trackCommerceEvent(
     ...(Number.isFinite(data.value) ? { value: data.value } : {}),
     ...(Number.isFinite(data.quantity) ? { num_items: data.quantity } : {}),
   }, customMeta);
+
+  trackConversion(mercauType, googleEventName(metaEvent), {
+    business_id: data.businessId,
+    business_name: data.businessName,
+    ...(data.productId ? { item_id: data.productId } : {}),
+    ...(data.productName ? { item_name: data.productName } : {}),
+    ...(Number.isFinite(data.value) ? { value: data.value, currency: "COP" } : {}),
+    ...(Number.isFinite(data.quantity) ? { quantity: data.quantity } : {}),
+  });
+}
+
+type ConversionData = Record<string, string | number | boolean | undefined>;
+
+function googleEventName(metaEvent: string) {
+  const names: Record<string, string> = {
+    ViewContent: "view_item",
+    AddToCart: "add_to_cart",
+    InitiateCheckout: "begin_checkout",
+    Lead: "generate_lead",
+    Contact: "contact",
+  };
+  return names[metaEvent] || "mercau_conversion";
+}
+
+export function trackConversion(eventName: string, gaEventName: string, data: ConversionData = {}) {
+  if (typeof window === "undefined") return;
+
+  const properties = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  );
+  window.gtag?.("event", gaEventName, properties);
+  if (posthog.__loaded) posthog.capture(eventName, properties);
 }
