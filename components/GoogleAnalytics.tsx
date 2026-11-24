@@ -53,7 +53,7 @@ function ensureGoogleTag() {
   }
 
   window.gtag("js", new Date());
-  if (!containerId) {
+  if (measurementId) {
     window.gtag("config", measurementId, {
       send_page_view: false,
       allow_google_signals: false,

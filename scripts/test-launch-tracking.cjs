@@ -17,6 +17,7 @@ const installPage=read('app/instalar/page.tsx');
 assert(consent.includes('NEXT_PUBLIC_META_PIXEL_ID'),'Pixel no configurable por entorno');
 assert(googleAnalytics.includes('NEXT_PUBLIC_GTM_CONTAINER_ID'),'Tag Manager no configurable por entorno');
 assert(googleAnalytics.includes('googletagmanager.com/gtm.js'),'No se carga el contenedor de Tag Manager');
+assert(googleAnalytics.includes('window.gtag("config", measurementId'),'Los eventos no tienen un destino de Analytics configurado');
 assert(pixel.includes('marketingConsent() !== "accepted"'),'Pixel puede cargar sin consentimiento');
 assert(consent.includes('No enviamos a Meta tu nombre, teléfono ni dirección.'),'Falta información clara de privacidad');
 assert(!commerce.includes('phone')&&!commerce.includes('address')&&!commerce.includes('customer'),'La medición comercial incluye datos personales');
