@@ -35,24 +35,68 @@ let attachments = [primary],
   hidden = [],
   published = true,
   uploads = 0,
-  denied = false;
+  denied = false,
+  media = [],
+  stored = new Map();
 const db = {
-  from() {
+  from(table) {
+    const filters = {};
     const query = {
       select() {
         return query;
       },
-      eq() {
+      eq(key, value) {
+        filters[key] = value;
         return query;
       },
+      in() {
+        return query;
+      },
+      order() {
+        return query;
+      },
+      limit() {
+        return query;
+      },
+      insert(row) {
+        if (table === "directory_business_media") {
+          media.push({ id: `00000000-0000-4000-8000-${String(media.length + 1).padStart(12, "0")}`, ...row });
+        }
+        return { error: null };
+      },
       async maybeSingle() {
+        if (table === "directory_businesses") return { data: { status: published ? "Publicado" : "Pendiente" }, error: null };
+        if (table === "directory_business_media") {
+          const found = media.find((item) => (!filters.id || item.id === filters.id) && (!filters.storage_path || item.storage_path === filters.storage_path)) || null;
+          return { data: found, error: null };
+        }
         return {
           data: { data: { galleryHiddenIds: hidden }, version: 1 },
           error: null,
         };
       },
+      then(resolve) {
+        const rows = table === "directory_business_media" ? media : [];
+        return Promise.resolve({ data: rows, error: null }).then(resolve);
+      },
     };
     return query;
+  },
+  storage: {
+    from() {
+      return {
+        async upload(path, bytes) {
+          if (stored.has(path)) return { error: new Error("exists") };
+          uploads++;
+          stored.set(path, new Blob([bytes], { type: "image/jpeg" }));
+          return { error: null };
+        },
+        async download(path) {
+          const data = stored.get(path);
+          return { data: data || null, error: data ? null : new Error("missing") };
+        },
+      };
+    },
   },
 };
 const admin = { getSupabaseAdminClient: () => db };
@@ -112,7 +156,7 @@ global.fetch = async (url, options = {}) => {
     assert.deepEqual(await gallery.businessGallery(bid), []);
     await gallery.addGalleryPhoto(bid, body);
     assert.equal(uploads, 1);
-    assert.equal(attachments[0], primary);
+    assert.equal(media.length, 1);
     assert(
       photo.photoDetails(bid, attachments).photoUrl.endsWith("attPrimary"),
     );
@@ -120,16 +164,16 @@ global.fetch = async (url, options = {}) => {
     assert.equal(uploads, 1);
     let visible = await gallery.businessGallery(bid);
     assert.equal(visible.length, 1);
-    hidden = ["attPhoto1"];
+    hidden = [media[0].id];
     assert.equal((await gallery.businessGallery(bid)).length, 0);
     assert.equal((await gallery.businessGallery(bid, true))[0].hidden, true);
     const image = (id) =>
       new NextRequest(
-        `https://local.test/api/negocios/${bid}/foto?image=${id}`,
+        `https://local.test/api/negocios/${bid}/foto?source=supabase&image=${id}`,
       );
     assert.equal(
       (
-        await publicRoute.GET(image("attPhoto1"), {
+        await publicRoute.GET(image(media[0].id), {
           params: { businessId: bid },
         })
       ).status,
@@ -137,7 +181,7 @@ global.fetch = async (url, options = {}) => {
     );
     assert.equal(
       (
-        await publicRoute.GET(image("attOtherBusiness"), {
+        await publicRoute.GET(image("00000000-0000-4000-8000-999999999999"), {
           params: { businessId: bid },
         })
       ).status,
@@ -146,14 +190,14 @@ global.fetch = async (url, options = {}) => {
     hidden = [];
     assert.equal(
       (
-        await publicRoute.GET(image("attPhoto1"), {
+        await publicRoute.GET(image(media[0].id), {
           params: { businessId: bid },
         })
       ).status,
-      302,
+      200,
     );
     published = false;
-    assert.deepEqual(await gallery.businessGallery(bid), []);
+    assert.equal((await gallery.businessGallery(bid)).length, 1);
     published = true;
     for (let i = 2; i <= 8; i++)
       await gallery.addGalleryPhoto(bid, {

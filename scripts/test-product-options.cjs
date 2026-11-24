@@ -6,7 +6,9 @@ const pilot=load('lib/restaurant-pilot.ts',{
   './business-order-hours':load('lib/business-order-hours.ts'),
   './order-changes-config':{orderChangesEnabled:()=>false},'./order-changes-model':{changeSelection:''},
   './pilot-order-finance':load('lib/pilot-order-finance.ts'),
-  './supabase-admin':{},'./deliveries':{},'./business-push':{},'./catalog-validation':validation
+  './supabase-admin':{},'./deliveries':{},'./business-push':{},'./catalog-validation':validation,
+  './restaurant-order-action-link':{ensureRestaurantOrderActionLink:async()=>undefined},
+  './restaurant-order-messages':{processRestaurantOrderMessages:async()=>undefined}
 });
 const group={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Adiciones',type:'multiple',required:false,minSelections:0,maxSelections:2,choices:[
   {id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',name:'Queso',priceDelta:3000,defaultSelected:false},

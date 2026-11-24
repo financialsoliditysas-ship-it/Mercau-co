@@ -73,8 +73,8 @@ export function catalogFields(value:unknown):CatalogFields {
   return {name:(input.name as string).trim(),description:(input.description as string).trim(),section:(input.section as string).trim(),price:Number(input.price),available:input.available,status:input.status as CatalogFields['status'],position:Number(input.position),optionGroups:catalogOptionGroups(input.optionGroups ?? []),publicationType,category:short('category',100),subcategory:short('subcategory',120),brand:short('brand'),condition:short('condition',80),sku:short('sku'),priceMode,attributes,variants};
 }
 export function sameCatalogFields(a:CatalogFields,b:CatalogFields) {
-  return catalogKeys.every(key=>key==='optionGroups'
-    ? JSON.stringify(a.optionGroups)===JSON.stringify(b.optionGroups)
+  return catalogKeys.every(key=>['optionGroups','attributes','variants'].includes(key)
+    ? JSON.stringify(a[key])===JSON.stringify(b[key])
     : a[key]===b[key]);
 }
 export function isFoodBusiness(category:string) {

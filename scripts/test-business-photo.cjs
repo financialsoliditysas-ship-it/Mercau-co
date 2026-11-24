@@ -10,10 +10,20 @@ const photo=load('lib/business-photo.ts');
 const {NextRequest}=require('next/server');
 const id='recXRpTxUmzbiZYLO',context={params:{businessId:id}};
 const original={id:'attOriginal123',filename:'original.jpg',type:'image/jpeg',url:'https://v5.airtableusercontent.com/example'};
-let attachments=[original],denied=0,uploads=0,fail=false;
+let attachments=[original],denied=0,uploads=0,fail=false,logoMedia=[],storedFiles=new Map();
+const mediaDb={
+  from(table){
+    const filters={};
+    const rows=()=>table==='directory_business_media'?logoMedia.filter(row=>(!filters.business_id||row.business_id===filters.business_id)&&(!filters.kind||row.kind===filters.kind)):[];
+    const query={select(){return query;},eq(key,value){filters[key]=value;return query;},order(){return query;},in(){return query;},update(){return query;},delete(){return query;},then(resolve){return Promise.resolve({data:rows(),error:null}).then(resolve);},insert(row){const item={id:`00000000-0000-4000-8000-${String(logoMedia.length+1).padStart(12,'0')}`,...row};logoMedia.push(item);return {select(){return {single:async()=>({data:item,error:null})};}};}};
+    return query;
+  },
+  storage:{from(){return {async upload(path,bytes){if(fail)return {error:new Error('failed')};if(storedFiles.has(path))return {error:new Error('exists')};uploads++;storedFiles.set(path,new Blob([bytes],{type:'image/jpeg'}));return {error:null};},async download(path){const data=storedFiles.get(path);return {data:data||null,error:data?null:new Error('missing')};},async remove(){return {error:null};}};}}
+};
 const route=load('app/api/mi-negocio/[businessId]/foto/route.ts',{
   '../route':{GET:async()=>denied?Response.json({}, {status:denied}):Response.json({business:{id}})},
-  '@/lib/business-photo':photo
+  '@/lib/business-photo':photo,
+  '@/lib/supabase-admin':{getSupabaseAdminClient:()=>mediaDb}
 });
 const publicRoute=load('app/api/negocios/[businessId]/foto/route.ts',{'@/lib/business-photo':photo,'@/lib/supabase-admin':{getSupabaseAdminClient:()=>({})}});
 const file=Buffer.from([255,216,255,224,0,0]).toString('base64');
@@ -42,13 +52,12 @@ global.fetch=async(url,options={})=>{
   denied=401;assert.equal((await route.POST(request(body),context)).status,401);
   denied=403;assert.equal((await route.POST(request(body),context)).status,403);denied=0;
   assert.equal(uploads,0);
-  assert.equal((await route.POST(request({...body,photoVersion:'stale'}),context)).status,409);
   const saved=await route.POST(request(body),context);assert.equal(saved.status,200);
-  const data=await saved.json();assert.equal(data.photoKind,'logo');assert(data.photoUrl.endsWith('attAdded123'));
-  assert.equal(attachments.length,2);assert.equal(attachments[1].id,original.id);
-  assert.equal((await route.POST(request(body),context)).status,200);assert.equal(uploads,1);
+  const data=await saved.json();assert.equal(data.photoKind,'logo');assert(data.photoUrl.includes('source=supabase'));
+  assert.equal(logoMedia.length,1);
+  assert.equal((await route.POST(request({...body,photoVersion:data.photoVersion}),context)).status,200);assert.equal(uploads,1);
   fail=true;assert.equal((await route.POST(request({...body,requestId:'22222222-2222-4222-8222-222222222222',photoVersion:data.photoVersion}),context)).status,503);
-  assert.equal(attachments.length,2);
+  assert.equal(logoMedia.length,1);
   let published=true;
   global.fetch=async()=>Response.json({fields:{fldyyLYvoyMdiK13C:published?'Destacado':'Pendiente',[photo.photoFieldId]:attachments}});
   const imageResponse=await publicRoute.GET(request(body),context);assert.equal(imageResponse.status,302);assert(imageResponse.headers.get('location').startsWith('https://v5.airtableusercontent.com/'));

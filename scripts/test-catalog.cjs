@@ -5,7 +5,7 @@ function load(path,mocks={}) {
   const mod=new Module(path);mod.require=id=>id in mocks?mocks[id]:require(id);
   mod._compile(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,path+'.cjs');return mod.exports;
 }
-const validation=load('lib/catalog-validation.ts'),photo=load('lib/business-photo.ts');
+const validation=load('lib/catalog-validation.ts'),photo=load('lib/business-photo.ts'),catalogTemplates=load('lib/catalog-templates.ts',{'@/data/directory':{directoryCategories:[]}});
 const businessId='recXRpTxUmzbiZYLO',other='recGLMhJYXTRE46st';
 const id='11111111-1111-4111-8111-111111111111';
 const optionGroup={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Tamaño',type:'single',required:true,minSelections:1,maxSelections:1,choices:[
@@ -13,7 +13,7 @@ const optionGroup={id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',name:'Tamaño',type
   {id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',name:'Grande',priceDelta:3000,defaultSelected:false}
 ]};
 const fields={name:'Producto de prueba',description:'Prueba local',section:'Bebidas',price:15000,available:true,status:'draft',position:0,optionGroups:[optionGroup]};
-assert.deepEqual(validation.catalogFields(fields),fields);
+assert.deepEqual(validation.catalogFields(fields),{...fields,publicationType:'product',category:'',subcategory:'',brand:'',condition:'',sku:'',priceMode:'fixed',attributes:[],variants:[]});
 for(const bad of [{...fields,name:''},{...fields,price:1.5},{...fields,price:-1},{...fields,price:'15000'},{...fields,business_id:other},{...fields,image_path:'evil'},{...fields,status:'evil'},{...fields,available:'true'},{...fields,optionGroups:[{...optionGroup,maxSelections:2}]},{...fields,optionGroups:[{...optionGroup,choices:[{...optionGroup.choices[0],priceDelta:-1}]}]}])assert.throws(()=>validation.catalogFields(bad));
 const rows=[],files=new Map();let member=true,writes=0,failUpload=false;
 const db={from(table){if(table==='business_catalog_product_option_groups'){const empty={select:()=>empty,eq:()=>empty,then:resolve=>Promise.resolve({data:[],error:null}).then(resolve)};return empty;}assert.equal(table,'business_catalog_products');let filters=[],action='',payload;
@@ -44,7 +44,7 @@ const catalog=load('lib/business-catalog.ts',{
   './supabase-admin':{getSupabaseAdminClient:()=>db},'./airtable-directory':directory,'./catalog-validation':validation
 });
 const http=load('lib/catalog-http.ts',{'./business-catalog':catalog});
-const mocks={'@/lib/catalog-business-public':{catalogBusinessPublic:async id=>id===businessId},'@/lib/business-catalog':catalog,'@/lib/catalog-http':http,'@/lib/catalog-validation':validation,'@/lib/business-photo':photo,'@/lib/supabase-admin':{getSupabaseAdminClient:()=>db},'@/lib/airtable-directory':directory};
+const mocks={'@/lib/catalog-business-public':{catalogBusinessPublic:async id=>id===businessId},'@/lib/business-catalog':catalog,'@/lib/catalog-http':http,'@/lib/catalog-validation':validation,'@/lib/catalog-templates':catalogTemplates,'@/lib/catalog-plan-limits':{catalogProductLimit:()=>null},'@/lib/business-photo':photo,'@/lib/supabase-admin':{getSupabaseAdminClient:()=>db},'@/lib/airtable-directory':directory};
 const collection=load('app/api/mi-negocio/[businessId]/catalogo/route.ts',mocks);
 const item=load('app/api/mi-negocio/[businessId]/catalogo/[productId]/route.ts',mocks);
 const upload=load('app/api/mi-negocio/[businessId]/catalogo/[productId]/foto/route.ts',mocks);

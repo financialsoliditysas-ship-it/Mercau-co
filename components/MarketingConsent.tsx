@@ -32,7 +32,7 @@ export default function MarketingConsent() {
   return (
     <aside className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-[70] mx-auto max-w-xl rounded-lg border border-slate-200 bg-white p-4 shadow-2xl md:bottom-5" aria-label="Preferencias de medición">
       <p className="font-black text-slate-950">Ayúdanos a mejorar Mercáu</p>
-      <p className="mt-1 text-sm leading-6 text-slate-600">Con tu permiso medimos visitas, errores y qué campañas llevan a menús y pedidos. No medimos las áreas privadas ni enviamos nombres, teléfonos, direcciones o datos de pago.</p>
+      <p className="mt-1 text-sm leading-6 text-slate-600">Con tu permiso medimos visitas, errores y qué campañas llevan a menús y pedidos. No medimos las áreas privadas ni enviamos nombres, teléfonos, direcciones o datos de pago. No enviamos a Meta tu nombre, teléfono ni dirección.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => decide("accepted")} className="min-h-11 rounded-md bg-[#D82016] px-4 text-sm font-bold text-white">Permitir medición</button>
         <button type="button" onClick={() => decide("rejected")} className="min-h-11 rounded-md border border-slate-300 px-4 text-sm font-bold">Continuar sin medición</button>

@@ -59,7 +59,7 @@ const links = load('lib/business-public-links.ts', {
 });
 let directory = [business];
 const resolver = load('lib/public-business.ts', {
-  react: { cache: fn => fn }, './airtable-directory': { loadDirectoryBusinesses: async () => directory },
+  react: { cache: fn => fn }, './airtable-directory': { loadDirectoryBusinesses: async () => directory, loadDirectoryBusiness: async id => directory.find(item => item.id === id) || null },
   './business-public-links': links, './business-public-url': urls
 });
 const stub = () => null;
@@ -87,6 +87,7 @@ const catalog = load('app/negocios/[id]/catalogo/page.tsx', {
   '@/lib/business-catalog': { publicCatalog: async id => { catalogId = id; return { products: [] }; } },
   '@/lib/restaurant-pilot': { pilotRestaurant: async id => { pilotId = id; return { is_live: true }; } },
   '@/components/PublicCatalog': { default: stub },
+  '@/components/CommerceCartPanel': { default: stub },
   '@/components/CatalogShareActions': { default: ({ catalogUrl }) => React.createElement('span', { 'data-catalog-share': catalogUrl }) },
   '@/components/InstallMercau': { default: stub },
   '@/components/BackToMyCatalog': { default: ({ businessId }) => React.createElement('span', { 'data-owner-business': businessId }) },
