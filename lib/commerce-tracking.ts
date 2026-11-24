@@ -69,6 +69,10 @@ export function trackConversion(eventName: string, gaEventName: string, data: Co
   const properties = Object.fromEntries(
     Object.entries(data).filter(([, value]) => value !== undefined),
   );
-  window.gtag?.("event", gaEventName, properties);
+  if (process.env.NEXT_PUBLIC_GTM_CONTAINER_ID) {
+    window.dataLayer?.push({ event: gaEventName, ...properties });
+  } else {
+    window.gtag?.("event", gaEventName, properties);
+  }
   if (posthog.__loaded) posthog.capture(eventName, properties);
 }
