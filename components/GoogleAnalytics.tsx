@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { marketingConsent } from "@/lib/meta-pixel";
 
 const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
+const containerId = process.env.NEXT_PUBLIC_GTM_CONTAINER_ID || "";
 const privatePrefixes = [
   "/actualizar/",
   "/admin",
@@ -34,7 +35,16 @@ function ensureGoogleTag() {
   };
   window.gtag("consent", "default", { analytics_storage: "denied" });
 
-  if (!document.querySelector(`script[data-mercau-ga="${measurementId}"]`)) {
+  if (containerId && !document.querySelector(`script[data-mercau-gtm="${containerId}"]`)) {
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(containerId)}`;
+    script.dataset.mercauGtm = containerId;
+    window.dataLayer.push({ "gtm.start": Date.now(), event: "gtm.js" });
+    document.head.appendChild(script);
+  }
+
+  if (!containerId && !document.querySelector(`script[data-mercau-ga="${measurementId}"]`)) {
     const script = document.createElement("script");
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
@@ -43,11 +53,13 @@ function ensureGoogleTag() {
   }
 
   window.gtag("js", new Date());
-  window.gtag("config", measurementId, {
-    send_page_view: false,
-    allow_google_signals: false,
-    allow_ad_personalization_signals: false
-  });
+  if (!containerId) {
+    window.gtag("config", measurementId, {
+      send_page_view: false,
+      allow_google_signals: false,
+      allow_ad_personalization_signals: false
+    });
+  }
 }
 
 export default function GoogleAnalytics() {
@@ -64,7 +76,7 @@ export default function GoogleAnalytics() {
   }, []);
 
   useEffect(() => {
-    if (!measurementId) return;
+    if (!measurementId && !containerId) return;
     if (consent !== "accepted" || isPrivatePath(pathname)) {
       window.gtag?.("consent", "update", { analytics_storage: "denied" });
       return;
