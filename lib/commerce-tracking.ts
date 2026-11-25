@@ -1,7 +1,7 @@
 "use client";
 
 import { trackPublicMetric } from "@/lib/marketing-attribution";
-import { trackMetaEvent } from "@/lib/meta-pixel";
+import { marketingConsent, trackMetaEvent } from "@/lib/meta-pixel";
 import posthog from "posthog-js";
 
 type CommerceData = {
@@ -51,6 +51,18 @@ export function trackCommerceEvent(
 }
 
 type ConversionData = Record<string, string | number | boolean | undefined>;
+const pendingPostHogEvents: Array<{ eventName: string; properties: Record<string, string | number | boolean> }> = [];
+
+export function flushPendingPostHogEvents() {
+  if (!posthog.__loaded || marketingConsent() !== "accepted") return;
+  for (const { eventName, properties } of pendingPostHogEvents.splice(0)) {
+    posthog.capture(eventName, properties);
+  }
+}
+
+export function discardPendingPostHogEvents() {
+  pendingPostHogEvents.length = 0;
+}
 
 function googleEventName(metaEvent: string) {
   const names: Record<string, string> = {
@@ -74,5 +86,9 @@ export function trackConversion(eventName: string, gaEventName: string, data: Co
   } else {
     window.gtag?.("event", gaEventName, properties);
   }
-  if (posthog.__loaded) posthog.capture(eventName, properties);
+  if (posthog.__loaded) {
+    posthog.capture(eventName, properties);
+  } else if (marketingConsent() === "accepted") {
+    pendingPostHogEvents.push({ eventName, properties: properties as Record<string, string | number | boolean> });
+  }
 }

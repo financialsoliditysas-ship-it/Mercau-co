@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import posthog from "posthog-js";
 import { marketingConsent } from "@/lib/meta-pixel";
+import { discardPendingPostHogEvents, flushPendingPostHogEvents } from "@/lib/commerce-tracking";
 
 const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || "";
 const apiHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
@@ -50,7 +51,8 @@ export default function PostHogAnalytics() {
           maskAllInputs: true,
           maskTextSelector: "[data-private]"
         },
-        before_send: event => isPrivatePath(window.location.pathname) ? null : event
+        before_send: event => isPrivatePath(window.location.pathname) ? null : event,
+        loaded: () => flushPendingPostHogEvents()
       });
       initialized.current = true;
     } else {
@@ -70,6 +72,7 @@ export default function PostHogAnalytics() {
 
   useEffect(() => {
     if (!initialized.current || consent !== "rejected") return;
+    discardPendingPostHogEvents();
     posthog.stopSessionRecording();
     posthog.opt_out_capturing();
   }, [consent]);
